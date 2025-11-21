@@ -7,6 +7,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   root: '.',
+  base: '/Megakem-Loyalty-app/', // GitHub Pages subdirectory
   server: {
     port: 5173,
     host: true, // Listen on all addresses including LAN
