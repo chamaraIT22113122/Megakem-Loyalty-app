@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <!-- Triangle with M shape -->
+  <path d="M400 100 L700 500 L550 500 L450 350 L350 350 L250 500 L100 500 Z" fill="#003366"/>
+  <path d="M400 200 L500 350 L450 350 L400 280 L350 350 L300 350 Z" fill="white"/>
+  
+  <!-- MEGAKEM Text -->
+  <text x="400" y="620" font-family="Arial Black, sans-serif" font-size="80" font-weight="900" fill="#003366" text-anchor="middle">MEGAKEM</text>
+  
+  <!-- Tagline -->
+  <text x="400" y="690" font-family="Arial, sans-serif" font-size="28" font-weight="600" fill="#003366" text-anchor="middle">WHERE TRUST MEETS EXCELLENCE</text>
+</svg>
