@@ -114,8 +114,11 @@ router.post('/admin/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log('🔑 Admin login attempt:', { email, hasPassword: !!password });
+
     // Validate input
     if (!email || !password) {
+      console.log('❌ Missing email or password');
       return res.status(400).json({
         success: false,
         message: 'Please provide email and password'
@@ -124,7 +127,10 @@ router.post('/admin/login', async (req, res) => {
 
     // Check for user with admin role
     const user = await User.findOne({ email, role: 'admin' }).select('+password');
+    console.log('👤 User found:', user ? `Yes (${user.username})` : 'No');
+    
     if (!user) {
+      console.log('❌ No admin user found with email:', email);
       return res.status(401).json({
         success: false,
         message: 'Invalid admin credentials'
@@ -133,6 +139,7 @@ router.post('/admin/login', async (req, res) => {
 
     // Check if user is active
     if (!user.isActive) {
+      console.log('❌ User account is deactivated');
       return res.status(401).json({
         success: false,
         message: 'Account is deactivated'
@@ -140,8 +147,12 @@ router.post('/admin/login', async (req, res) => {
     }
 
     // Check if password matches
+    console.log('🔐 Checking password...');
     const isMatch = await user.comparePassword(password);
+    console.log('🔐 Password match:', isMatch);
+    
     if (!isMatch) {
+      console.log('❌ Password does not match');
       return res.status(401).json({
         success: false,
         message: 'Invalid admin credentials'
