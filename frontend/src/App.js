@@ -19,6 +19,15 @@ const theme = createTheme({
     background: { default: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', paper: '#ffffff' }
   },
   shape: { borderRadius: 16 },
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 960,
+      lg: 1280,
+      xl: 1920
+    }
+  },
   components: {
     MuiButton: { 
       styleOverrides: { 
@@ -29,6 +38,10 @@ const theme = createTheme({
           borderRadius: '12px',
           boxShadow: '0 4px 14px 0 rgba(0,51,102,0.25)',
           transition: 'all 0.3s ease',
+          '@media (max-width: 600px)': {
+            padding: '10px 20px',
+            fontSize: '0.9rem'
+          },
           '&:hover': {
             transform: 'translateY(-2px)',
             boxShadow: '0 6px 20px 0 rgba(0,51,102,0.35)'
@@ -44,9 +57,11 @@ const theme = createTheme({
         root: { 
           boxShadow: '0 8px 24px -4px rgba(0,51,102,0.12)',
           transition: 'all 0.3s ease',
-          '&:hover': {
-            boxShadow: '0 12px 32px -4px rgba(0,51,102,0.2)',
-            transform: 'translateY(-4px)'
+          '@media (hover: hover)': {
+            '&:hover': {
+              boxShadow: '0 12px 32px -4px rgba(0,51,102,0.2)',
+              transform: 'translateY(-4px)'
+            }
           }
         } 
       } 
@@ -55,7 +70,21 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           fontWeight: 600,
-          borderRadius: '8px'
+          borderRadius: '8px',
+          '@media (max-width: 600px)': {
+            fontSize: '0.7rem',
+            height: '24px'
+          }
+        }
+      }
+    },
+    MuiContainer: {
+      styleOverrides: {
+        root: {
+          '@media (max-width: 600px)': {
+            paddingLeft: '16px',
+            paddingRight: '16px'
+          }
         }
       }
     }
@@ -319,55 +348,55 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}><CssBaseline /><Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', display: 'flex', flexDirection: 'column' }}>
-      <AppBar position='static' elevation={0} sx={{ background: 'linear-gradient(135deg, #003366 0%, #004d7a 50%, #4A90A4 100%)', boxShadow: '0 4px 20px rgba(0,51,102,0.3)' }}><Toolbar>
-        <QrCodeScanner sx={{ mr: 2, color: 'secondary.main', fontSize: '2rem', animation: 'pulse 2s ease-in-out infinite', '@keyframes pulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)' }, '50%': { opacity: 0.7, transform: 'scale(0.95)' } } }} />
+      <AppBar position='static' elevation={0} sx={{ background: 'linear-gradient(135deg, #003366 0%, #004d7a 50%, #4A90A4 100%)', boxShadow: '0 4px 20px rgba(0,51,102,0.3)' }}><Toolbar sx={{ minHeight: { xs: '56px', sm: '64px' }, px: { xs: 1, sm: 2 } }}>
+        <QrCodeScanner sx={{ mr: { xs: 1, sm: 2 }, color: 'secondary.main', fontSize: { xs: '1.5rem', sm: '2rem' }, animation: 'pulse 2s ease-in-out infinite', '@keyframes pulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)' }, '50%': { opacity: 0.7, transform: 'scale(0.95)' } } }} />
         <Box sx={{ flexGrow: 1 }}>
-          <Typography variant='h6' component='div' sx={{ fontWeight: 700, letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)', lineHeight: 1.2 }}>MEGAKEM LOYALTY</Typography>
-          <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: '0.65rem', opacity: 0.9 }}>WHERE TRUST MEETS EXCELLENCE</Typography>
+          <Typography variant='h6' component='div' sx={{ fontWeight: 700, letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)', lineHeight: 1.2, fontSize: { xs: '0.9rem', sm: '1.25rem' } }}>MEGAKEM LOYALTY</Typography>
+          <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: { xs: '0.55rem', sm: '0.65rem' }, opacity: 0.9, display: { xs: 'none', sm: 'block' } }}>WHERE TRUST MEETS EXCELLENCE</Typography>
         </Box>
         {adminAuth && view === 'admin' && (
-          <Button color='inherit' onClick={handleAdminLogout} sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}>Logout</Button>
+          <Button color='inherit' onClick={handleAdminLogout} sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>Logout</Button>
         )}
-        <Button color='inherit' onClick={() => setView(view === 'admin' ? 'welcome' : 'admin')} sx={{ bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}>{view === 'admin' ? 'App' : 'Admin'}</Button>
+        <Button color='inherit' onClick={() => setView(view === 'admin' ? 'welcome' : 'admin')} sx={{ bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>{view === 'admin' ? 'App' : 'Admin'}</Button>
       </Toolbar></AppBar>
-      <Container maxWidth={view === 'admin' && adminAuth ? 'lg' : 'sm'} sx={{ flexGrow: 1, py: 3, display: 'flex', flexDirection: 'column' }}>
+      <Container maxWidth={view === 'admin' && adminAuth ? 'lg' : 'sm'} sx={{ flexGrow: 1, py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column' }}>
         {view === 'welcome' && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', animation: 'fadeIn 0.6s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
-          <Box sx={{ textAlign: 'center', mb: 5 }}>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center', animation: 'logoFloat 3s ease-in-out infinite', '@keyframes logoFloat': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-15px)' } } }}>
-              <img src={megakemLogo} alt='Megakem Logo' style={{ width: '240px', height: 'auto', filter: 'drop-shadow(0 15px 35px rgba(0,51,102,0.25))' }} />
+          <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 5 } }}>
+            <Box sx={{ mb: { xs: 2, sm: 4 }, display: 'flex', justifyContent: 'center', animation: 'logoFloat 3s ease-in-out infinite', '@keyframes logoFloat': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-15px)' } } }}>
+              <img src={megakemLogo} alt='Megakem Logo' style={{ width: '100%', maxWidth: '240px', height: 'auto', filter: 'drop-shadow(0 15px 35px rgba(0,51,102,0.25))' }} />
             </Box>
-            <Typography variant='h3' fontWeight='800' gutterBottom sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', mb: 2, letterSpacing: '-0.5px' }}>New Session</Typography>
-            <Typography variant='h6' sx={{ color: 'text.secondary', fontWeight: 500 }}>Select your role to begin scanning</Typography>
+            <Typography variant='h3' fontWeight='800' gutterBottom sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', mb: 2, letterSpacing: '-0.5px', fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' } }}>New Session</Typography>
+            <Typography variant='h6' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '1rem', sm: '1.25rem' } }}>Select your role to begin scanning</Typography>
           </Box>
           <Grid container spacing={3}>
-            <Grid item xs={12}><Card sx={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.main', overflow: 'hidden', position: 'relative', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { transform: 'translateY(-8px) scale(1.02)', boxShadow: '0 20px 40px rgba(0,51,102,0.25)' }, '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '5px', background: 'linear-gradient(90deg, #003366 0%, #00B4D8 50%, #A4D233 100%)' } }}>
-              <CardActionArea onClick={() => { setRole('applicator'); setView('scanner'); setCart([]); }} sx={{ p: 3.5 }}>
+            <Grid item xs={12}><Card sx={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.main', overflow: 'hidden', position: 'relative', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', '@media (hover: hover)': { '&:hover': { transform: 'translateY(-8px) scale(1.02)', boxShadow: '0 20px 40px rgba(0,51,102,0.25)' } }, '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '5px', background: 'linear-gradient(90deg, #003366 0%, #00B4D8 50%, #A4D233 100%)' } }}>
+              <CardActionArea onClick={() => { setRole('applicator'); setView('scanner'); setCart([]); }} sx={{ p: { xs: 2, sm: 3.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ p: 2.5, borderRadius: '20px', background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', mr: 3, boxShadow: '0 8px 20px rgba(0,51,102,0.35)', transition: 'all 0.3s', '&:hover': { transform: 'rotate(5deg) scale(1.1)' } }}><Inventory2 sx={{ color: 'white', fontSize: '2.5rem' }} /></Box>
-                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'primary.main', mb: 0.5, letterSpacing: '-0.3px' }}>Applicator</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500 }}>Contractor / Worker</Typography></Box>
-                  <ArrowForward sx={{ color: 'secondary.main', fontSize: '2.5rem', animation: 'slideRight 1.5s ease-in-out infinite', '@keyframes slideRight': { '0%, 100%': { transform: 'translateX(0)' }, '50%': { transform: 'translateX(8px)' } } }} />
+                  <Box sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: { xs: '15px', sm: '20px' }, background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', mr: { xs: 2, sm: 3 }, boxShadow: '0 8px 20px rgba(0,51,102,0.35)', transition: 'all 0.3s', '@media (hover: hover)': { '&:hover': { transform: 'rotate(5deg) scale(1.1)' } } }}><Inventory2 sx={{ color: 'white', fontSize: { xs: '1.75rem', sm: '2.5rem' } }} /></Box>
+                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'primary.main', mb: 0.5, letterSpacing: '-0.3px', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>Applicator</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '0.85rem', sm: '1rem' } }}>Contractor / Worker</Typography></Box>
+                  <ArrowForward sx={{ color: 'secondary.main', fontSize: { xs: '1.75rem', sm: '2.5rem' }, animation: 'slideRight 1.5s ease-in-out infinite', '@keyframes slideRight': { '0%, 100%': { transform: 'translateX(0)' }, '50%': { transform: 'translateX(8px)' } } }} />
                 </Box>
               </CardActionArea>
             </Card></Grid>
-            <Grid item xs={12}><Card sx={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0fff4 100%)', border: '2px solid', borderColor: 'secondary.main', overflow: 'hidden', position: 'relative', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { transform: 'translateY(-8px) scale(1.02)', boxShadow: '0 20px 40px rgba(164,210,51,0.25)' }, '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '5px', background: 'linear-gradient(90deg, #A4D233 0%, #00B4D8 50%, #003366 100%)' } }}>
-              <CardActionArea onClick={() => { setRole('customer'); setView('scanner'); setCart([]); }} sx={{ p: 3.5 }}>
+            <Grid item xs={12}><Card sx={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0fff4 100%)', border: '2px solid', borderColor: 'secondary.main', overflow: 'hidden', position: 'relative', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', '@media (hover: hover)': { '&:hover': { transform: 'translateY(-8px) scale(1.02)', boxShadow: '0 20px 40px rgba(164,210,51,0.25)' } }, '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '5px', background: 'linear-gradient(90deg, #A4D233 0%, #00B4D8 50%, #003366 100%)' } }}>
+              <CardActionArea onClick={() => { setRole('customer'); setView('scanner'); setCart([]); }} sx={{ p: { xs: 2, sm: 3.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ p: 2.5, borderRadius: '20px', background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', mr: 3, boxShadow: '0 8px 20px rgba(164,210,51,0.35)', transition: 'all 0.3s', '&:hover': { transform: 'rotate(-5deg) scale(1.1)' } }}><Person sx={{ color: 'white', fontSize: '2.5rem' }} /></Box>
-                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'secondary.dark', mb: 0.5, letterSpacing: '-0.3px' }}>Customer</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500 }}>End User / Buyer</Typography></Box>
-                  <ArrowForward sx={{ color: 'info.main', fontSize: '2.5rem', animation: 'slideRight 1.5s ease-in-out infinite', '@keyframes slideRight': { '0%, 100%': { transform: 'translateX(0)' }, '50%': { transform: 'translateX(8px)' } } }} />
+                  <Box sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: { xs: '15px', sm: '20px' }, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', mr: { xs: 2, sm: 3 }, boxShadow: '0 8px 20px rgba(164,210,51,0.35)', transition: 'all 0.3s', '@media (hover: hover)': { '&:hover': { transform: 'rotate(-5deg) scale(1.1)' } } }}><Person sx={{ color: 'white', fontSize: { xs: '1.75rem', sm: '2.5rem' } }} /></Box>
+                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'secondary.dark', mb: 0.5, letterSpacing: '-0.3px', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>Customer</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '0.85rem', sm: '1rem' } }}>End User / Buyer</Typography></Box>
+                  <ArrowForward sx={{ color: 'info.main', fontSize: { xs: '1.75rem', sm: '2.5rem' }, animation: 'slideRight 1.5s ease-in-out infinite', '@keyframes slideRight': { '0%, 100%': { transform: 'translateX(0)' }, '50%': { transform: 'translateX(8px)' } } }} />
                 </Box>
               </CardActionArea>
             </Card></Grid>
           </Grid>
         </Box>}
-        {view === 'scanner' && <Paper sx={{ flexGrow: 1, bgcolor: '#000', color: 'white', overflow: 'hidden', position: 'relative', borderRadius: 3, display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-          <Box sx={{ flexGrow: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#000' }}>
+        {view === 'scanner' && <Paper sx={{ flexGrow: 1, bgcolor: '#000', color: 'white', overflow: 'hidden', position: 'relative', borderRadius: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+          <Box sx={{ flexGrow: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#000', minHeight: { xs: '300px', sm: '400px' } }}>
             <div id='reader' style={{ width: '100%', height: '100%' }}></div>
-            <Box sx={{ position: 'absolute', zIndex: 0, opacity: 0.3, textAlign: 'center' }}><Typography variant='caption'>Loading Camera...</Typography></Box>
-            <IconButton onClick={() => setView('welcome')} sx={{ position: 'absolute', top: 16, left: 16, zIndex: 10, bgcolor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', transition: 'all 0.3s', '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' } }}><ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main' }} /></IconButton>
-            {cart.length > 0 && <Fab variant='extended' size='medium' onClick={() => setView('cart')} sx={{ position: 'absolute', top: 16, right: 16, zIndex: 10, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white', fontWeight: 700, boxShadow: '0 6px 20px rgba(164,210,51,0.4)', animation: 'bounce 2s ease-in-out infinite', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }, '&:hover': { background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)' } }}>View Cart ({cart.length})</Fab>}
+            <Box sx={{ position: 'absolute', zIndex: 0, opacity: 0.3, textAlign: 'center' }}><Typography variant='caption' sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Loading Camera...</Typography></Box>
+            <IconButton onClick={() => setView('welcome')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, left: { xs: 8, sm: 16 }, zIndex: 10, bgcolor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', transition: 'all 0.3s', '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
+            {cart.length > 0 && <Fab variant='extended' size={window.innerWidth < 600 ? 'small' : 'medium'} onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, right: { xs: 8, sm: 16 }, zIndex: 10, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white', fontWeight: 700, boxShadow: '0 6px 20px rgba(164,210,51,0.4)', animation: 'bounce 2s ease-in-out infinite', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }, '&:hover': { background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1.5, sm: 2 } }}>View Cart ({cart.length})</Fab>}
           </Box>
-          <Paper sx={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, p: 3, bgcolor: 'background.paper', color: 'text.primary', maxHeight: '45vh', overflowY: 'auto', boxShadow: '0 -10px 30px rgba(0,0,0,0.1)' }}>
+          <Paper sx={{ borderTopLeftRadius: { xs: 20, sm: 28 }, borderTopRightRadius: { xs: 20, sm: 28 }, p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', color: 'text.primary', maxHeight: '45vh', overflowY: 'auto', boxShadow: '0 -10px 30px rgba(0,0,0,0.1)' }}>
             <Typography variant='subtitle1' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary', fontWeight: 600, mb: 2 }}><CameraAlt fontSize='small' /> Or tap below to simulate scan:</Typography>
             <List dense disablePadding>
               {MOCK_QR_CODES.map((qr, i) => {
@@ -384,32 +413,32 @@ function App() {
           </Paper>
         </Paper>}
         {view === 'cart' && <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', animation: 'slideIn 0.4s ease-out', '@keyframes slideIn': { from: { opacity: 0, transform: 'translateX(100px)' }, to: { opacity: 1, transform: 'translateX(0)' } } }}>
-          <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-            <IconButton onClick={() => setView('scanner')} sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0,51,102,0.3)', transition: 'all 0.3s', '&:hover': { transform: 'scale(1.1) rotate(-10deg)', boxShadow: '0 6px 16px rgba(0,51,102,0.4)' } }}><ArrowForward sx={{ transform: 'rotate(180deg)' }} /></IconButton>
-            <Box><Typography variant='h4' fontWeight='800' sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scanned Items</Typography><Typography variant='body1' color='text.secondary' fontWeight={500}>{cart.length} items ready for submission</Typography></Box>
+          <Box sx={{ mb: { xs: 2, sm: 3 }, display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
+            <IconButton onClick={() => setView('scanner')} sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0,51,102,0.3)', transition: 'all 0.3s', '&:hover': { transform: 'scale(1.1) rotate(-10deg)', boxShadow: '0 6px 16px rgba(0,51,102,0.4)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
+            <Box><Typography variant='h4' fontWeight='800' sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>Scanned Items</Typography><Typography variant='body1' color='text.secondary' fontWeight={500} sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>{cart.length} items ready for submission</Typography></Box>
           </Box>
-          <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 3 }}>
-            {cart.map((item, idx) => <Card key={item.tempId} sx={{ mb: 2, position: 'relative', background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)', border: '2px solid', borderColor: 'grey.100', animation: `slideInItem 0.4s ease-out ${idx * 0.1}s backwards`, '@keyframes slideInItem': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } }, transition: 'all 0.3s', '&:hover': { borderColor: 'primary.main', transform: 'translateY(-4px)', boxShadow: '0 12px 24px rgba(0,51,102,0.15)' } }}>
-              <CardContent sx={{ p: 3 }}>
-                <IconButton size='small' onClick={() => handleRemoveItem(item.tempId)} sx={{ position: 'absolute', top: 12, right: 12, color: 'error.main', bgcolor: 'error.50', transition: 'all 0.3s', '&:hover': { bgcolor: 'error.main', color: 'white', transform: 'rotate(90deg) scale(1.1)' } }}><Delete fontSize='small' /></IconButton>
-                <Typography variant='h6' fontWeight='800' sx={{ pr: 5, color: 'primary.main', mb: 1 }}>{item.name}</Typography>
-                <Box sx={{ display: 'flex', gap: 1.5, my: 2 }}>
-                  <Chip label={item.qty} size='medium' sx={{ bgcolor: 'primary.main', color: 'white', fontWeight: 700, px: 1.5, fontSize: '0.9rem' }} />
-                  <Chip label={item.id} size='medium' sx={{ bgcolor: 'info.main', color: 'white', fontWeight: 600, fontSize: '0.9rem' }} />
+          <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: { xs: 2, sm: 3 } }}>
+            {cart.map((item, idx) => <Card key={item.tempId} sx={{ mb: { xs: 1.5, sm: 2 }, position: 'relative', background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)', border: '2px solid', borderColor: 'grey.100', animation: `slideInItem 0.4s ease-out ${idx * 0.1}s backwards`, '@keyframes slideInItem': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } }, transition: 'all 0.3s', '@media (hover: hover)': { '&:hover': { borderColor: 'primary.main', transform: 'translateY(-4px)', boxShadow: '0 12px 24px rgba(0,51,102,0.15)' } } }}>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <IconButton size='small' onClick={() => handleRemoveItem(item.tempId)} sx={{ position: 'absolute', top: { xs: 8, sm: 12 }, right: { xs: 8, sm: 12 }, color: 'error.main', bgcolor: 'error.50', transition: 'all 0.3s', '&:hover': { bgcolor: 'error.main', color: 'white', transform: 'rotate(90deg) scale(1.1)' }, width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}><Delete fontSize='small' sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} /></IconButton>
+                <Typography variant='h6' fontWeight='800' sx={{ pr: { xs: 4, sm: 5 }, color: 'primary.main', mb: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }}>{item.name}</Typography>
+                <Box sx={{ display: 'flex', gap: { xs: 1, sm: 1.5 }, my: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
+                  <Chip label={item.qty} size='medium' sx={{ bgcolor: 'primary.main', color: 'white', fontWeight: 700, px: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />
+                  <Chip label={item.id} size='medium' sx={{ bgcolor: 'info.main', color: 'white', fontWeight: 600, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, pt: 2, borderTop: '2px solid', borderColor: 'grey.100' }}>
-                  <Typography variant='body2' color='text.secondary' fontWeight={600}>Batch: {item.batch}</Typography>
-                  <Typography variant='body2' color='text.secondary' fontWeight={600}>Bag: {item.bag}</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: { xs: 1, sm: 2 }, pt: { xs: 1, sm: 2 }, borderTop: '2px solid', borderColor: 'grey.100', flexWrap: 'wrap', gap: 1 }}>
+                  <Typography variant='body2' color='text.secondary' fontWeight={600} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Batch: {item.batch}</Typography>
+                  <Typography variant='body2' color='text.secondary' fontWeight={600} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Bag: {item.bag}</Typography>
                 </Box>
               </CardContent>
             </Card>)}
             <Button variant='outlined' fullWidth startIcon={<Add />} onClick={() => setView('scanner')} sx={{ borderStyle: 'dashed', borderWidth: 3, borderColor: 'primary.main', py: 3, fontSize: '1rem', fontWeight: 700, color: 'primary.main', transition: 'all 0.3s', '&:hover': { borderWidth: 3, bgcolor: 'primary.50', transform: 'scale(1.02)' } }}>Scan Another Item</Button>
           </Box>
-          <Paper elevation={6} sx={{ p: 3, borderRadius: 4, background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.light', boxShadow: '0 12px 40px rgba(0,51,102,0.2)' }}>
-            <Grid container spacing={2.5}>
+          <Paper elevation={6} sx={{ p: { xs: 2, sm: 3 }, borderRadius: { xs: 3, sm: 4 }, background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.light', boxShadow: '0 12px 40px rgba(0,51,102,0.2)' }}>
+            <Grid container spacing={{ xs: 1.5, sm: 2.5 }}>
               {role === 'customer' && <Grid item xs={12}><TextField fullWidth label='Customer Name' variant='outlined' value={memberName} onChange={(e) => setMemberName(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>}
               <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? 'Phone Number' : 'Member ID'} placeholder={role === 'customer' ? 'e.g. 0712345678' : 'e.g. APP-001'} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
-              <Grid item xs={12}><Button fullWidth variant='contained' size='large' disabled={loading || cart.length === 0} onClick={handleSubmitAll} startIcon={loading ? <CircularProgress size={22} color='inherit' /> : <CheckCircle />} sx={{ py: 2, fontSize: '1.1rem', fontWeight: 800, background: loading ? undefined : 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', boxShadow: '0 8px 20px rgba(164,210,51,0.4)', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(164,210,51,0.5)' }, '&:disabled': { opacity: 0.6 } }}>{loading ? 'Submitting...' : `Submit ${cart.length} Items`}</Button></Grid>
+              <Grid item xs={12}><Button fullWidth variant='contained' size='large' disabled={loading || cart.length === 0} onClick={handleSubmitAll} startIcon={loading ? <CircularProgress size={22} color='inherit' /> : <CheckCircle />} sx={{ py: { xs: 1.5, sm: 2 }, fontSize: { xs: '0.95rem', sm: '1.1rem' }, fontWeight: 800, background: loading ? undefined : 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', boxShadow: '0 8px 20px rgba(164,210,51,0.4)', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(164,210,51,0.5)' }, '&:disabled': { opacity: 0.6 } }}>{loading ? 'Submitting...' : `Submit ${cart.length} Items`}</Button></Grid>
             </Grid>
           </Paper>
         </Box>}
@@ -440,11 +469,11 @@ function App() {
             </Tabs>
           </Paper>
 
-          {adminTab === 0 && stats && <Grid container spacing={2}>
-            <Grid item xs={6} md={3}><Card><CardContent><Typography variant='h4' color='primary'>{stats.total}</Typography><Typography variant='body2' color='text.secondary'>Total Scans</Typography></CardContent></Card></Grid>
-            <Grid item xs={6} md={3}><Card><CardContent><Typography variant='h4' color='warning.main'>{stats.applicator}</Typography><Typography variant='body2' color='text.secondary'>Applicators</Typography></CardContent></Card></Grid>
-            <Grid item xs={6} md={3}><Card><CardContent><Typography variant='h4' color='info.main'>{stats.customer}</Typography><Typography variant='body2' color='text.secondary'>Customers</Typography></CardContent></Card></Grid>
-            <Grid item xs={6} md={3}><Card><CardContent><Typography variant='h4' color='success.main'>{stats.last24Hours}</Typography><Typography variant='body2' color='text.secondary'>Last 24hrs</Typography></CardContent></Card></Grid>
+          {adminTab === 0 && stats && <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+            <Grid item xs={6} md={3}><Card><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' color='primary' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>{stats.total}</Typography><Typography variant='body2' color='text.secondary' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>Total Scans</Typography></CardContent></Card></Grid>
+            <Grid item xs={6} md={3}><Card><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' color='warning.main' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>{stats.applicator}</Typography><Typography variant='body2' color='text.secondary' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>Applicators</Typography></CardContent></Card></Grid>
+            <Grid item xs={6} md={3}><Card><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' color='info.main' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>{stats.customer}</Typography><Typography variant='body2' color='text.secondary' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>Customers</Typography></CardContent></Card></Grid>
+            <Grid item xs={6} md={3}><Card><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' color='success.main' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>{stats.last24Hours}</Typography><Typography variant='body2' color='text.secondary' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>Last 24hrs</Typography></CardContent></Card></Grid>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><TrendingUp /> Top Products</Typography><List dense>{stats.topProducts?.map((p, i) => <ListItem key={i}><ListItemText primary={p._id} secondary={`${p.count} scans`} /></ListItem>)}</List></CardContent></Card></Grid>
           </Grid>}
 
@@ -468,7 +497,7 @@ function App() {
               </Card>)}
           </Box>}
 
-          {adminTab === 2 && <TableContainer component={Paper}>
+          {adminTab === 2 && <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
             <Table><TableHead><TableRow><TableCell>Username</TableCell><TableCell>Email</TableCell><TableCell>Role</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
               <TableBody>{users.map(u => <TableRow key={u._id}><TableCell>{u.username}</TableCell><TableCell>{u.email}</TableCell><TableCell><Chip label={u.role} size='small' color={u.role === 'admin' ? 'error' : 'default'} /></TableCell><TableCell><Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} /></TableCell></TableRow>)}</TableBody>
             </Table>
@@ -476,7 +505,7 @@ function App() {
 
           {adminTab === 3 && <Box>
             <Box sx={{ mb: 2 }}><Button variant='contained' startIcon={<Add />} onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '' } })}>Add Product</Button></Box>
-            <TableContainer component={Paper}>
+            <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table><TableHead><TableRow><TableCell>Name</TableCell><TableCell>Product No</TableCell><TableCell>Category</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
                 <TableBody>{products.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })}><Edit /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)}><Delete /></IconButton></TableCell></TableRow>)}</TableBody>
               </Table>
