@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, ListItemButton, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
-import { QrCodeScanner, CameraAlt, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, Layers, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel } from '@mui/icons-material';
+import { QrCodeScanner, CameraAlt, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel } from '@mui/icons-material';
+import { BarChart, Bar, PieChart, Pie, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI } from './services/api';
 import megakemLogo from './assets/Megakem  Logo.png';
 
@@ -120,6 +121,7 @@ function App() {
   const [profileData, setProfileData] = useState({ username: '', email: '' });
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [productDialog, setProductDialog] = useState({ open: false, product: null });
+  const [userDialog, setUserDialog] = useState({ open: false, user: null });
   const scannerRef = useRef(null);
   const pollIntervalRef = useRef(null);
 
@@ -337,6 +339,34 @@ function App() {
     }
   };
 
+  const handleCreateUser = async () => {
+    setLoading(true);
+    try {
+      const { username, email, password, role } = userDialog.user;
+      
+      if (!username || !email || !password) {
+        showNotification('Please fill all required fields', 'error');
+        setLoading(false);
+        return;
+      }
+
+      if (password.length < 6) {
+        showNotification('Password must be at least 6 characters', 'error');
+        setLoading(false);
+        return;
+      }
+
+      const res = await authAPI.createUser({ username, email, password, role: role || 'user' });
+      setUsers([res.data.data, ...users]);
+      showNotification('User created successfully!', 'success');
+      setUserDialog({ open: false, user: null });
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to create user', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (initializing) return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)' }}>
       <Box sx={{ animation: 'pulse 1.5s ease-in-out infinite', '@keyframes pulse': { '0%, 100%': { transform: 'scale(1)', opacity: 1 }, '50%': { transform: 'scale(1.05)', opacity: 0.8 } } }}>
@@ -470,11 +500,16 @@ function App() {
           </Paper>
 
           {adminTab === 0 && stats && <Grid container spacing={{ xs: 1.5, sm: 2 }}>
-            <Grid item xs={6} md={3}><Card><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' color='primary' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>{stats.total}</Typography><Typography variant='body2' color='text.secondary' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>Total Scans</Typography></CardContent></Card></Grid>
-            <Grid item xs={6} md={3}><Card><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' color='warning.main' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>{stats.applicator}</Typography><Typography variant='body2' color='text.secondary' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>Applicators</Typography></CardContent></Card></Grid>
-            <Grid item xs={6} md={3}><Card><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' color='info.main' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>{stats.customer}</Typography><Typography variant='body2' color='text.secondary' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>Customers</Typography></CardContent></Card></Grid>
-            <Grid item xs={6} md={3}><Card><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' color='success.main' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>{stats.last24Hours}</Typography><Typography variant='body2' color='text.secondary' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>Last 24hrs</Typography></CardContent></Card></Grid>
-            <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><TrendingUp /> Top Products</Typography><List dense>{stats.topProducts?.map((p, i) => <ListItem key={i}><ListItemText primary={p._id} secondary={`${p.count} scans`} /></ListItem>)}</List></CardContent></Card></Grid>
+            <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.total}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Total Scans</Typography></CardContent></Card></Grid>
+            <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.applicator}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Applicators</Typography></CardContent></Card></Grid>
+            <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.customer}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Customers</Typography></CardContent></Card></Grid>
+            <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.last24Hours}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Last 24hrs</Typography></CardContent></Card></Grid>
+            
+            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><TrendingUp /> Top Products by Scans</Typography><ResponsiveContainer width='100%' height={300}><BarChart data={stats.topProducts?.slice(0, 5).map(p => ({ name: p._id.length > 20 ? p._id.substring(0, 20) + '...' : p._id, scans: p.count }))} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}><CartesianGrid strokeDasharray='3 3' stroke='#f0f0f0' /><XAxis dataKey='name' angle={-45} textAnchor='end' height={100} tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} /><Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }} /><Bar dataKey='scans' fill='#003366' radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card></Grid>
+            
+            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>User Distribution</Typography><ResponsiveContainer width='100%' height={300}><PieChart><Pie data={[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }]} cx='50%' cy='50%' labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill='#8884d8' dataKey='value'>{[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></CardContent></Card></Grid>
+            
+            <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><Category /> Product Scan Details</Typography><List dense>{stats.topProducts?.map((p, i) => <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}><ListItemText primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} secondary={<Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}><Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} /><Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography></Box>} /></ListItem>)}</List></CardContent></Card></Grid>
           </Grid>}
 
           {adminTab === 1 && <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
@@ -497,11 +532,14 @@ function App() {
               </Card>)}
           </Box>}
 
-          {adminTab === 2 && <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-            <Table><TableHead><TableRow><TableCell>Username</TableCell><TableCell>Email</TableCell><TableCell>Role</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
-              <TableBody>{users.map(u => <TableRow key={u._id}><TableCell>{u.username}</TableCell><TableCell>{u.email}</TableCell><TableCell><Chip label={u.role} size='small' color={u.role === 'admin' ? 'error' : 'default'} /></TableCell><TableCell><Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} /></TableCell></TableRow>)}</TableBody>
-            </Table>
-          </TableContainer>}
+          {adminTab === 2 && <Box>
+            <Box sx={{ mb: 2 }}><Button variant='contained' startIcon={<Add />} onClick={() => setUserDialog({ open: true, user: { username: '', email: '', password: '', role: 'user' } })}>Add User</Button></Box>
+            <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+              <Table><TableHead><TableRow><TableCell>Username</TableCell><TableCell>Email</TableCell><TableCell>Role</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
+                <TableBody>{users.map(u => <TableRow key={u._id}><TableCell>{u.username}</TableCell><TableCell>{u.email}</TableCell><TableCell><Chip label={u.role} size='small' color={u.role === 'admin' ? 'error' : 'default'} /></TableCell><TableCell><Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} /></TableCell></TableRow>)}</TableBody>
+              </Table>
+            </TableContainer>
+          </Box>}
 
           {adminTab === 3 && <Box>
             <Box sx={{ mb: 2 }}><Button variant='contained' startIcon={<Add />} onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '' } })}>Add Product</Button></Box>
@@ -521,6 +559,23 @@ function App() {
             <DialogTitle>{productDialog.product?._id ? 'Edit Product' : 'Add Product'}</DialogTitle>
             <DialogContent><TextField fullWidth label='Product Name' value={productDialog.product?.name || ''} onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, name: e.target.value } })} sx={{ mt: 2, mb: 2 }} /><TextField fullWidth label='Product Number' value={productDialog.product?.productNo || ''} onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, productNo: e.target.value } })} sx={{ mb: 2 }} /><TextField fullWidth label='Category' value={productDialog.product?.category || ''} onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, category: e.target.value } })} sx={{ mb: 2 }} /><TextField fullWidth label='Description' multiline rows={3} value={productDialog.product?.description || ''} onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, description: e.target.value } })} /></DialogContent>
             <DialogActions><Button onClick={() => setProductDialog({ open: false, product: null })}>Cancel</Button><Button variant='contained' onClick={handleSaveProduct} disabled={loading}>Save</Button></DialogActions>
+          </Dialog>
+
+          <Dialog open={userDialog.open} onClose={() => setUserDialog({ open: false, user: null })} maxWidth='sm' fullWidth>
+            <DialogTitle>Create New User</DialogTitle>
+            <DialogContent>
+              <TextField fullWidth label='Username' value={userDialog.user?.username || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, username: e.target.value } })} sx={{ mt: 2, mb: 2 }} required />
+              <TextField fullWidth label='Email' type='email' value={userDialog.user?.email || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, email: e.target.value } })} sx={{ mb: 2 }} required />
+              <TextField fullWidth label='Password' type='password' value={userDialog.user?.password || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, password: e.target.value } })} sx={{ mb: 2 }} helperText='Minimum 6 characters' required />
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Role</InputLabel>
+                <Select value={userDialog.user?.role || 'user'} label='Role' onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, role: e.target.value } })}>
+                  <MenuItem value='user'>User</MenuItem>
+                  <MenuItem value='admin'>Admin</MenuItem>
+                </Select>
+              </FormControl>
+            </DialogContent>
+            <DialogActions><Button onClick={() => setUserDialog({ open: false, user: null })}>Cancel</Button><Button variant='contained' onClick={handleCreateUser} disabled={loading} startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Add />}>{loading ? 'Creating...' : 'Create User'}</Button></DialogActions>
           </Dialog>
         </Box>}
       </Container>

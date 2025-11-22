@@ -47,6 +47,7 @@ export const authAPI = {
   updateProfile: (data) => api.put('/auth/profile', data),
   changePassword: (data) => api.put('/auth/change-password', data),
   getUsers: () => api.get('/auth/users'),
+  createUser: (userData) => api.post('/auth/users', userData),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
   getAuthStats: () => api.get('/auth/stats'),
 };
