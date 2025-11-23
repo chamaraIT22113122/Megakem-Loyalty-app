@@ -60,6 +60,17 @@ exports.authorize = (...roles) => {
   };
 };
 
+// Admin only middleware
+exports.admin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin privileges required.'
+    });
+  }
+  next();
+};
+
 // Optional authentication - doesn't fail if no token
 exports.optionalAuth = async (req, res, next) => {
   let token;

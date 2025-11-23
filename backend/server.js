@@ -63,6 +63,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/scans', require('./routes/scans'));
 app.use('/api/products', require('./routes/products'));
+app.use('/api/rewards', require('./routes/rewards'));
+app.use('/api/analytics', require('./routes/analytics'));
 
 // Health check
 app.get('/api/health', (req, res) => {

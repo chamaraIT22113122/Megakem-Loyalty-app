@@ -1,17 +1,21 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel } from '@mui/icons-material';
-import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { authAPI, scansAPI, productsAPI } from './services/api';
+import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Badge, Avatar, LinearProgress, Tooltip } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, GetApp, Search, Brightness4, Brightness7, Star } from '@mui/icons-material';
+import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
+import { authAPI, scansAPI, productsAPI, rewardsAPI, analyticsAPI } from './services/api';
 import megakemLogo from './assets/Megakem  Logo.png';
 
 
-const theme = createTheme({
+const getTheme = (mode) => createTheme({
   palette: { 
+    mode,
     primary: { main: '#003366', light: '#4A90A4', dark: '#001a33' }, 
     secondary: { main: '#A4D233', light: '#c5e066', dark: '#7fa326' },
     info: { main: '#00B4D8' },
-    background: { default: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', paper: '#ffffff' }
+    background: { 
+      default: mode === 'dark' ? '#0a1929' : 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', 
+      paper: mode === 'dark' ? '#132f4c' : '#ffffff'
+    }
   },
   shape: { borderRadius: 16 },
   breakpoints: {
@@ -116,6 +120,13 @@ function App() {
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [productDialog, setProductDialog] = useState({ open: false, product: null });
   const [userDialog, setUserDialog] = useState({ open: false, user: null });
+  const [darkMode, setDarkMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [rewards, setRewards] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [userStats, setUserStats] = useState(null);
+  const [rewardDialog, setRewardDialog] = useState({ open: false, reward: null });
   const scannerRef = useRef(null);
   const pollIntervalRef = useRef(null);
 
@@ -371,13 +382,16 @@ function App() {
   );
 
   return (
-    <ThemeProvider theme={theme}><CssBaseline /><Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', display: 'flex', flexDirection: 'column' }}>
+    <ThemeProvider theme={getTheme(darkMode ? 'dark' : 'light')}><CssBaseline /><Box sx={{ minHeight: '100vh', background: darkMode ? '#0a1929' : 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', display: 'flex', flexDirection: 'column' }}>
       <AppBar position='static' elevation={0} sx={{ background: 'linear-gradient(135deg, #003366 0%, #004d7a 50%, #4A90A4 100%)', boxShadow: '0 4px 20px rgba(0,51,102,0.3)' }}><Toolbar sx={{ minHeight: { xs: '56px', sm: '64px' }, px: { xs: 1, sm: 2 } }}>
         <QrCodeScanner sx={{ mr: { xs: 1, sm: 2 }, color: 'secondary.main', fontSize: { xs: '1.5rem', sm: '2rem' }, animation: 'pulse 2s ease-in-out infinite', '@keyframes pulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)' }, '50%': { opacity: 0.7, transform: 'scale(0.95)' } } }} />
         <Box sx={{ flexGrow: 1 }}>
           <Typography variant='h6' component='div' sx={{ fontWeight: 700, letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)', lineHeight: 1.2, fontSize: { xs: '0.9rem', sm: '1.25rem' } }}>MEGAKEM LOYALTY</Typography>
           <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: { xs: '0.55rem', sm: '0.65rem' }, opacity: 0.9, display: { xs: 'none', sm: 'block' } }}>WHERE TRUST MEETS EXCELLENCE</Typography>
         </Box>
+        <IconButton onClick={() => setDarkMode(!darkMode)} color='inherit' sx={{ mr: 1 }}>
+          {darkMode ? <Brightness7 /> : <Brightness4 />}
+        </IconButton>
         {adminAuth && view === 'admin' && (
           <Button color='inherit' onClick={handleAdminLogout} sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>Logout</Button>
         )}

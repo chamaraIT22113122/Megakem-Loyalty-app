@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Scan = require('../models/Scan');
+const User = require('../models/User');
 const { optionalAuth, protect, authorize } = require('../middleware/auth');
 
 // @route   GET /api/scans
@@ -122,6 +123,31 @@ router.post('/', optionalAuth, async (req, res) => {
 
     const scan = await Scan.create(scanData);
 
+    // Award points if user is authenticated
+    if (req.user) {
+      const user = await User.findById(req.user._id);
+      if (user) {
+        await user.addPoints(10); // 10 points per scan
+        user.totalScans += 1;
+        
+        // Check for achievements
+        if (user.totalScans === 1 && !user.achievements.some(a => a.name === 'First Scan')) {
+          user.achievements.push({ name: 'First Scan' });
+        }
+        if (user.totalScans === 10 && !user.achievements.some(a => a.name === '10 Scans')) {
+          user.achievements.push({ name: '10 Scans' });
+        }
+        if (user.totalScans === 50 && !user.achievements.some(a => a.name === '50 Scans')) {
+          user.achievements.push({ name: '50 Scans' });
+        }
+        if (user.totalScans === 100 && !user.achievements.some(a => a.name === 'Century Club')) {
+          user.achievements.push({ name: 'Century Club' });
+        }
+        
+        await user.save();
+      }
+    }
+
     res.status(201).json({
       success: true,
       data: scan
@@ -156,6 +182,16 @@ router.post('/batch', optionalAuth, async (req, res) => {
     }));
 
     const createdScans = await Scan.insertMany(scansData);
+
+    // Award points if user is authenticated
+    if (req.user) {
+      const user = await User.findById(req.user._id);
+      if (user) {
+        await user.addPoints(createdScans.length * 10); // 10 points per scan
+        user.totalScans += createdScans.length;
+        await user.save();
+      }
+    }
 
     res.status(201).json({
       success: true,

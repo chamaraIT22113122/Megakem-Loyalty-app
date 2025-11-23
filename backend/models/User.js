@@ -34,7 +34,28 @@ const userSchema = new mongoose.Schema({
   },
   lastLogin: {
     type: Date
-  }
+  },
+  points: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  tier: {
+    type: String,
+    enum: ['bronze', 'silver', 'gold', 'platinum'],
+    default: 'bronze'
+  },
+  totalScans: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  achievements: [{
+    name: String,
+    earnedAt: { type: Date, default: Date.now }
+  }],
+  resetPasswordToken: String,
+  resetPasswordExpires: Date
 }, {
   timestamps: true
 });
@@ -51,6 +72,26 @@ userSchema.pre('save', async function(next) {
 // Method to compare password
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Method to update tier based on points
+userSchema.methods.updateTier = function() {
+  if (this.points >= 10000) {
+    this.tier = 'platinum';
+  } else if (this.points >= 5000) {
+    this.tier = 'gold';
+  } else if (this.points >= 2000) {
+    this.tier = 'silver';
+  } else {
+    this.tier = 'bronze';
+  }
+};
+
+// Method to add points
+userSchema.methods.addPoints = async function(points) {
+  this.points += points;
+  this.updateTier();
+  await this.save();
 };
 
 module.exports = mongoose.model('User', userSchema);

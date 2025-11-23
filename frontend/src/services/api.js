@@ -72,4 +72,23 @@ export const productsAPI = {
   delete: (id) => api.delete(`/products/${id}`),
 };
 
+// Rewards API
+export const rewardsAPI = {
+  getAll: () => api.get('/rewards'),
+  create: (rewardData) => api.post('/rewards', rewardData),
+  update: (id, rewardData) => api.put(`/rewards/${id}`, rewardData),
+  delete: (id) => api.delete(`/rewards/${id}`),
+  redeem: (id) => api.post(`/rewards/redeem/${id}`),
+  getRedemptions: () => api.get('/rewards/redemptions'),
+  getAllRedemptions: () => api.get('/rewards/redemptions/all'),
+};
+
+// Analytics API
+export const analyticsAPI = {
+  getDashboard: (params) => api.get('/analytics/dashboard', { params }),
+  getLeaderboard: (params) => api.get('/analytics/leaderboard', { params }),
+  getUserStats: () => api.get('/analytics/user-stats'),
+  export: (params) => api.get('/analytics/export', { params, responseType: 'blob' }),
+};
+
 export default api;
