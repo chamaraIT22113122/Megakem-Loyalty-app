@@ -120,6 +120,7 @@ function App() {
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [productDialog, setProductDialog] = useState({ open: false, product: null });
   const [userDialog, setUserDialog] = useState({ open: false, user: null });
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, scanId: null, scanDetails: null });
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -209,10 +210,23 @@ function App() {
     setLoading(true);
     try {
       const scansData = cart.map(item => ({ memberName: memberName || 'N/A', memberId: memberId.toUpperCase(), role, productName: item.name, productNo: item.id, batchNo: item.batch, bagNo: item.bag, qty: item.qty }));
-      await scansAPI.createBatch(scansData);
-      showNotification(`Successfully submitted ${cart.length} items!`, 'success');
+      const response = await scansAPI.createBatch(scansData);
+      
+      if (response.data.duplicates && response.data.duplicates.length > 0) {
+        showNotification(`${response.data.count} items submitted. ${response.data.duplicates.length} duplicates skipped.`, 'warning');
+      } else {
+        showNotification(`Successfully submitted ${cart.length} items!`, 'success');
+      }
+      
       setCart([]); setMemberId(''); setMemberName(''); setView('welcome');
-    } catch (error) { console.error('Error:', error); showNotification(error.response?.data?.message || 'Transfer failed', 'error'); }
+    } catch (error) { 
+      console.error('Error:', error); 
+      if (error.response?.data?.duplicates) {
+        showNotification(error.response.data.message, 'error');
+      } else {
+        showNotification(error.response?.data?.message || 'Transfer failed', 'error');
+      }
+    }
     finally { setLoading(false); }
   };
 
@@ -341,6 +355,20 @@ function App() {
       showNotification('Product deleted!', 'success');
     } catch (error) {
       showNotification('Failed to delete product', 'error');
+    }
+  };
+
+  const handleDeleteScan = async () => {
+    setLoading(true);
+    try {
+      await scansAPI.delete(deleteDialog.scanId);
+      setScanHistory(scanHistory.filter(s => s._id !== deleteDialog.scanId));
+      showNotification('Scan deleted successfully!', 'success');
+      setDeleteDialog({ open: false, scanId: null, scanDetails: null });
+    } catch (error) {
+      showNotification('Failed to delete scan', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -512,7 +540,21 @@ function App() {
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                     <Box><Typography variant='subtitle1' fontWeight='bold'>{item.memberName || 'Unknown'}</Typography><Chip label={item.memberId} size='small' sx={{ borderRadius: 1, height: 20, fontSize: '0.7rem' }} /></Box>
-                    <Chip label={item.role} size='small' color={item.role === 'applicator' ? 'warning' : 'info'} sx={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 'bold' }} />
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Chip label={item.role} size='small' color={item.role === 'applicator' ? 'warning' : 'info'} sx={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 'bold' }} />
+                      <IconButton 
+                        size='small' 
+                        color='error' 
+                        onClick={() => setDeleteDialog({ 
+                          open: true, 
+                          scanId: item._id, 
+                          scanDetails: `${item.productName} (${item.batchNo} - ${item.bagNo}) by ${item.memberName}` 
+                        })}
+                        sx={{ ml: 1 }}
+                      >
+                        <Delete fontSize='small' />
+                      </IconButton>
+                    </Box>
                   </Box>
                   <Divider sx={{ my: 1 }} />
                   <Typography variant='body2' color='text.secondary'>Product: <Box component='span' color='text.primary'>{item.productName}</Box></Typography>
@@ -570,6 +612,39 @@ function App() {
               </FormControl>
             </DialogContent>
             <DialogActions><Button onClick={() => setUserDialog({ open: false, user: null })}>Cancel</Button><Button variant='contained' onClick={handleCreateUser} disabled={loading} startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Add />}>{loading ? 'Creating...' : 'Create User'}</Button></DialogActions>
+          </Dialog>
+
+          <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, scanId: null, scanDetails: null })} maxWidth='sm' fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main' }}>
+              <Delete /> Confirm Delete
+            </DialogTitle>
+            <DialogContent>
+              <Typography variant='body1' sx={{ mt: 2 }}>
+                Are you sure you want to delete this scan?
+              </Typography>
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'error.50', borderRadius: 2, border: '1px solid', borderColor: 'error.200' }}>
+                <Typography variant='body2' fontWeight='bold' color='error.dark'>
+                  {deleteDialog.scanDetails}
+                </Typography>
+              </Box>
+              <Typography variant='body2' color='text.secondary' sx={{ mt: 2 }}>
+                This action cannot be undone.
+              </Typography>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button onClick={() => setDeleteDialog({ open: false, scanId: null, scanDetails: null })} disabled={loading}>
+                No, Cancel
+              </Button>
+              <Button 
+                variant='contained' 
+                color='error' 
+                onClick={handleDeleteScan} 
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Delete />}
+              >
+                {loading ? 'Deleting...' : 'Yes, Delete'}
+              </Button>
+            </DialogActions>
           </Dialog>
         </Box>}
       </Container>

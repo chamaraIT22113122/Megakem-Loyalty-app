@@ -105,6 +105,22 @@ router.post('/', optionalAuth, async (req, res) => {
       qty
     } = req.body;
 
+    // Check for duplicate scan - same person (memberId + role) can't scan same product (batchNo + bagNo) twice
+    const duplicateScan = await Scan.findOne({
+      memberId: memberId.toUpperCase(),
+      role,
+      batchNo,
+      bagNo
+    });
+
+    if (duplicateScan) {
+      return res.status(400).json({
+        success: false,
+        message: `This ${role} has already scanned this product (Batch: ${batchNo}, Bag: ${bagNo})`,
+        duplicate: true
+      });
+    }
+
     const scanData = {
       memberName,
       memberId: memberId.toUpperCase(),
@@ -174,14 +190,43 @@ router.post('/batch', optionalAuth, async (req, res) => {
       });
     }
 
-    // Add user ID to all scans if authenticated
-    const scansData = scans.map(scan => ({
-      ...scan,
-      memberId: scan.memberId.toUpperCase(),
-      userId: req.user ? req.user._id : undefined
-    }));
+    // Check for duplicates and filter them out
+    const validScans = [];
+    const duplicates = [];
 
-    const createdScans = await Scan.insertMany(scansData);
+    for (const scan of scans) {
+      const duplicateScan = await Scan.findOne({
+        memberId: scan.memberId.toUpperCase(),
+        role: scan.role,
+        batchNo: scan.batchNo,
+        bagNo: scan.bagNo
+      });
+
+      if (duplicateScan) {
+        duplicates.push({
+          productName: scan.productName,
+          batchNo: scan.batchNo,
+          bagNo: scan.bagNo,
+          role: scan.role
+        });
+      } else {
+        validScans.push({
+          ...scan,
+          memberId: scan.memberId.toUpperCase(),
+          userId: req.user ? req.user._id : undefined
+        });
+      }
+    }
+
+    if (validScans.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'All scans are duplicates. No new scans were added.',
+        duplicates
+      });
+    }
+
+    const createdScans = await Scan.insertMany(validScans);
 
     // Award points if user is authenticated
     if (req.user) {
@@ -196,7 +241,11 @@ router.post('/batch', optionalAuth, async (req, res) => {
     res.status(201).json({
       success: true,
       count: createdScans.length,
-      data: createdScans
+      data: createdScans,
+      duplicates: duplicates.length > 0 ? duplicates : undefined,
+      message: duplicates.length > 0 
+        ? `${createdScans.length} scans added successfully. ${duplicates.length} duplicates were skipped.`
+        : undefined
     });
   } catch (error) {
     res.status(400).json({
