@@ -1,16 +1,10 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, ListItemButton, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
-import { QrCodeScanner, CameraAlt, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel } from '@mui/icons-material';
-import { BarChart, Bar, PieChart, Pie, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel } from '@mui/icons-material';
+import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI } from './services/api';
 import megakemLogo from './assets/Megakem  Logo.png';
 
-const MOCK_QR_CODES = [
-  JSON.stringify({ name: 'UltraSeal Waterproofing', batch: 'BATCH-2024-001', bag: 'BAG-8821', id: 'PRD-99102', qty: '5KG' }),
-  JSON.stringify({ name: 'Premium Wall Putty', batch: 'BATCH-2024-002', bag: 'BAG-9943', id: 'PRD-11203', qty: '20KG' }),
-  JSON.stringify({ name: 'Exterior Primer X', batch: 'BATCH-2024-015', bag: 'BAG-1102', id: 'PRD-55401', qty: '10L' }),
-  JSON.stringify({ name: 'SuperBond Adhesive', batch: 'BATCH-2024-088', bag: 'BAG-3341', id: 'PRD-77201', qty: '1KG' })
-];
 
 const theme = createTheme({
   palette: { 
@@ -426,21 +420,7 @@ function App() {
             <IconButton onClick={() => setView('welcome')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, left: { xs: 8, sm: 16 }, zIndex: 10, bgcolor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', transition: 'all 0.3s', '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
             {cart.length > 0 && <Fab variant='extended' size={window.innerWidth < 600 ? 'small' : 'medium'} onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, right: { xs: 8, sm: 16 }, zIndex: 10, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white', fontWeight: 700, boxShadow: '0 6px 20px rgba(164,210,51,0.4)', animation: 'bounce 2s ease-in-out infinite', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }, '&:hover': { background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1.5, sm: 2 } }}>View Cart ({cart.length})</Fab>}
           </Box>
-          <Paper sx={{ borderTopLeftRadius: { xs: 20, sm: 28 }, borderTopRightRadius: { xs: 20, sm: 28 }, p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', color: 'text.primary', maxHeight: '45vh', overflowY: 'auto', boxShadow: '0 -10px 30px rgba(0,0,0,0.1)' }}>
-            <Typography variant='subtitle1' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary', fontWeight: 600, mb: 2 }}><CameraAlt fontSize='small' /> Or tap below to simulate scan:</Typography>
-            <List dense disablePadding>
-              {MOCK_QR_CODES.map((qr, i) => {
-                const d = JSON.parse(qr);
-                return <ListItem key={i} disablePadding sx={{ border: '2px solid', borderColor: 'grey.200', borderRadius: 3, mb: 1.5, overflow: 'hidden', transition: 'all 0.3s', '&:hover': { borderColor: 'primary.main', transform: 'translateX(8px)', boxShadow: '0 4px 12px rgba(0,51,102,0.15)' } }}>
-                  <ListItemButton onClick={() => handleScan(qr)} sx={{ py: 1.5 }}>
-                    <ListItemText primary={d.name} secondary={`Batch: ${d.batch}`} primaryTypographyProps={{variant: 'body1', fontWeight: 700}} secondaryTypographyProps={{fontWeight: 500}} />
-                    <Chip label='ADD' size='small' sx={{ bgcolor: 'primary.main', color: 'white', fontWeight: 700, px: 1 }} />
-                  </ListItemButton>
-                </ListItem>
-              })}
-            </List>
-            <Button fullWidth size='large' onClick={() => cart.length > 0 ? setView('cart') : setView('welcome')} sx={{ mt: 2, color: 'text.secondary', fontWeight: 600, '&:hover': { bgcolor: 'grey.100' } }}>Cancel</Button>
-          </Paper>
+
         </Paper>}
         {view === 'cart' && <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', animation: 'slideIn 0.4s ease-out', '@keyframes slideIn': { from: { opacity: 0, transform: 'translateX(100px)' }, to: { opacity: 1, transform: 'translateX(0)' } } }}>
           <Box sx={{ mb: { xs: 2, sm: 3 }, display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>

@@ -9,7 +9,6 @@ const productSchema = new mongoose.Schema({
   productNo: {
     type: String,
     required: [true, 'Product number is required'],
-    unique: true,
     trim: true
   },
   description: {

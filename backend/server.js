@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const connectDB = require('./config/database');
+const User = require('./models/User');
 
 // Load environment variables
 dotenv.config();
@@ -9,8 +10,30 @@ dotenv.config();
 // Initialize Express
 const app = express();
 
-// Connect to MongoDB
-connectDB();
+// Initialize database and admin user
+const initializeApp = async () => {
+  await connectDB();
+  
+  try {
+    // Ensure admin user exists
+    const adminExists = await User.findOne({ email: 'admin@megakem.com' });
+    if (!adminExists) {
+      await User.create({
+        username: 'admin',
+        email: 'admin@megakem.com',
+        password: 'Admin@123',
+        role: 'admin',
+        isActive: true
+      });
+      console.log('✅ Admin user created automatically');
+    }
+    console.log('📝 Admin login: admin@megakem.com | Password: Admin@123');
+  } catch (error) {
+    console.error('⚠️  Error with admin user:', error.message);
+  }
+};
+
+initializeApp();
 
 // Middleware
 const allowedOrigins = [
