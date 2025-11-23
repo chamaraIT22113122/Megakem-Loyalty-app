@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Badge, Avatar, LinearProgress, Tooltip } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, GetApp, Search, Brightness4, Brightness7, Star } from '@mui/icons-material';
+import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Brightness4, Brightness7, Star } from '@mui/icons-material';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, rewardsAPI, analyticsAPI } from './services/api';
 import megakemLogo from './assets/Megakem  Logo.png';
@@ -164,6 +164,23 @@ function App() {
     pollIntervalRef.current = setInterval(fetchLiveScans, 3000);
     return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
   }, [user, view]);
+
+  useEffect(() => {
+    if (!user || user.anonymous) return;
+    const loadData = async () => {
+      try {
+        const [rewardsRes, leaderboardRes] = await Promise.all([
+          rewardsAPI.getAll(),
+          analyticsAPI.getLeaderboard()
+        ]);
+        setRewards(rewardsRes.data.data);
+        setLeaderboard(leaderboardRes.data.data);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    };
+    loadData();
+  }, [user]);
 
   useEffect(() => {
     let html5QrcodeScanner;
@@ -454,7 +471,278 @@ function App() {
               </CardActionArea>
             </Card></Grid>
           </Grid>
+          {!user?.anonymous && (
+            <Box sx={{ mt: 4 }}>
+              <Divider sx={{ mb: 3 }}><Chip label="My Account" color="primary" /></Divider>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={4}>
+                  <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('profile')}>
+                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                      <Person sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                      <Typography variant="h6" fontWeight={600}>Profile</Typography>
+                      <Typography variant="caption" color="text.secondary">View stats & history</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('rewards')}>
+                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                      <CardGiftcard sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
+                      <Typography variant="h6" fontWeight={600}>Rewards</Typography>
+                      <Typography variant="caption" color="text.secondary">Redeem your points</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('leaderboard')}>
+                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                      <EmojiEvents sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+                      <Typography variant="h6" fontWeight={600}>Leaderboard</Typography>
+                      <Typography variant="caption" color="text.secondary">Top contributors</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
         </Box>}
+        {view === 'profile' && (
+          <Box sx={{ py: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+              <IconButton onClick={() => setView('welcome')} sx={{ mr: 2 }}>
+                <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
+              </IconButton>
+              <Typography variant="h4" fontWeight={700}>My Profile</Typography>
+            </Box>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
+                  <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                    <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'secondary.main', fontSize: '2rem' }}>
+                      {user?.username?.[0]?.toUpperCase() || 'U'}
+                    </Avatar>
+                    <Typography variant="h5" fontWeight={700} gutterBottom>{user?.username || 'User'}</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>{user?.email}</Typography>
+                    <Chip label={user?.tier || 'Bronze'} color="secondary" sx={{ fontWeight: 700, fontSize: '1rem' }} />
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={8}>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} sm={3}>
+                    <Card>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Typography variant="h4" fontWeight={700} color="primary">{user?.points || 0}</Typography>
+                        <Typography variant="caption" color="text.secondary">Points</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Card>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Typography variant="h4" fontWeight={700} color="secondary">{user?.totalScans || 0}</Typography>
+                        <Typography variant="caption" color="text.secondary">Total Scans</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Card>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Typography variant="h4" fontWeight={700} color="info.main">{user?.achievements?.length || 0}</Typography>
+                        <Typography variant="caption" color="text.secondary">Achievements</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Card>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <EmojiEvents sx={{ fontSize: 40, color: 'warning.main' }} />
+                        <Typography variant="caption" color="text.secondary">Tier Badge</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+                <Card sx={{ mt: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={600} gutterBottom>Achievements</Typography>
+                    {user?.achievements && user.achievements.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {user.achievements.map((achievement, idx) => (
+                          <Chip key={idx} label={achievement} icon={<Star />} color="warning" variant="outlined" />
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">No achievements yet. Start scanning to earn rewards!</Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                      <HistoryIcon sx={{ mr: 1 }} /> Scan History
+                    </Typography>
+                    <Divider sx={{ my: 2 }} />
+                    {scanHistory.length > 0 ? (
+                      <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                        {scanHistory.slice(0, 10).map((scan) => (
+                          <Box key={scan._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                            <Box>
+                              <Typography variant="body1" fontWeight={600}>{scan.productName}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Batch: {scan.batchNo} | Bag: {scan.bagNo}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ textAlign: 'right' }}>
+                              <Chip label={scan.role} size="small" color={scan.role === 'applicator' ? 'primary' : 'secondary'} />
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                {new Date(scan.scannedAt).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">No scan history available.</Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
+        )}
+        {view === 'rewards' && (
+          <Box sx={{ py: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+              <IconButton onClick={() => setView('welcome')} sx={{ mr: 2 }}>
+                <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
+              </IconButton>
+              <Typography variant="h4" fontWeight={700}>Rewards Catalog</Typography>
+            </Box>
+            <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="h6" fontWeight={600}>Available Points</Typography>
+                    <Typography variant="h3" fontWeight={700}>{user?.points || 0}</Typography>
+                  </Box>
+                  <CardGiftcard sx={{ fontSize: 80, opacity: 0.3 }} />
+                </Box>
+              </CardContent>
+            </Card>
+            <Grid container spacing={3}>
+              {rewards.length > 0 ? rewards.map((reward) => (
+                <Grid item xs={12} sm={6} md={4} key={reward._id}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }}>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="h6" fontWeight={700} gutterBottom>{reward.title}</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{reward.description}</Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
+                        <Chip label={`${reward.pointsRequired} pts`} color="primary" sx={{ fontWeight: 700 }} />
+                        <Typography variant="caption" color="text.secondary">Stock: {reward.stock}</Typography>
+                      </Box>
+                    </CardContent>
+                    <Box sx={{ p: 2, pt: 0 }}>
+                      <Button 
+                        fullWidth 
+                        variant="contained" 
+                        disabled={!user || user.points < reward.pointsRequired || reward.stock === 0}
+                        onClick={() => setRewardDialog({ open: true, reward })}
+                        sx={{ fontWeight: 600 }}
+                      >
+                        {user?.points >= reward.pointsRequired ? 'Redeem' : 'Insufficient Points'}
+                      </Button>
+                    </Box>
+                  </Card>
+                </Grid>
+              )) : (
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent sx={{ textAlign: 'center', py: 6 }}>
+                      <CardGiftcard sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+                      <Typography variant="h6" color="text.secondary">No rewards available at the moment</Typography>
+                      <Typography variant="body2" color="text.secondary">Check back soon for exciting rewards!</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
+            </Grid>
+          </Box>
+        )}
+        {view === 'leaderboard' && (
+          <Box sx={{ py: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+              <IconButton onClick={() => setView('welcome')} sx={{ mr: 2 }}>
+                <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
+              </IconButton>
+              <Typography variant="h4" fontWeight={700}>Leaderboard</Typography>
+            </Box>
+            <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)' }}>
+              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                <EmojiEvents sx={{ fontSize: 60, color: 'white', mb: 2 }} />
+                <Typography variant="h5" fontWeight={700} color="white">Top Contributors</Typography>
+                <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>Compete and earn rewards!</Typography>
+              </CardContent>
+            </Card>
+            {leaderboard.length > 0 ? (
+              <Grid container spacing={2}>
+                {leaderboard.slice(0, 10).map((entry, index) => (
+                  <Grid item xs={12} key={entry._id}>
+                    <Card sx={{ 
+                      border: index < 3 ? '2px solid' : 'none',
+                      borderColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : 'transparent',
+                      background: index < 3 ? `linear-gradient(135deg, ${index === 0 ? '#FFF9E6' : index === 1 ? '#F5F5F5' : '#FFF0E6'} 0%, white 100%)` : 'white'
+                    }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ 
+                              width: 50, 
+                              height: 50, 
+                              borderRadius: '50%', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              background: index === 0 ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)' : 
+                                         index === 1 ? 'linear-gradient(135deg, #C0C0C0 0%, #999999 100%)' : 
+                                         index === 2 ? 'linear-gradient(135deg, #CD7F32 0%, #B8860B 100%)' : 
+                                         'linear-gradient(135deg, #003366 0%, #4A90A4 100%)',
+                              color: 'white',
+                              fontWeight: 700,
+                              fontSize: '1.5rem'
+                            }}>
+                              {index < 3 ? <EmojiEvents /> : index + 1}
+                            </Box>
+                            <Box>
+                              <Typography variant="h6" fontWeight={700}>{entry.username}</Typography>
+                              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                <Chip label={entry.tier} size="small" color="primary" />
+                                <Typography variant="caption" color="text.secondary">{entry.totalScans} scans</Typography>
+                              </Box>
+                            </Box>
+                          </Box>
+                          <Box sx={{ textAlign: 'right' }}>
+                            <Typography variant="h5" fontWeight={700} color="primary">{entry.points}</Typography>
+                            <Typography variant="caption" color="text.secondary">points</Typography>
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Card>
+                <CardContent sx={{ textAlign: 'center', py: 6 }}>
+                  <EmojiEvents sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary">No leaderboard data available</Typography>
+                  <Typography variant="body2" color="text.secondary">Be the first to climb the ranks!</Typography>
+                </CardContent>
+              </Card>
+            )}
+          </Box>
+        )}
         {view === 'scanner' && <Paper sx={{ flexGrow: 1, bgcolor: '#000', color: 'white', overflow: 'hidden', position: 'relative', borderRadius: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
           <Box sx={{ flexGrow: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#000', minHeight: { xs: '300px', sm: '400px' } }}>
             <div id='reader' style={{ width: '100%', height: '100%' }}></div>
@@ -643,6 +931,46 @@ function App() {
                 startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Delete />}
               >
                 {loading ? 'Deleting...' : 'Yes, Delete'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Dialog open={rewardDialog.open} onClose={() => setRewardDialog({ open: false, reward: null })} maxWidth="sm" fullWidth>
+            <DialogTitle>Confirm Redemption</DialogTitle>
+            <DialogContent>
+              <Typography variant="body1" gutterBottom>
+                Are you sure you want to redeem <strong>{rewardDialog.reward?.title}</strong>?
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                This will deduct <strong>{rewardDialog.reward?.pointsRequired} points</strong> from your account.
+              </Typography>
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.50', borderRadius: 2 }}>
+                <Typography variant="caption" color="text.secondary">Current Points: {user?.points}</Typography>
+                <Typography variant="h6" fontWeight={700} color="primary">
+                  After: {(user?.points || 0) - (rewardDialog.reward?.pointsRequired || 0)} points
+                </Typography>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setRewardDialog({ open: false, reward: null })} disabled={loading}>Cancel</Button>
+              <Button onClick={async () => {
+                if (!rewardDialog.reward) return;
+                setLoading(true);
+                try {
+                  await rewardsAPI.redeem(rewardDialog.reward._id);
+                  const userRes = await authAPI.getMe();
+                  setUser(userRes.data.data);
+                  showNotification('Reward redeemed successfully!', 'success');
+                  setRewardDialog({ open: false, reward: null });
+                  const rewardsRes = await rewardsAPI.getAll();
+                  setRewards(rewardsRes.data.data);
+                } catch (error) {
+                  showNotification(error.response?.data?.message || 'Failed to redeem reward', 'error');
+                } finally {
+                  setLoading(false);
+                }
+              }} variant="contained" disabled={loading} sx={{ fontWeight: 600 }}>
+                {loading ? <CircularProgress size={24} /> : 'Confirm Redemption'}
               </Button>
             </DialogActions>
           </Dialog>
