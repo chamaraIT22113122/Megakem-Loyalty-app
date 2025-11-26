@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const XLSX = require('xlsx');
 const Scan = require('../models/Scan');
 const User = require('../models/User');
 const { protect, admin } = require('../middleware/auth');
@@ -132,11 +133,11 @@ router.get('/user-stats', protect, async (req, res) => {
 });
 
 // @route   GET /api/analytics/export
-// @desc    Export analytics data as CSV
+// @desc    Export analytics data as CSV or Excel
 // @access  Private/Admin
 router.get('/export', protect, admin, async (req, res) => {
   try {
-    const { type = 'scans', startDate, endDate } = req.query;
+    const { type = 'scans', startDate, endDate, format = 'csv' } = req.query;
     
     const dateFilter = {};
     if (startDate || endDate) {
@@ -145,25 +146,65 @@ router.get('/export', protect, admin, async (req, res) => {
       if (endDate) dateFilter.timestamp.$lte = new Date(endDate);
     }
 
-    let csvData = '';
+    let data = [];
+    let filename = '';
     
     if (type === 'scans') {
       const scans = await Scan.find(dateFilter).sort({ timestamp: -1 });
-      csvData = 'Timestamp,Member Name,Member ID,Role,Product Name,Product No,Batch No,Bag No,Qty\n';
-      scans.forEach(scan => {
-        csvData += `${scan.timestamp},${scan.memberName},${scan.memberId},${scan.role},${scan.productName},${scan.productNo},${scan.batchNo},${scan.bagNo},${scan.qty}\n`;
-      });
+      data = scans.map(scan => ({
+        'Timestamp': new Date(scan.timestamp).toLocaleString(),
+        'Member Name': scan.memberName,
+        'Member ID': scan.memberId,
+        'Role': scan.role,
+        'Product Name': scan.productName,
+        'Product No': scan.productNo || 'N/A',
+        'Batch No': scan.batchNo,
+        'Bag No': scan.bagNo,
+        'Quantity': scan.qty || 1
+      }));
+      filename = `scans-export-${Date.now()}`;
     } else if (type === 'users') {
       const users = await User.find({ role: 'user' }).sort({ points: -1 });
-      csvData = 'Username,Email,Points,Tier,Total Scans,Created At\n';
-      users.forEach(user => {
-        csvData += `${user.username},${user.email},${user.points},${user.tier},${user.totalScans},${user.createdAt}\n`;
-      });
+      data = users.map(user => ({
+        'Username': user.username,
+        'Email': user.email,
+        'Points': user.points,
+        'Tier': user.tier,
+        'Total Scans': user.totalScans,
+        'Achievements': user.achievements?.join(', ') || 'None',
+        'Created At': new Date(user.createdAt).toLocaleDateString()
+      }));
+      filename = `users-export-${Date.now()}`;
     }
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="${type}-export-${Date.now()}.csv"`);
-    res.send(csvData);
+    if (format === 'excel' || format === 'xlsx') {
+      // Create Excel file
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, type === 'scans' ? 'Scans' : 'Users');
+      
+      // Set column widths for better readability
+      const maxWidth = 20;
+      const cols = Object.keys(data[0] || {}).map(() => ({ wch: maxWidth }));
+      worksheet['!cols'] = cols;
+      
+      // Generate buffer
+      const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
+      res.send(excelBuffer);
+    } else {
+      // CSV format
+      let csvData = Object.keys(data[0] || {}).join(',') + '\n';
+      data.forEach(row => {
+        csvData += Object.values(row).map(val => `"${val}"`).join(',') + '\n';
+      });
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
+      res.send(csvData);
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

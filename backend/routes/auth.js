@@ -59,6 +59,8 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log('🔑 User login attempt:', { email, hasPassword: !!password });
+
     // Validate input
     if (!email || !password) {
       return res.status(400).json({
@@ -69,6 +71,8 @@ router.post('/login', async (req, res) => {
 
     // Check for user
     const user = await User.findOne({ email }).select('+password');
+    console.log('👤 User found:', user ? `Yes (${user.username})` : 'No');
+    
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -76,8 +80,20 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Check if user is active
+    if (!user.isActive) {
+      console.log('❌ User account is deactivated');
+      return res.status(401).json({
+        success: false,
+        message: 'Account is deactivated. Please contact admin.'
+      });
+    }
+
     // Check if password matches
+    console.log('🔐 Checking password...');
     const isMatch = await user.comparePassword(password);
+    console.log('🔐 Password match:', isMatch);
+    
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -89,6 +105,8 @@ router.post('/login', async (req, res) => {
     user.lastLogin = Date.now();
     await user.save();
 
+    console.log('✅ User login successful');
+
     res.json({
       success: true,
       data: {
@@ -96,10 +114,15 @@ router.post('/login', async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        points: user.points,
+        tier: user.tier,
+        totalScans: user.totalScans,
+        achievements: user.achievements,
         token: generateToken(user._id)
       }
     });
   } catch (error) {
+    console.error('❌ Login error:', error);
     res.status(400).json({
       success: false,
       message: error.message
@@ -376,6 +399,8 @@ router.post('/users', protect, async (req, res) => {
 
     const { username, email, password, role } = req.body;
 
+    console.log('👥 Creating new user:', { username, email, role: role || 'user' });
+
     // Validate input
     if (!username || !email || !password) {
       return res.status(400).json({
@@ -409,6 +434,8 @@ router.post('/users', protect, async (req, res) => {
       isActive: true
     });
 
+    console.log('✅ User created successfully:', user.username);
+
     res.status(201).json({
       success: true,
       data: {
@@ -421,6 +448,7 @@ router.post('/users', protect, async (req, res) => {
       message: 'User created successfully'
     });
   } catch (error) {
+    console.error('❌ User creation error:', error);
     res.status(400).json({
       success: false,
       message: error.message
@@ -464,6 +492,49 @@ router.put('/users/:id', protect, async (req, res) => {
         role: user.role,
         isActive: user.isActive
       }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   DELETE /api/auth/users/:id
+// @desc    Delete user (admin only)
+// @access  Private/Admin
+router.delete('/users/:id', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Prevent admin from deleting themselves
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account'
+      });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
     });
   } catch (error) {
     res.status(400).json({

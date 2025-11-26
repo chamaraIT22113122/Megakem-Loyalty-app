@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Brightness4, Brightness7, Star } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Brightness4, Brightness7, Star, GetApp } from '@mui/icons-material';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, rewardsAPI, analyticsAPI } from './services/api';
 import megakemLogo from './assets/Megakem  Logo.png';
@@ -112,6 +112,9 @@ function App() {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminTab, setAdminTab] = useState(0);
+  const [userLoginEmail, setUserLoginEmail] = useState('');
+  const [userLoginPassword, setUserLoginPassword] = useState('');
+  const [showUserLogin, setShowUserLogin] = useState(false);
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -121,6 +124,7 @@ function App() {
   const [productDialog, setProductDialog] = useState({ open: false, product: null });
   const [userDialog, setUserDialog] = useState({ open: false, user: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, scanId: null, scanDetails: null });
+  const [userDeleteDialog, setUserDeleteDialog] = useState({ open: false, userId: null, userDetails: null });
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -273,6 +277,28 @@ function App() {
     setView('welcome');
   };
 
+  const handleUserLogin = async (e) => {
+    e.preventDefault();
+    if (!userLoginEmail || !userLoginPassword) return showNotification('Please enter email and password', 'error');
+    setLoading(true);
+    try {
+      const response = await authAPI.login({ email: userLoginEmail, password: userLoginPassword });
+      const { token, id, username, email, role } = response.data.data;
+      localStorage.setItem('token', token);
+      setUser({ id, username, email, role, anonymous: false });
+      setShowUserLogin(false);
+      setView('welcome');
+      showNotification(`Welcome back, ${username}!`, 'success');
+      setUserLoginEmail('');
+      setUserLoginPassword('');
+    } catch (error) {
+      console.error('Login error:', error);
+      showNotification(error.response?.data?.message || 'Invalid email or password', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadAdminData = async () => {
     if (!adminAuth) return;
     try {
@@ -384,6 +410,20 @@ function App() {
       setDeleteDialog({ open: false, scanId: null, scanDetails: null });
     } catch (error) {
       showNotification('Failed to delete scan', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    setLoading(true);
+    try {
+      await authAPI.deleteUser(userDeleteDialog.userId);
+      setUsers(users.filter(u => u._id !== userDeleteDialog.userId));
+      showNotification('User deleted successfully!', 'success');
+      setUserDeleteDialog({ open: false, userId: null, userDetails: null });
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to delete user', 'error');
     } finally {
       setLoading(false);
     }
@@ -505,7 +545,45 @@ function App() {
               </Grid>
             </Box>
           )}
+          {user?.anonymous && (
+            <Box sx={{ textAlign: 'center', mt: 4 }}>
+              <Button 
+                variant='outlined' 
+                size='large' 
+                onClick={() => setShowUserLogin(true)}
+                sx={{ 
+                  borderRadius: '12px', 
+                  px: 4, 
+                  py: 1.5,
+                  fontWeight: 600,
+                  borderWidth: 2,
+                  '&:hover': { borderWidth: 2 }
+                }}
+              >
+                Already have an account? Login
+              </Button>
+            </Box>
+          )}
         </Box>}
+
+        {showUserLogin && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
+          <Card sx={{ maxWidth: 400, mx: 'auto', p: 2 }}>
+            <CardContent>
+              <Box sx={{ textAlign: 'center', mb: 3 }}>
+                <Box sx={{ width: 60, height: 60, bgcolor: 'primary.light', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, color: 'white' }}><Person fontSize='large' /></Box>
+                <Typography variant='h5' fontWeight='bold' gutterBottom>User Login</Typography>
+                <Typography variant='body2' color='text.secondary'>Sign in to access your account</Typography>
+              </Box>
+              <form onSubmit={handleUserLogin}>
+                <TextField fullWidth label='Email' type='email' variant='outlined' value={userLoginEmail} onChange={(e) => setUserLoginEmail(e.target.value)} sx={{ mb: 2 }} required />
+                <TextField fullWidth label='Password' type='password' variant='outlined' value={userLoginPassword} onChange={(e) => setUserLoginPassword(e.target.value)} sx={{ mb: 3 }} required />
+                <Button fullWidth variant='contained' size='large' type='submit' disabled={loading} startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Person />}>{loading ? 'Logging in...' : 'Login'}</Button>
+                <Button fullWidth variant='text' sx={{ mt: 2 }} onClick={() => setShowUserLogin(false)}>Back to Welcome</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </Box>}
+
         {view === 'profile' && (
           <Box sx={{ py: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
@@ -823,6 +901,59 @@ function App() {
           </Grid>}
 
           {adminTab === 1 && <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+            <Box sx={{ mb: 2, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+              <Button 
+                variant='outlined' 
+                startIcon={<GetApp />} 
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    const response = await analyticsAPI.export({ type: 'scans', format: 'csv' });
+                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `scans-export-${Date.now()}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    showNotification('CSV downloaded successfully!', 'success');
+                  } catch (error) {
+                    showNotification('Failed to download CSV', 'error');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading || scanHistory.length === 0}
+              >
+                Download CSV
+              </Button>
+              <Button 
+                variant='contained' 
+                startIcon={<GetApp />} 
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    const response = await analyticsAPI.export({ type: 'scans', format: 'xlsx' });
+                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `scans-export-${Date.now()}.xlsx`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    showNotification('Excel file downloaded successfully!', 'success');
+                  } catch (error) {
+                    showNotification('Failed to download Excel file', 'error');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading || scanHistory.length === 0}
+                sx={{ background: 'linear-gradient(135deg, #217346 0%, #34a853 100%)', '&:hover': { background: 'linear-gradient(135deg, #1a5c37 0%, #2d8f45 100%)' } }}
+              >
+                Download Excel
+              </Button>
+            </Box>
             {scanHistory.length === 0 ? <Box sx={{ textAlign: 'center', mt: 8, opacity: 0.5 }}><HistoryIcon sx={{ fontSize: 60, mb: 2 }} /><Typography>No scans yet.</Typography></Box> :
               scanHistory.map((item, i) => <Card key={item._id || i} sx={{ mb: 2, borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
                 <CardContent>
@@ -859,8 +990,8 @@ function App() {
           {adminTab === 2 && <Box>
             <Box sx={{ mb: 2 }}><Button variant='contained' startIcon={<Add />} onClick={() => setUserDialog({ open: true, user: { username: '', email: '', password: '', role: 'user' } })}>Add User</Button></Box>
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-              <Table><TableHead><TableRow><TableCell>Username</TableCell><TableCell>Email</TableCell><TableCell>Role</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
-                <TableBody>{users.map(u => <TableRow key={u._id}><TableCell>{u.username}</TableCell><TableCell>{u.email}</TableCell><TableCell><Chip label={u.role} size='small' color={u.role === 'admin' ? 'error' : 'default'} /></TableCell><TableCell><Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} /></TableCell></TableRow>)}</TableBody>
+              <Table><TableHead><TableRow><TableCell>Username</TableCell><TableCell>Email</TableCell><TableCell>Role</TableCell><TableCell>Status</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
+                <TableBody>{users.map(u => <TableRow key={u._id}><TableCell>{u.username}</TableCell><TableCell>{u.email}</TableCell><TableCell><Chip label={u.role} size='small' color={u.role === 'admin' ? 'error' : 'default'} /></TableCell><TableCell><Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} /></TableCell><TableCell><IconButton size='small' color='error' onClick={() => setUserDeleteDialog({ open: true, userId: u._id, userDetails: { username: u.username, email: u.email, role: u.role } })}><Delete /></IconButton></TableCell></TableRow>)}</TableBody>
               </Table>
             </TableContainer>
           </Box>}
@@ -927,6 +1058,42 @@ function App() {
                 variant='contained' 
                 color='error' 
                 onClick={handleDeleteScan} 
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Delete />}
+              >
+                {loading ? 'Deleting...' : 'Yes, Delete'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Dialog open={userDeleteDialog.open} onClose={() => setUserDeleteDialog({ open: false, userId: null, userDetails: null })} maxWidth='sm' fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main' }}>
+              <Delete />
+              Delete User
+            </DialogTitle>
+            <DialogContent>
+              <Typography variant='body1' gutterBottom>
+                Are you sure you want to delete this user?
+              </Typography>
+              {userDeleteDialog.userDetails && (
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'error.50', borderRadius: 2, border: '1px solid', borderColor: 'error.light' }}>
+                  <Typography variant='body2' color='text.secondary'>Username: <Box component='span' fontWeight='bold' color='text.primary'>{userDeleteDialog.userDetails.username}</Box></Typography>
+                  <Typography variant='body2' color='text.secondary'>Email: <Box component='span' fontWeight='bold' color='text.primary'>{userDeleteDialog.userDetails.email}</Box></Typography>
+                  <Typography variant='body2' color='text.secondary'>Role: <Box component='span' fontWeight='bold' color='text.primary'>{userDeleteDialog.userDetails.role}</Box></Typography>
+                </Box>
+              )}
+              <Typography variant='body2' color='text.secondary' sx={{ mt: 2 }}>
+                This action cannot be undone. All user data will be permanently deleted.
+              </Typography>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button onClick={() => setUserDeleteDialog({ open: false, userId: null, userDetails: null })} disabled={loading}>
+                No, Cancel
+              </Button>
+              <Button 
+                variant='contained' 
+                color='error' 
+                onClick={handleDeleteUser} 
                 disabled={loading}
                 startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Delete />}
               >

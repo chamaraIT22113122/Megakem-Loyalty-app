@@ -49,6 +49,7 @@ export const authAPI = {
   getUsers: () => api.get('/auth/users'),
   createUser: (userData) => api.post('/auth/users', userData),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
+  deleteUser: (id) => api.delete(`/auth/users/${id}`),
   getAuthStats: () => api.get('/auth/stats'),
 };
 
