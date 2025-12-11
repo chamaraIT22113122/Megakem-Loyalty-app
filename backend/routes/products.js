@@ -8,7 +8,8 @@ const { protect, authorize } = require('../middleware/auth');
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    const { search, category, isActive = true } = req.query;
+    console.log('📦 GET /api/products - Request received');
+    const { search, category, isActive } = req.query;
     
     const query = {};
     if (search) {
@@ -18,9 +19,15 @@ router.get('/', async (req, res) => {
       ];
     }
     if (category) query.category = category;
-    if (isActive !== undefined) query.isActive = isActive === 'true';
+    // Only filter by isActive if explicitly provided in query
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true' || isActive === true;
+    }
 
+    console.log('📦 Query:', JSON.stringify(query));
     const products = await Product.find(query).sort({ name: 1 });
+    console.log('📦 Found products:', products.length);
+    console.log('📦 Products:', products.map(p => ({ name: p.name, code: p.productNo })));
 
     res.json({
       success: true,

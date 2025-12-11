@@ -9,11 +9,18 @@ const { optionalAuth, protect, authorize } = require('../middleware/auth');
 // @access  Public (but optionally authenticated)
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 50, role, memberId } = req.query;
+    const { page = 1, limit = 50, role, memberId, phone } = req.query;
     
     const query = {};
     if (role) query.role = role;
     if (memberId) query.memberId = memberId.toUpperCase();
+    if (phone) {
+      // Search in both phone field and memberId field (for old records)
+      query.$or = [
+        { phone: phone.trim() },
+        { memberId: { $regex: phone.trim(), $options: 'i' } }
+      ];
+    }
 
     const scans = await Scan.find(query)
       .sort({ timestamp: -1 })
@@ -105,18 +112,15 @@ router.post('/', optionalAuth, async (req, res) => {
       qty
     } = req.body;
 
-    // Check for duplicate scan - same person (memberId + role) can't scan same product (batchNo + bagNo) twice
+    // Check for duplicate scan - only check if this batch number has been scanned before
     const duplicateScan = await Scan.findOne({
-      memberId: memberId.toUpperCase(),
-      role,
-      batchNo,
-      bagNo
+      batchNo
     });
 
     if (duplicateScan) {
       return res.status(400).json({
         success: false,
-        message: `This ${role} has already scanned this product (Batch: ${batchNo}, Bag: ${bagNo})`,
+        message: `This batch number (${batchNo}) has already been scanned`,
         duplicate: true
       });
     }
@@ -196,18 +200,14 @@ router.post('/batch', optionalAuth, async (req, res) => {
 
     for (const scan of scans) {
       const duplicateScan = await Scan.findOne({
-        memberId: scan.memberId.toUpperCase(),
-        role: scan.role,
-        batchNo: scan.batchNo,
-        bagNo: scan.bagNo
+        batchNo: scan.batchNo
       });
 
       if (duplicateScan) {
         duplicates.push({
           productName: scan.productName,
           batchNo: scan.batchNo,
-          bagNo: scan.bagNo,
-          role: scan.role
+          bagNo: scan.bagNo
         });
       } else {
         validScans.push({

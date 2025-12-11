@@ -12,6 +12,10 @@ const scanSchema = new mongoose.Schema({
     uppercase: true,
     trim: true
   },
+  phone: {
+    type: String,
+    trim: true
+  },
   role: {
     type: String,
     required: true,
@@ -37,6 +41,10 @@ const scanSchema = new mongoose.Schema({
   qty: {
     type: String,
     required: true
+  },
+  location: {
+    type: String,
+    trim: true
   },
   timestamp: {
     type: Date,

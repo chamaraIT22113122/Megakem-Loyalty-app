@@ -103,18 +103,26 @@ function App() {
   const [role, setRole] = useState('applicator');
   const [memberId, setMemberId] = useState('');
   const [memberName, setMemberName] = useState('');
+  const [location, setLocation] = useState('');
   const [cart, setCart] = useState([]);
+  const [pendingScan, setPendingScan] = useState(null);
   const [scanHistory, setScanHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, msg: '', type: 'success' });
-  const [adminAuth, setAdminAuth] = useState(false);
+  const [adminAuth, setAdminAuth] = useState(() => {
+    const stored = localStorage.getItem('adminAuth');
+    return stored === 'true';
+  });
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminTab, setAdminTab] = useState(0);
   const [userLoginEmail, setUserLoginEmail] = useState('');
   const [userLoginPassword, setUserLoginPassword] = useState('');
   const [showUserLogin, setShowUserLogin] = useState(false);
+  const [searchMemberId, setSearchMemberId] = useState('');
+  const [searchPhone, setSearchPhone] = useState('');
+  const [memberHistory, setMemberHistory] = useState([]);
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -139,9 +147,22 @@ function App() {
     const initAuth = async () => {
       try {
         const token = localStorage.getItem('token');
+        const storedAdminAuth = localStorage.getItem('adminAuth');
+        
         if (token) {
-          try { const response = await authAPI.getMe(); setUser(response.data.data); }
-          catch { localStorage.removeItem('token'); await createAnonymousSession(); }
+          try { 
+            const response = await authAPI.getMe(); 
+            setUser(response.data.data);
+            // If adminAuth is stored, restore admin view
+            if (storedAdminAuth === 'true') {
+              setView('admin');
+            }
+          }
+          catch { 
+            localStorage.removeItem('token'); 
+            localStorage.removeItem('adminAuth');
+            await createAnonymousSession(); 
+          }
         } else { await createAnonymousSession(); }
       } catch (error) { console.error('Auth error:', error); showNotification('Connection Error', 'error'); }
       finally { setInitializing(false); }
@@ -158,6 +179,72 @@ function App() {
     } catch (error) { console.error('Anonymous auth error:', error); }
   };
 
+  // Parse batch number to extract components
+  const parseBatchInfo = (batchNo) => {
+    if (!batchNo) return null;
+    
+    // Try to parse format: "MLSP 001 050525 001 001"
+    const parts = batchNo.trim().split(/\s+/);
+    
+    if (parts.length === 5) {
+      const [productCode, materialBatch, dateCode, packSize, packNo] = parts;
+      
+      // Parse date: 050525 -> 05/05/25 -> May 5, 2025
+      let formattedDate = dateCode;
+      if (dateCode.length === 6) {
+        const day = dateCode.substring(0, 2);
+        const month = dateCode.substring(2, 4);
+        const year = '20' + dateCode.substring(4, 6);
+        formattedDate = `${day}/${month}/${year}`;
+      }
+      
+      return {
+        productCode,
+        materialBatch,
+        date: formattedDate,
+        packSize,
+        packNo,
+        parsed: true
+      };
+    }
+    
+    return { raw: batchNo, parsed: false };
+  };
+
+  // Handle QR code URL parameters on initial load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const batchParam = params.get('batch') || params.get('batchNo');
+    
+    if (batchParam) {
+      console.log('Detected batch parameter:', batchParam);
+      
+      // Parse the batch format: "MLSP 001 050525 001 001"
+      // Components: Product Code, Material Batch No, Date, Pack Size, Pack No
+      const parts = batchParam.trim().split(/\s+/);
+      
+      if (parts.length === 5) {
+        const [productCode, materialBatch, dateCode, packSize, packNo] = parts;
+        
+        const parsedData = {
+          productCode,        // "MLSP" - for product matching
+          materialBatch,      // "001"
+          dateCode,           // "050525" - date
+          packSize,           // "001" - quantity
+          bagNo: packNo,      // "001" - bag/pack number
+          fullBatch: batchParam // Full string for display
+        };
+        
+        console.log('Parsed batch data:', parsedData);
+        setPendingScan(parsedData);
+      } else {
+        console.warn('Unexpected batch format, expected 5 parts, got:', parts.length);
+        // Fallback for other formats
+        setPendingScan({ batchNo: batchParam, fullBatch: batchParam });
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (!user || view !== 'admin') return;
     const fetchLiveScans = async () => {
@@ -170,15 +257,21 @@ function App() {
   }, [user, view]);
 
   useEffect(() => {
-    if (!user || user.anonymous) return;
+    if (!user) return;
     const loadData = async () => {
       try {
-        const [rewardsRes, leaderboardRes] = await Promise.all([
-          rewardsAPI.getAll(),
-          analyticsAPI.getLeaderboard()
-        ]);
-        setRewards(rewardsRes.data.data);
-        setLeaderboard(leaderboardRes.data.data);
+        const productsRes = await productsAPI.getAll();
+        setProducts(productsRes.data.data);
+        
+        // Load additional data for logged-in users
+        if (!user.anonymous) {
+          const [rewardsRes, leaderboardRes] = await Promise.all([
+            rewardsAPI.getAll(),
+            analyticsAPI.getLeaderboard()
+          ]);
+          setRewards(rewardsRes.data.data);
+          setLeaderboard(leaderboardRes.data.data);
+        }
       } catch (error) {
         console.error('Error loading data:', error);
       }
@@ -208,14 +301,75 @@ function App() {
   const showNotification = (msg, type = 'success') => setSnackbar({ open: true, msg, type });
   const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
-  const handleScan = (qrString) => {
+  const handleScan = async (qrString) => {
     try {
-      let data; try { data = JSON.parse(qrString); } catch { data = { name: 'Unknown Item', batch: 'N/A', bag: 'N/A', id: qrString, qty: '1' }; }
+      let data;
+      
+      // Try to parse as JSON first
+      try {
+        data = JSON.parse(qrString);
+      } catch {
+        // If not JSON, parse as batch number format: "MLSP 001 050525 001 002"
+        const parts = qrString.trim().split(/\s+/);
+        
+        if (parts.length === 5) {
+          const [productCode, materialBatch, dateCode, packSize, packNo] = parts;
+          
+          // If products not loaded yet, load them
+          let currentProducts = products;
+          if (currentProducts.length === 0) {
+            console.log('Products not loaded, fetching...');
+            try {
+              const productsRes = await productsAPI.getAll();
+              currentProducts = productsRes.data.data;
+              setProducts(currentProducts);
+            } catch (error) {
+              console.error('Error loading products:', error);
+            }
+          }
+          
+          // Find product by exact product code match from admin products
+          console.log('Looking for product with code:', productCode);
+          console.log('Available products:', currentProducts.map(p => ({ name: p.name, code: p.productNo })));
+          
+          const product = currentProducts.find(p => 
+            p.productNo.toUpperCase() === productCode.toUpperCase()
+          );
+          
+          console.log('Found product:', product);
+          
+          if (product) {
+            data = {
+              id: product.productNo,
+              name: product.name,
+              batch: qrString, // Full batch string
+              bag: packNo,     // Pack number as bag
+              qty: packSize    // Pack size as quantity
+            };
+            showNotification(`Added ${product.name}!`);
+          } else {
+            data = {
+              name: `Unknown Item (Code: ${productCode})`,
+              batch: qrString,
+              bag: packNo || 'N/A',
+              id: productCode,
+              qty: packSize || '1'
+            };
+            showNotification(`Product with code "${productCode}" not found. Please add it in Admin > Products.`, 'warning');
+          }
+        } else {
+          // Unknown format
+          data = { name: 'Unknown Item', batch: qrString, bag: 'N/A', id: qrString, qty: '1' };
+        }
+      }
+      
       const newItem = { ...data, tempId: Date.now() + Math.random() };
       setCart(prev => [...prev, newItem]);
-      showNotification('Item Added to Cart!');
       setView('cart');
-    } catch (e) { showNotification('Scan Error', 'error'); }
+    } catch (e) {
+      console.error('Scan error:', e);
+      showNotification('Scan Error', 'error');
+    }
   };
 
   const handleRemoveItem = (tempId) => setCart(prev => prev.filter(item => item.tempId !== tempId));
@@ -230,7 +384,18 @@ function App() {
     }
     setLoading(true);
     try {
-      const scansData = cart.map(item => ({ memberName: memberName || 'N/A', memberId: memberId.toUpperCase(), role, productName: item.name, productNo: item.id, batchNo: item.batch, bagNo: item.bag, qty: item.qty }));
+      const scansData = cart.map(item => ({ 
+        memberName: memberName || 'N/A', 
+        memberId: role === 'customer' ? `CUS-${memberId}` : memberId.toUpperCase(), 
+        phone: role === 'customer' ? memberId : '',
+        role, 
+        productName: item.name, 
+        productNo: item.id, 
+        batchNo: item.batch, 
+        bagNo: item.bag, 
+        qty: item.qty, 
+        location: location || '' 
+      }));
       const response = await scansAPI.createBatch(scansData);
       
       if (response.data.duplicates && response.data.duplicates.length > 0) {
@@ -239,7 +404,7 @@ function App() {
         showNotification(`Successfully submitted ${cart.length} items!`, 'success');
       }
       
-      setCart([]); setMemberId(''); setMemberName(''); setView('welcome');
+      setCart([]); setMemberId(''); setMemberName(''); setLocation(''); setView('welcome');
     } catch (error) { 
       console.error('Error:', error); 
       if (error.response?.data?.duplicates) {
@@ -259,6 +424,7 @@ function App() {
       const response = await authAPI.adminLogin({ email: adminEmail, password: adminPassword });
       const { token, id, username, role } = response.data.data;
       localStorage.setItem('token', token);
+      localStorage.setItem('adminAuth', 'true');
       setUser({ id, username, role });
       setAdminAuth(true);
       showNotification('Admin login successful!', 'success');
@@ -271,6 +437,8 @@ function App() {
   };
 
   const handleAdminLogout = () => {
+    localStorage.removeItem('adminAuth');
+    localStorage.removeItem('token');
     setAdminAuth(false);
     setAdminEmail('');
     setAdminPassword('');
@@ -302,30 +470,91 @@ function App() {
   const loadAdminData = async () => {
     if (!adminAuth) return;
     try {
+      console.log('🔄 Loading admin data...');
       const [statsRes, scansRes, usersRes, productsRes] = await Promise.all([
         scansAPI.getStats(),
         scansAPI.getLive(),
         authAPI.getUsers(),
         productsAPI.getAll()
       ]);
+      console.log('📦 Products response:', productsRes.data);
       setStats(statsRes.data.data);
       setScanHistory(scansRes.data.data);
       setUsers(usersRes.data.data);
       setProducts(productsRes.data.data);
+      console.log('✅ Products loaded:', productsRes.data.data.length, 'products');
     } catch (error) {
-      console.error('Error loading admin data:', error);
+      console.error('❌ Error loading admin data:', error);
     }
   };
 
   useEffect(() => {
-    if (adminAuth && view === 'admin') {
+    if (adminAuth) {
+      // Load admin data when adminAuth is true (including on page refresh)
       loadAdminData();
-      const interval = setInterval(() => {
-        scansAPI.getLive().then(res => setScanHistory(res.data.data)).catch(console.error);
-      }, 5000);
-      return () => clearInterval(interval);
+      
+      if (view === 'admin') {
+        const interval = setInterval(() => {
+          scansAPI.getLive().then(res => setScanHistory(res.data.data)).catch(console.error);
+        }, 5000);
+        return () => clearInterval(interval);
+      }
     }
   }, [adminAuth, view]);
+
+  // Process pending scan after role selection
+  useEffect(() => {
+    const processPendingScan = async () => {
+      if (pendingScan && role && (view === 'scanner' || view === 'cart')) {
+        console.log('Processing pending scan:', pendingScan);
+        try {
+          // Find product by exact product code match from admin products
+          console.log('Processing pending scan with productCode:', pendingScan.productCode);
+          console.log('Available products:', products.map(p => ({ name: p.name, code: p.productNo })));
+          
+          const product = products.find(p => 
+            (pendingScan.productCode && p.productNo.toUpperCase() === pendingScan.productCode.toUpperCase())
+          );
+          
+          console.log('Matched product:', product);
+          
+          if (product) {
+            const newItem = {
+              id: product.productNo,
+              name: product.name,
+              batch: pendingScan.fullBatch || pendingScan.batchNo,
+              bag: pendingScan.bagNo || '001',
+              qty: pendingScan.packSize || '1'
+            };
+            
+            // Check for duplicates
+            const isDuplicate = cart.some(item => 
+              item.id === newItem.id && 
+              item.batch === newItem.batch && 
+              item.bag === newItem.bag
+            );
+            
+            if (!isDuplicate) {
+              setCart(prev => [...prev, newItem]);
+              setSnackbar({ open: true, msg: `Added ${product.name} (Bag #${newItem.bag}) to cart!`, type: 'success' });
+              setView('cart');
+            } else {
+              setSnackbar({ open: true, msg: 'This item is already in your cart', type: 'warning' });
+              setView('cart');
+            }
+          } else {
+            setSnackbar({ open: true, msg: `Product not found for code: ${pendingScan.productCode || 'Unknown'}`, type: 'error' });
+          }
+        } catch (error) {
+          console.error('Error processing pending scan:', error);
+        } finally {
+          setPendingScan(null);
+        }
+      }
+    };
+    
+    processPendingScan();
+  }, [pendingScan, role, view, products, cart]);
 
   const handleUpdateProfile = async () => {
     setLoading(true);
@@ -373,6 +602,13 @@ function App() {
   const handleSaveProduct = async () => {
     setLoading(true);
     try {
+      // Validate required fields
+      if (!productDialog.product?.name || !productDialog.product?.productNo) {
+        showNotification('Product Name and Product Code are required', 'error');
+        setLoading(false);
+        return;
+      }
+
       if (productDialog.product._id) {
         await productsAPI.update(productDialog.product._id, productDialog.product);
         setProducts(products.map(p => p._id === productDialog.product._id ? productDialog.product : p));
@@ -493,16 +729,16 @@ function App() {
           </Box>
           <Grid container spacing={3}>
             <Grid item xs={12}><Card sx={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.main', overflow: 'hidden', position: 'relative', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', '@media (hover: hover)': { '&:hover': { transform: 'translateY(-8px) scale(1.02)', boxShadow: '0 20px 40px rgba(0,51,102,0.25)' } }, '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '5px', background: 'linear-gradient(90deg, #003366 0%, #00B4D8 50%, #A4D233 100%)' } }}>
-              <CardActionArea onClick={() => { setRole('applicator'); setView('scanner'); setCart([]); }} sx={{ p: { xs: 2, sm: 3.5 } }}>
+              <CardActionArea onClick={() => { setRole('applicator'); setView('cart'); }} sx={{ p: { xs: 2, sm: 3.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Box sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: { xs: '15px', sm: '20px' }, background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', mr: { xs: 2, sm: 3 }, boxShadow: '0 8px 20px rgba(0,51,102,0.35)', transition: 'all 0.3s', '@media (hover: hover)': { '&:hover': { transform: 'rotate(5deg) scale(1.1)' } } }}><Inventory2 sx={{ color: 'white', fontSize: { xs: '1.75rem', sm: '2.5rem' } }} /></Box>
-                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'primary.main', mb: 0.5, letterSpacing: '-0.3px', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>Applicator</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '0.85rem', sm: '1rem' } }}>Contractor / Worker</Typography></Box>
+                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'primary.main', mb: 0.5, letterSpacing: '-0.3px', fontSize: { xs: '0.95rem', sm: '1.25rem' } }}>Waterproofing Technician Club</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '0.75rem', sm: '0.9rem' } }}>Loyalty Plan/Programme</Typography></Box>
                   <ArrowForward sx={{ color: 'secondary.main', fontSize: { xs: '1.75rem', sm: '2.5rem' }, animation: 'slideRight 1.5s ease-in-out infinite', '@keyframes slideRight': { '0%, 100%': { transform: 'translateX(0)' }, '50%': { transform: 'translateX(8px)' } } }} />
                 </Box>
               </CardActionArea>
             </Card></Grid>
             <Grid item xs={12}><Card sx={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0fff4 100%)', border: '2px solid', borderColor: 'secondary.main', overflow: 'hidden', position: 'relative', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', '@media (hover: hover)': { '&:hover': { transform: 'translateY(-8px) scale(1.02)', boxShadow: '0 20px 40px rgba(164,210,51,0.25)' } }, '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '5px', background: 'linear-gradient(90deg, #A4D233 0%, #00B4D8 50%, #003366 100%)' } }}>
-              <CardActionArea onClick={() => { setRole('customer'); setView('scanner'); setCart([]); }} sx={{ p: { xs: 2, sm: 3.5 } }}>
+              <CardActionArea onClick={() => { setRole('customer'); setView('cart'); }} sx={{ p: { xs: 2, sm: 3.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Box sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: { xs: '15px', sm: '20px' }, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', mr: { xs: 2, sm: 3 }, boxShadow: '0 8px 20px rgba(164,210,51,0.35)', transition: 'all 0.3s', '@media (hover: hover)': { '&:hover': { transform: 'rotate(-5deg) scale(1.1)' } } }}><Person sx={{ color: 'white', fontSize: { xs: '1.75rem', sm: '2.5rem' } }} /></Box>
                   <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'secondary.dark', mb: 0.5, letterSpacing: '-0.3px', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>Customer</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '0.85rem', sm: '1rem' } }}>End User / Buyer</Typography></Box>
@@ -511,7 +747,25 @@ function App() {
               </CardActionArea>
             </Card></Grid>
           </Grid>
-          {!user?.anonymous && (
+          <Box sx={{ mt: 4, textAlign: 'center' }}>
+            <Button 
+              variant='outlined' 
+              size='large' 
+              startIcon={<HistoryIcon />}
+              onClick={() => setView('history')}
+              sx={{ 
+                borderRadius: '12px', 
+                px: 4, 
+                py: 1.5,
+                fontWeight: 600,
+                borderWidth: 2,
+                '&:hover': { borderWidth: 2 }
+              }}
+            >
+              Search Purchase History
+            </Button>
+          </Box>
+          {false && !user?.anonymous && (
             <Box sx={{ mt: 4 }}>
               <Divider sx={{ mb: 3 }}><Chip label="My Account" color="primary" /></Divider>
               <Grid container spacing={2}>
@@ -582,6 +836,125 @@ function App() {
               </form>
             </CardContent>
           </Card>
+        </Box>}
+
+        {view === 'history' && <Box sx={{ py: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <IconButton onClick={() => setView('welcome')} sx={{ mr: 2 }}>
+              <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
+            </IconButton>
+            <Typography variant='h4' fontWeight={700}>Purchase History Search</Typography>
+          </Box>
+          <Card sx={{ mb: 3, p: 3 }}>
+            <Typography variant='subtitle1' fontWeight={600} sx={{ mb: 2 }}>Search Purchase History</Typography>
+            <TextField 
+              fullWidth 
+              label='Member ID (for Applicators)' 
+              placeholder='e.g., APP-001' 
+              value={searchMemberId} 
+              onChange={(e) => {
+                setSearchMemberId(e.target.value.toUpperCase());
+                setSearchPhone('');
+              }}
+              sx={{ mb: 2 }}
+            />
+            <Typography variant='body2' color='text.secondary' sx={{ mb: 1, textAlign: 'center', fontWeight: 600 }}>OR</Typography>
+            <TextField 
+              fullWidth 
+              label='Phone Number (for Customers)' 
+              placeholder='e.g., 0712345678' 
+              value={searchPhone} 
+              onChange={(e) => {
+                setSearchPhone(e.target.value);
+                setSearchMemberId('');
+              }}
+              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+              sx={{ mb: 2 }}
+            />
+            <Button 
+              fullWidth 
+              variant='contained' 
+              size='large'
+              startIcon={<TrendingUp />}
+              disabled={loading || (!searchMemberId.trim() && !searchPhone.trim())}
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const searchValue = searchPhone.trim() || searchMemberId.trim();
+                  const isPhone = searchPhone.trim().length > 0;
+                  const searchParam = isPhone 
+                    ? { phone: searchPhone.trim() } 
+                    : { memberId: searchMemberId.toUpperCase().trim() };
+                  console.log('Searching with:', searchParam);
+                  const response = await scansAPI.getAll(searchParam);
+                  console.log('Full API response:', response);
+                  console.log('Response data:', response.data);
+                  
+                  // Handle nested data structure from backend
+                  const results = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+                  console.log('Parsed results:', results);
+                  
+                  setMemberHistory(results);
+                  if (results.length === 0) {
+                    setSnackbar({ open: true, msg: `No records found for ${isPhone ? 'phone number' : 'member ID'}: ${searchValue}`, type: 'info' });
+                  } else {
+                    setSnackbar({ open: true, msg: `Found ${results.length} record${results.length > 1 ? 's' : ''}`, type: 'success' });
+                  }
+                } catch (error) {
+                  console.error('Search error:', error);
+                  setSnackbar({ open: true, msg: 'Failed to fetch history. Error: ' + (error.message || 'Unknown error'), type: 'error' });
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              {loading ? 'Searching...' : 'Search'}
+            </Button>
+          </Card>
+          {memberHistory.length > 0 && (
+            <Box>
+              <Typography variant='h6' gutterBottom>
+                Found {memberHistory.length} records for {searchPhone || searchMemberId}
+              </Typography>
+              {memberHistory.map((scan, idx) => (
+                <Card key={scan._id || idx} sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant='h6' fontWeight='bold'>{scan.productName}</Typography>
+                      <Chip label={scan.role} size='small' color={scan.role === 'applicator' ? 'primary' : 'secondary'} />
+                    </Box>
+                    <Typography variant='body2' color='text.secondary'>Member: {scan.memberName}</Typography>
+                    {scan.phone && <Typography variant='body2' color='text.secondary'>Phone: {scan.phone}</Typography>}
+                    <Typography variant='body2' color='text.secondary'>Product No: {scan.productNo}</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                      <Chip label={`Batch: ${scan.batchNo}`} size='small' variant='outlined' />
+                      <Chip label={`Bag: ${scan.bagNo}`} size='small' variant='outlined' />
+                      <Chip label={`Qty: ${scan.qty}`} size='small' />
+                    </Box>
+                    {(() => {
+                      const batchInfo = parseBatchInfo(scan.batchNo);
+                      if (batchInfo?.parsed) {
+                        return (
+                          <Box sx={{ mt: 1, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block', fontWeight: 600 }}>Batch Details:</Typography>
+                            <Typography variant='caption' color='text.secondary'>Product Code: {batchInfo.productCode}</Typography>
+                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>Material Batch: {batchInfo.materialBatch}</Typography>
+                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>Date: {batchInfo.date}</Typography>
+                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>Pack Size: {batchInfo.packSize} | Pack No: {batchInfo.packNo}</Typography>
+                          </Box>
+                        );
+                      }
+                      return null;
+                    })()}
+                    {scan.location && <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mt: 1 }}>📍 {scan.location}</Typography>}
+                    <Typography variant='caption' color='text.disabled' sx={{ display: 'block', mt: 1 }}>
+                      {new Date(scan.timestamp).toLocaleString()}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
+          )}
         </Box>}
 
         {view === 'profile' && (
@@ -671,6 +1044,17 @@ function App() {
                               <Typography variant="caption" color="text.secondary">
                                 Batch: {scan.batchNo} | Bag: {scan.bagNo}
                               </Typography>
+                              {(() => {
+                                const batchInfo = parseBatchInfo(scan.batchNo);
+                                if (batchInfo?.parsed) {
+                                  return (
+                                    <Typography variant="caption" display="block" color="primary.main" sx={{ mt: 0.5 }}>
+                                      {batchInfo.productCode} • Mat: {batchInfo.materialBatch} • {batchInfo.date}
+                                    </Typography>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </Box>
                             <Box sx={{ textAlign: 'right' }}>
                               <Chip label={scan.role} size="small" color={scan.role === 'applicator' ? 'primary' : 'secondary'} />
@@ -822,11 +1206,40 @@ function App() {
           </Box>
         )}
         {view === 'scanner' && <Paper sx={{ flexGrow: 1, bgcolor: '#000', color: 'white', overflow: 'hidden', position: 'relative', borderRadius: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+          <Box sx={{ position: 'absolute', top: { xs: 60, sm: 80 }, left: 0, right: 0, zIndex: 5, px: 2 }}>
+            <Paper elevation={3} sx={{ bgcolor: 'rgba(255,255,255,0.95)', p: { xs: 1.5, sm: 2 }, borderRadius: 2, backdropFilter: 'blur(10px)' }}>
+              <Typography variant='subtitle2' fontWeight='bold' color='primary' gutterBottom sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
+                {role === 'applicator' ? 'Waterproofing Technician - Instructions:' : 'Customer - Instructions:'}
+              </Typography>
+              <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                📱 Scan QR code on product bags OR use manual entry below
+              </Typography>
+              <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                ✅ Multiple scans allowed - Add all your products
+              </Typography>
+              <Typography variant='caption' color='text.secondary' sx={{ display: 'block', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                🎯 {role === 'applicator' ? 'Earn points with each scan!' : 'Track your purchases'}
+              </Typography>
+            </Paper>
+          </Box>
           <Box sx={{ flexGrow: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#000', minHeight: { xs: '300px', sm: '400px' } }}>
             <div id='reader' style={{ width: '100%', height: '100%' }}></div>
             <Box sx={{ position: 'absolute', zIndex: 0, opacity: 0.3, textAlign: 'center' }}><Typography variant='caption' sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Loading Camera...</Typography></Box>
             <IconButton onClick={() => setView('welcome')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, left: { xs: 8, sm: 16 }, zIndex: 10, bgcolor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', transition: 'all 0.3s', '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
             {cart.length > 0 && <Fab variant='extended' size={window.innerWidth < 600 ? 'small' : 'medium'} onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, right: { xs: 8, sm: 16 }, zIndex: 10, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white', fontWeight: 700, boxShadow: '0 6px 20px rgba(164,210,51,0.4)', animation: 'bounce 2s ease-in-out infinite', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }, '&:hover': { background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1.5, sm: 2 } }}>View Cart ({cart.length})</Fab>}
+          </Box>
+          <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10, bgcolor: 'rgba(255,255,255,0.98)', p: 2, borderTop: '2px solid', borderColor: 'primary.main' }}>
+            <Typography variant='subtitle2' fontWeight='bold' color='primary' gutterBottom>Manual Entry (Temporary Simulator)</Typography>
+            <Grid container spacing={1}>
+              <Grid item xs={12}>
+                <TextField fullWidth size='small' placeholder='Paste QR Code Data' onKeyPress={(e) => {
+                  if (e.key === 'Enter' && e.target.value.trim()) {
+                    handleScan(e.target.value);
+                    e.target.value = '';
+                  }
+                }} sx={{ bgcolor: 'white' }} />
+              </Grid>
+            </Grid>
           </Box>
 
         </Paper>}
@@ -853,9 +1266,20 @@ function App() {
             <Button variant='outlined' fullWidth startIcon={<Add />} onClick={() => setView('scanner')} sx={{ borderStyle: 'dashed', borderWidth: 3, borderColor: 'primary.main', py: 3, fontSize: '1rem', fontWeight: 700, color: 'primary.main', transition: 'all 0.3s', '&:hover': { borderWidth: 3, bgcolor: 'primary.50', transform: 'scale(1.02)' } }}>Scan Another Item</Button>
           </Box>
           <Paper elevation={6} sx={{ p: { xs: 2, sm: 3 }, borderRadius: { xs: 3, sm: 4 }, background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.light', boxShadow: '0 12px 40px rgba(0,51,102,0.2)' }}>
+            {role === 'customer' && (
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'info.50', borderRadius: 2, border: '1px solid', borderColor: 'info.light' }}>
+                <Typography variant='caption' fontWeight='bold' color='info.dark' sx={{ display: 'block', mb: 1, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                  📋 Customer Information
+                </Typography>
+                <Typography variant='caption' color='text.secondary' sx={{ display: 'block', fontSize: { xs: '0.65rem', sm: '0.7rem' } }}>
+                  ⚠️ Disclaimer: By providing your information, you consent to Megakem storing your contact details and purchase history for loyalty program purposes. Your data will be handled according to our privacy policy.
+                </Typography>
+              </Box>
+            )}
             <Grid container spacing={{ xs: 1.5, sm: 2.5 }}>
               {role === 'customer' && <Grid item xs={12}><TextField fullWidth label='Customer Name' variant='outlined' value={memberName} onChange={(e) => setMemberName(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>}
               <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? 'Phone Number' : 'Member ID'} placeholder={role === 'customer' ? 'e.g. 0712345678' : 'e.g. APP-001'} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
+              <Grid item xs={12}><TextField fullWidth label='Location (Optional)' placeholder='e.g. Colombo, Kandy' variant='outlined' value={location} onChange={(e) => setLocation(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
               <Grid item xs={12}><Button fullWidth variant='contained' size='large' disabled={loading || cart.length === 0} onClick={handleSubmitAll} startIcon={loading ? <CircularProgress size={22} color='inherit' /> : <CheckCircle />} sx={{ py: { xs: 1.5, sm: 2 }, fontSize: { xs: '0.95rem', sm: '1.1rem' }, fontWeight: 800, background: loading ? undefined : 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', boxShadow: '0 8px 20px rgba(164,210,51,0.4)', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(164,210,51,0.5)' }, '&:disabled': { opacity: 0.6 } }}>{loading ? 'Submitting...' : `Submit ${cart.length} Items`}</Button></Grid>
             </Grid>
           </Paper>
@@ -881,7 +1305,7 @@ function App() {
             <Tabs value={adminTab} onChange={(e, v) => setAdminTab(v)} variant='scrollable' scrollButtons='auto'>
               <Tab icon={<DashboardIcon />} label='Dashboard' />
               <Tab icon={<HistoryIcon />} label='Scans' />
-              <Tab icon={<People />} label='Users' />
+              <Tab icon={<People />} label='Co-Admins' />
               <Tab icon={<Category />} label='Products' />
               <Tab icon={<Settings />} label='Profile' />
             </Tabs>
@@ -896,6 +1320,12 @@ function App() {
             <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><TrendingUp /> Top Products by Scans</Typography><ResponsiveContainer width='100%' height={300}><BarChart data={stats.topProducts?.slice(0, 5).map(p => ({ name: p._id.length > 20 ? p._id.substring(0, 20) + '...' : p._id, scans: p.count }))} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}><CartesianGrid strokeDasharray='3 3' stroke='#f0f0f0' /><XAxis dataKey='name' angle={-45} textAnchor='end' height={100} tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} /><Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }} /><Bar dataKey='scans' fill='#003366' radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card></Grid>
             
             <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>User Distribution</Typography><ResponsiveContainer width='100%' height={300}><PieChart><Pie data={[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }]} cx='50%' cy='50%' labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill='#8884d8' dataKey='value'>{[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></CardContent></Card></Grid>
+            
+            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>📍 Top Locations</Typography><List dense>{scanHistory.filter(s => s.location).reduce((acc, scan) => { const existing = acc.find(l => l.location === scan.location); if (existing) { existing.count++; } else { acc.push({ location: scan.location, count: 1 }); } return acc; }, []).sort((a, b) => b.count - a.count).slice(0, 5).map((loc, i) => <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: i === 0 ? 'success.main' : 'grey.400', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}><ListItemText primary={<Typography variant='body1' fontWeight={600}>{loc.location}</Typography>} secondary={<Chip label={`${loc.count} scans`} size='small' color={i === 0 ? 'success' : 'default'} />} /></ListItem>)}</List></CardContent></Card></Grid>
+            
+            <Grid item xs={12} md={6}><Card sx={{ background: 'linear-gradient(135deg, #FAD961 0%, #F76B1C 100%)', color: 'white' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>💰 Total Product Value (Estimated)</Typography><Typography variant='h3' fontWeight='bold' sx={{ my: 2 }}>Rs. {scanHistory.reduce((total, scan) => { const product = products.find(p => p.productNo === scan.productNo); return total + ((product?.price || 0) * (scan.qty || 1)); }, 0).toLocaleString()}</Typography><Typography variant='body2' sx={{ opacity: 0.9 }}>Based on {scanHistory.length} scans with product pricing</Typography></CardContent></Card></Grid>
+            
+            <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>💵 Price Estimation by Product</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell><TableCell sx={{ fontWeight: 700 }}>Pack Size</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Unit Price</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Qty</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Est. Value</TableCell></TableRow></TableHead><TableBody>{(() => { const productStats = scanHistory.reduce((acc, scan) => { const product = products.find(p => p.productNo === scan.productNo); if (!product) return acc; const key = product.productNo; if (!acc[key]) { acc[key] = { name: product.name, packSize: product.category || 'N/A', price: product.price || 0, scans: 0, totalQty: 0 }; } acc[key].scans += 1; acc[key].totalQty += parseInt(scan.qty) || 1; return acc; }, {}); return Object.entries(productStats).sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty)).map(([code, data]) => <TableRow key={code} sx={{ '&:hover': { bgcolor: 'action.hover' } }}><TableCell><Typography variant='body2' fontWeight={600}>{data.name}</Typography><Typography variant='caption' color='text.secondary'>{code}</Typography></TableCell><TableCell><Chip label={data.packSize} size='small' variant='outlined' /></TableCell><TableCell align='right'><Typography variant='body2' fontWeight={600}>Rs. {data.price.toLocaleString()}</Typography></TableCell><TableCell align='right'><Chip label={data.scans} size='small' color='primary' /></TableCell><TableCell align='right'><Typography variant='body2' fontWeight={600}>{data.totalQty}</Typography></TableCell><TableCell align='right'><Typography variant='body1' fontWeight={700} color='success.main'>Rs. {(data.price * data.totalQty).toLocaleString()}</Typography></TableCell></TableRow>); })()}</TableBody></Table></TableContainer><Box sx={{ mt: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Typography variant='body1' fontWeight={700} color='success.dark'>Grand Total Estimated Value:</Typography><Typography variant='h5' fontWeight={800} color='success.dark'>Rs. {scanHistory.reduce((total, scan) => { const product = products.find(p => p.productNo === scan.productNo); return total + ((product?.price || 0) * ((parseInt(scan.qty) || 1))); }, 0).toLocaleString()}</Typography></Box></CardContent></Card></Grid>
             
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><Category /> Product Scan Details</Typography><List dense>{stats.topProducts?.map((p, i) => <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}><ListItemText primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} secondary={<Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}><Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} /><Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography></Box>} /></ListItem>)}</List></CardContent></Card></Grid>
           </Grid>}
@@ -958,7 +1388,13 @@ function App() {
               scanHistory.map((item, i) => <Card key={item._id || i} sx={{ mb: 2, borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                    <Box><Typography variant='subtitle1' fontWeight='bold'>{item.memberName || 'Unknown'}</Typography><Chip label={item.memberId} size='small' sx={{ borderRadius: 1, height: 20, fontSize: '0.7rem' }} /></Box>
+                    <Box>
+                      <Typography variant='subtitle1' fontWeight='bold'>{item.memberName || 'Unknown'}</Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Chip label={item.memberId} size='small' sx={{ borderRadius: 1, height: 20, fontSize: '0.7rem' }} />
+                        {item.phone && <Chip label={`📱 ${item.phone}`} size='small' color='success' sx={{ borderRadius: 1, height: 20, fontSize: '0.7rem' }} />}
+                      </Box>
+                    </Box>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                       <Chip label={item.role} size='small' color={item.role === 'applicator' ? 'warning' : 'info'} sx={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 'bold' }} />
                       <IconButton 
@@ -976,31 +1412,70 @@ function App() {
                     </Box>
                   </Box>
                   <Divider sx={{ my: 1 }} />
-                  <Typography variant='body2' color='text.secondary'>Product: <Box component='span' color='text.primary'>{item.productName}</Box></Typography>
-                  <Typography variant='body2' color='text.secondary'>ID: {item.productNo}</Typography>
-                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                  <Typography variant='body2' color='text.secondary'>Product: <Box component='span' color='text.primary' fontWeight={600}>{item.productName}</Box></Typography>
+                  <Typography variant='body2' color='text.secondary'>Product ID: {item.productNo}</Typography>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                     <Chip label={`Batch: ${item.batchNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
                     <Chip label={`Bag: ${item.bagNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
+                    <Chip label={`Qty: ${item.qty}`} size='small' color='primary' sx={{ fontSize: '0.7rem' }} />
                   </Box>
+                  {(() => {
+                    const batchInfo = parseBatchInfo(item.batchNo);
+                    if (batchInfo?.parsed) {
+                      return (
+                        <Box sx={{ mt: 1, p: 0.75, bgcolor: 'action.hover', borderRadius: 0.5 }}>
+                          <Typography variant='caption' color='text.secondary' sx={{ fontSize: '0.65rem' }}>
+                            📦 {batchInfo.productCode} • Batch {batchInfo.materialBatch} • {batchInfo.date} • Pack {batchInfo.packSize} #{batchInfo.packNo}
+                          </Typography>
+                        </Box>
+                      );
+                    }
+                    return null;
+                  })()}
+                  {item.location && <Typography variant='body2' color='text.secondary' sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>📍 <Box component='span' fontWeight={500}>{item.location}</Box></Typography>}
                   <Typography variant='caption' sx={{ display: 'block', textAlign: 'right', mt: 1, color: 'text.disabled' }}>{item.timestamp ? new Date(item.timestamp).toLocaleString() : 'Pending'}</Typography>
                 </CardContent>
               </Card>)}
           </Box>}
 
           {adminTab === 2 && <Box>
-            <Box sx={{ mb: 2 }}><Button variant='contained' startIcon={<Add />} onClick={() => setUserDialog({ open: true, user: { username: '', email: '', password: '', role: 'user' } })}>Add User</Button></Box>
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Button variant='contained' startIcon={<Add />} onClick={() => setUserDialog({ open: true, user: { username: '', email: '', password: '', role: 'admin' } })}>Add Co-Admin</Button>
+              <Typography variant='body2' color='text.secondary'>Total Co-Admins: {users.filter(u => u.role === 'admin').length}</Typography>
+            </Box>
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-              <Table><TableHead><TableRow><TableCell>Username</TableCell><TableCell>Email</TableCell><TableCell>Role</TableCell><TableCell>Status</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
-                <TableBody>{users.map(u => <TableRow key={u._id}><TableCell>{u.username}</TableCell><TableCell>{u.email}</TableCell><TableCell><Chip label={u.role} size='small' color={u.role === 'admin' ? 'error' : 'default'} /></TableCell><TableCell><Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} /></TableCell><TableCell><IconButton size='small' color='error' onClick={() => setUserDeleteDialog({ open: true, userId: u._id, userDetails: { username: u.username, email: u.email, role: u.role } })}><Delete /></IconButton></TableCell></TableRow>)}</TableBody>
+              <Table><TableHead><TableRow>
+                <TableCell><strong>Username</strong></TableCell>
+                <TableCell><strong>Email</strong></TableCell>
+                <TableCell><strong>Role</strong></TableCell>
+                <TableCell><strong>Status</strong></TableCell>
+                <TableCell><strong>Created</strong></TableCell>
+                <TableCell><strong>Actions</strong></TableCell>
+              </TableRow></TableHead>
+                <TableBody>{users.filter(u => u.role === 'admin').map(u => <TableRow key={u._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                  <TableCell><Typography variant='body2' fontWeight={600}>{u.username}</Typography></TableCell>
+                  <TableCell><Typography variant='body2'>{u.email}</Typography></TableCell>
+                  <TableCell><Chip label='Admin' size='small' color='error' /></TableCell>
+                  <TableCell><Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} /></TableCell>
+                  <TableCell><Typography variant='caption' color='text.secondary'>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</Typography></TableCell>
+                  <TableCell><IconButton size='small' color='error' onClick={() => setUserDeleteDialog({ open: true, userId: u._id, userDetails: { username: u.username, email: u.email, role: u.role } })}><Delete /></IconButton></TableCell>
+                </TableRow>)}</TableBody>
               </Table>
             </TableContainer>
           </Box>}
 
           {adminTab === 3 && <Box>
-            <Box sx={{ mb: 2 }}><Button variant='contained' startIcon={<Add />} onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '' } })}>Add Product</Button></Box>
+            <Box sx={{ mb: 2 }}><Button variant='contained' startIcon={<Add />} onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0 } })}>Add Product</Button></Box>
+            {console.log('🏷️ Rendering Products tab, products array:', products, 'Count:', products.length)}
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-              <Table><TableHead><TableRow><TableCell>Name</TableCell><TableCell>Product No</TableCell><TableCell>Category</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
-                <TableBody>{products.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })}><Edit /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)}><Delete /></IconButton></TableCell></TableRow>)}</TableBody>
+              <Table><TableHead><TableRow><TableCell>Product Name</TableCell><TableCell>Product Code</TableCell><TableCell>Pack Size</TableCell><TableCell>Price (LKR)</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
+                <TableBody>
+                  {products.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} align="center">No products found. Click "Add Product" to create one.</TableCell></TableRow>
+                  ) : (
+                    products.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell><TableCell><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })}><Edit /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)}><Delete /></IconButton></TableCell></TableRow>)
+                  )}
+                </TableBody>
               </Table>
             </TableContainer>
           </Box>}
@@ -1012,7 +1487,52 @@ function App() {
 
           <Dialog open={productDialog.open} onClose={() => setProductDialog({ open: false, product: null })} maxWidth='sm' fullWidth>
             <DialogTitle>{productDialog.product?._id ? 'Edit Product' : 'Add Product'}</DialogTitle>
-            <DialogContent><TextField fullWidth label='Product Name' value={productDialog.product?.name || ''} onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, name: e.target.value } })} sx={{ mt: 2, mb: 2 }} /><TextField fullWidth label='Product Number' value={productDialog.product?.productNo || ''} onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, productNo: e.target.value } })} sx={{ mb: 2 }} /><TextField fullWidth label='Category' value={productDialog.product?.category || ''} onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, category: e.target.value } })} sx={{ mb: 2 }} /><TextField fullWidth label='Description' multiline rows={3} value={productDialog.product?.description || ''} onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, description: e.target.value } })} /></DialogContent>
+            <DialogContent>
+              <TextField 
+                fullWidth 
+                label='Product Name' 
+                value={productDialog.product?.name || ''} 
+                onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, name: e.target.value } })} 
+                sx={{ mt: 2, mb: 2 }} 
+                required
+                helperText='Full product name (e.g., Megakem Liquid Sealer Plus)'
+              />
+              <TextField 
+                fullWidth 
+                label='Product Code' 
+                value={productDialog.product?.productNo || ''} 
+                onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, productNo: e.target.value.toUpperCase() } })} 
+                sx={{ mb: 2 }} 
+                required
+                helperText='Short code used in batch numbers (e.g., MLSP). Will be auto-converted to uppercase.'
+                placeholder='e.g., MLSP, WP100'
+              />
+              <TextField 
+                fullWidth 
+                label='Pack Size' 
+                value={productDialog.product?.category || ''} 
+                onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, category: e.target.value } })} 
+                sx={{ mb: 2 }}
+                helperText='Pack size/quantity (e.g., 540ml, 1L, 25kg)'
+              />
+              <TextField 
+                fullWidth 
+                label='Price (LKR)' 
+                type='number' 
+                value={productDialog.product?.price || ''} 
+                onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, price: parseFloat(e.target.value) || 0 } })} 
+                sx={{ mb: 2 }} 
+                InputProps={{ startAdornment: 'Rs.' }} 
+              />
+              <TextField 
+                fullWidth 
+                label='Description' 
+                multiline 
+                rows={3} 
+                value={productDialog.product?.description || ''} 
+                onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, description: e.target.value } })} 
+              />
+            </DialogContent>
             <DialogActions><Button onClick={() => setProductDialog({ open: false, product: null })}>Cancel</Button><Button variant='contained' onClick={handleSaveProduct} disabled={loading}>Save</Button></DialogActions>
           </Dialog>
 
