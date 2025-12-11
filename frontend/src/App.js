@@ -179,6 +179,33 @@ function App() {
     } catch (error) { console.error('Anonymous auth error:', error); }
   };
 
+  // Extract pack size from batch code (e.g., "001" -> "1kg", "010" -> "10kg")
+  const extractPackSize = (packSizeCode) => {
+    if (!packSizeCode) return '1kg';
+    const numericValue = parseInt(packSizeCode, 10);
+    return isNaN(numericValue) ? packSizeCode : `${numericValue}kg`;
+  };
+
+  // Get price for a product based on product code and pack size
+  const getProductPrice = (productCode, packSize) => {
+    const product = products.find(p => 
+      p.productNo.toUpperCase() === productCode.toUpperCase()
+    );
+    
+    if (!product) return 0;
+    
+    // Check if product has pack size pricing
+    if (product.packSizePricing && product.packSizePricing.length > 0) {
+      const pricing = product.packSizePricing.find(p => 
+        p.packSize.toLowerCase() === packSize.toLowerCase()
+      );
+      if (pricing) return pricing.price;
+    }
+    
+    // Fall back to default price
+    return product.price || 0;
+  };
+
   // Parse batch number to extract components
   const parseBatchInfo = (batchNo) => {
     if (!batchNo) return null;
@@ -202,7 +229,7 @@ function App() {
         productCode,
         materialBatch,
         date: formattedDate,
-        packSize,
+        packSize: extractPackSize(packSize),
         packNo,
         parsed: true
       };
@@ -230,7 +257,7 @@ function App() {
           productCode,        // "MLSP" - for product matching
           materialBatch,      // "001"
           dateCode,           // "050525" - date
-          packSize,           // "001" - quantity
+          packSize: extractPackSize(packSize),  // "001" -> "1kg" - quantity
           bagNo: packNo,      // "001" - bag/pack number
           fullBatch: batchParam // Full string for display
         };
@@ -338,13 +365,17 @@ function App() {
           
           console.log('Found product:', product);
           
+          const packSizeFormatted = extractPackSize(packSize);
+          const itemPrice = getProductPrice(productCode, packSizeFormatted);
+          
           if (product) {
             data = {
               id: product.productNo,
               name: product.name,
               batch: qrString, // Full batch string
               bag: packNo,     // Pack number as bag
-              qty: packSize    // Pack size as quantity
+              qty: packSizeFormatted,  // Pack size converted to kg format
+              price: itemPrice // Price based on product and pack size
             };
             showNotification(`Added ${product.name}!`);
           } else {
@@ -353,7 +384,8 @@ function App() {
               batch: qrString,
               bag: packNo || 'N/A',
               id: productCode,
-              qty: packSize || '1'
+              qty: extractPackSize(packSize) || '1kg',
+              price: 0
             };
             showNotification(`Product with code "${productCode}" not found. Please add it in Admin > Products.`, 'warning');
           }
@@ -393,7 +425,8 @@ function App() {
         productNo: item.id, 
         batchNo: item.batch, 
         bagNo: item.bag, 
-        qty: item.qty, 
+        qty: item.qty,
+        price: item.price || 0,
         location: location || '' 
       }));
       const response = await scansAPI.createBatch(scansData);
@@ -518,13 +551,17 @@ function App() {
           
           console.log('Matched product:', product);
           
+          const itemPrice = product ? getProductPrice(pendingScan.productCode, pendingScan.packSize || '1kg') : 0;
+          
           if (product) {
             const newItem = {
               id: product.productNo,
               name: product.name,
               batch: pendingScan.fullBatch || pendingScan.batchNo,
               bag: pendingScan.bagNo || '001',
-              qty: pendingScan.packSize || '1'
+              qty: pendingScan.packSize || '1kg',
+              price: itemPrice,
+              tempId: Date.now()
             };
             
             // Check for duplicates
@@ -1254,8 +1291,9 @@ function App() {
                 <IconButton size='small' onClick={() => handleRemoveItem(item.tempId)} sx={{ position: 'absolute', top: { xs: 8, sm: 12 }, right: { xs: 8, sm: 12 }, color: 'error.main', bgcolor: 'error.50', transition: 'all 0.3s', '&:hover': { bgcolor: 'error.main', color: 'white', transform: 'rotate(90deg) scale(1.1)' }, width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}><Delete fontSize='small' sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} /></IconButton>
                 <Typography variant='h6' fontWeight='800' sx={{ pr: { xs: 4, sm: 5 }, color: 'primary.main', mb: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }}>{item.name}</Typography>
                 <Box sx={{ display: 'flex', gap: { xs: 1, sm: 1.5 }, my: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
-                  <Chip label={item.qty} size='medium' sx={{ bgcolor: 'primary.main', color: 'white', fontWeight: 700, px: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />
+                  <Chip label={`Weight: ${item.qty}`} size='medium' sx={{ bgcolor: 'primary.main', color: 'white', fontWeight: 700, px: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />
                   <Chip label={item.id} size='medium' sx={{ bgcolor: 'info.main', color: 'white', fontWeight: 600, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />
+                  {item.price > 0 && <Chip label={`Rs. ${item.price.toLocaleString()}`} size='medium' sx={{ bgcolor: 'success.main', color: 'white', fontWeight: 700, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />}
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: { xs: 1, sm: 2 }, pt: { xs: 1, sm: 2 }, borderTop: '2px solid', borderColor: 'grey.100', flexWrap: 'wrap', gap: 1 }}>
                   <Typography variant='body2' color='text.secondary' fontWeight={600} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Batch: {item.batch}</Typography>
@@ -1266,6 +1304,16 @@ function App() {
             <Button variant='outlined' fullWidth startIcon={<Add />} onClick={() => setView('scanner')} sx={{ borderStyle: 'dashed', borderWidth: 3, borderColor: 'primary.main', py: 3, fontSize: '1rem', fontWeight: 700, color: 'primary.main', transition: 'all 0.3s', '&:hover': { borderWidth: 3, bgcolor: 'primary.50', transform: 'scale(1.02)' } }}>Scan Another Item</Button>
           </Box>
           <Paper elevation={6} sx={{ p: { xs: 2, sm: 3 }, borderRadius: { xs: 3, sm: 4 }, background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.light', boxShadow: '0 12px 40px rgba(0,51,102,0.2)' }}>
+            {cart.length > 0 && cart.some(item => item.price > 0) && (
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, border: '2px solid', borderColor: 'success.light', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant='body1' fontWeight='bold' color='success.dark' sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+                  💰 Total Estimated Value:
+                </Typography>
+                <Typography variant='h5' fontWeight='800' color='success.dark' sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+                  Rs. {cart.reduce((sum, item) => sum + (item.price || 0), 0).toLocaleString()}
+                </Typography>
+              </Box>
+            )}
             {role === 'customer' && (
               <Box sx={{ mb: 2, p: 2, bgcolor: 'info.50', borderRadius: 2, border: '1px solid', borderColor: 'info.light' }}>
                 <Typography variant='caption' fontWeight='bold' color='info.dark' sx={{ display: 'block', mb: 1, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
@@ -1417,7 +1465,8 @@ function App() {
                   <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                     <Chip label={`Batch: ${item.batchNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
                     <Chip label={`Bag: ${item.bagNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
-                    <Chip label={`Qty: ${item.qty}`} size='small' color='primary' sx={{ fontSize: '0.7rem' }} />
+                    <Chip label={`Weight: ${item.qty.includes('kg') ? item.qty : extractPackSize(item.qty)}`} size='small' color='primary' sx={{ fontSize: '0.7rem' }} />
+                    {item.price > 0 && <Chip label={`Rs. ${item.price.toLocaleString()}`} size='small' color='success' sx={{ fontSize: '0.7rem' }} />}
                   </Box>
                   {(() => {
                     const batchInfo = parseBatchInfo(item.batchNo);

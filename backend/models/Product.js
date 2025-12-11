@@ -24,6 +24,10 @@ const productSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  packSizePricing: [{
+    packSize: String,    // e.g., "1kg", "10kg", "25kg"
+    price: Number        // Price for this pack size
+  }],
   isActive: {
     type: Boolean,
     default: true
