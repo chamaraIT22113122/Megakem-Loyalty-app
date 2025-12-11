@@ -761,7 +761,7 @@ function App() {
             <Box sx={{ mb: { xs: 2, sm: 4 }, display: 'flex', justifyContent: 'center', animation: 'logoFloat 3s ease-in-out infinite', '@keyframes logoFloat': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-15px)' } } }}>
               <img src={megakemLogo} alt='Megakem Logo' style={{ width: '100%', maxWidth: '240px', height: 'auto', filter: 'drop-shadow(0 15px 35px rgba(0,51,102,0.25))' }} />
             </Box>
-            <Typography variant='h3' fontWeight='800' gutterBottom sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', mb: 2, letterSpacing: '-0.5px', fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' } }}>New Session</Typography>
+            <Typography variant='h3' fontWeight='800' gutterBottom sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', mb: 2, letterSpacing: '-0.5px', fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' } }}>MEGAKEM LOYALTY</Typography>
             <Typography variant='h6' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '1rem', sm: '1.25rem' } }}>Select your role to begin scanning</Typography>
           </Box>
           <Grid container spacing={3}>
@@ -836,43 +836,6 @@ function App() {
               </Grid>
             </Box>
           )}
-          {user?.anonymous && (
-            <Box sx={{ textAlign: 'center', mt: 4 }}>
-              <Button 
-                variant='outlined' 
-                size='large' 
-                onClick={() => setShowUserLogin(true)}
-                sx={{ 
-                  borderRadius: '12px', 
-                  px: 4, 
-                  py: 1.5,
-                  fontWeight: 600,
-                  borderWidth: 2,
-                  '&:hover': { borderWidth: 2 }
-                }}
-              >
-                Already have an account? Login
-              </Button>
-            </Box>
-          )}
-        </Box>}
-
-        {showUserLogin && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-          <Card sx={{ maxWidth: 400, mx: 'auto', p: 2 }}>
-            <CardContent>
-              <Box sx={{ textAlign: 'center', mb: 3 }}>
-                <Box sx={{ width: 60, height: 60, bgcolor: 'primary.light', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, color: 'white' }}><Person fontSize='large' /></Box>
-                <Typography variant='h5' fontWeight='bold' gutterBottom>User Login</Typography>
-                <Typography variant='body2' color='text.secondary'>Sign in to access your account</Typography>
-              </Box>
-              <form onSubmit={handleUserLogin}>
-                <TextField fullWidth label='Email' type='email' variant='outlined' value={userLoginEmail} onChange={(e) => setUserLoginEmail(e.target.value)} sx={{ mb: 2 }} required />
-                <TextField fullWidth label='Password' type='password' variant='outlined' value={userLoginPassword} onChange={(e) => setUserLoginPassword(e.target.value)} sx={{ mb: 3 }} required />
-                <Button fullWidth variant='contained' size='large' type='submit' disabled={loading} startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Person />}>{loading ? 'Logging in...' : 'Login'}</Button>
-                <Button fullWidth variant='text' sx={{ mt: 2 }} onClick={() => setShowUserLogin(false)}>Back to Welcome</Button>
-              </form>
-            </CardContent>
-          </Card>
         </Box>}
 
         {view === 'history' && <Box sx={{ py: 2 }}>
