@@ -4,6 +4,7 @@ import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, De
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, rewardsAPI, analyticsAPI } from './services/api';
 import megakemLogo from './assets/Megakem  Logo.png';
+import megakemBrandLogo from './assets/Megakem  Brand Logo-01.png';
 
 
 const getTheme = (mode) => createTheme({
@@ -417,7 +418,7 @@ function App() {
     setLoading(true);
     try {
       const scansData = cart.map(item => ({ 
-        memberName: memberName || 'N/A', 
+        memberName: memberName || (role === 'customer' ? `CUS-${memberId}` : memberId.toUpperCase()), 
         memberId: role === 'customer' ? `CUS-${memberId}` : memberId.toUpperCase(), 
         phone: role === 'customer' ? memberId : '',
         role, 
@@ -742,14 +743,11 @@ function App() {
   return (
     <ThemeProvider theme={getTheme(darkMode ? 'dark' : 'light')}><CssBaseline /><Box sx={{ minHeight: '100vh', background: darkMode ? '#0a1929' : 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', display: 'flex', flexDirection: 'column' }}>
       <AppBar position='static' elevation={0} sx={{ background: 'linear-gradient(135deg, #003366 0%, #004d7a 50%, #4A90A4 100%)', boxShadow: '0 4px 20px rgba(0,51,102,0.3)' }}><Toolbar sx={{ minHeight: { xs: '56px', sm: '64px' }, px: { xs: 1, sm: 2 } }}>
-        <QrCodeScanner sx={{ mr: { xs: 1, sm: 2 }, color: 'secondary.main', fontSize: { xs: '1.5rem', sm: '2rem' }, animation: 'pulse 2s ease-in-out infinite', '@keyframes pulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)' }, '50%': { opacity: 0.7, transform: 'scale(0.95)' } } }} />
+        <img src={megakemBrandLogo} alt='Megakem Logo' style={{ height: '40px', width: 'auto', marginRight: '12px' }} />
         <Box sx={{ flexGrow: 1 }}>
           <Typography variant='h6' component='div' sx={{ fontWeight: 700, letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)', lineHeight: 1.2, fontSize: { xs: '0.9rem', sm: '1.25rem' } }}>MEGAKEM LOYALTY</Typography>
           <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: { xs: '0.55rem', sm: '0.65rem' }, opacity: 0.9, display: { xs: 'none', sm: 'block' } }}>WHERE TRUST MEETS EXCELLENCE</Typography>
         </Box>
-        <IconButton onClick={() => setDarkMode(!darkMode)} color='inherit' sx={{ mr: 1 }}>
-          {darkMode ? <Brightness7 /> : <Brightness4 />}
-        </IconButton>
         {adminAuth && view === 'admin' && (
           <Button color='inherit' onClick={handleAdminLogout} sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>Logout</Button>
         )}
@@ -923,13 +921,12 @@ function App() {
                       <Typography variant='h6' fontWeight='bold'>{scan.productName}</Typography>
                       <Chip label={scan.role} size='small' color={scan.role === 'applicator' ? 'primary' : 'secondary'} />
                     </Box>
-                    <Typography variant='body2' color='text.secondary'>Member: {scan.memberName}</Typography>
+                    <Typography variant='body2' color='text.secondary'>Member: {scan.memberName || scan.memberId}</Typography>
                     {scan.phone && <Typography variant='body2' color='text.secondary'>Phone: {scan.phone}</Typography>}
-                    <Typography variant='body2' color='text.secondary'>Product No: {scan.productNo}</Typography>
+                    <Typography variant='body2' color='text.secondary'>PRODUCT: {scan.productNo}</Typography>
                     <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                       <Chip label={`Batch: ${scan.batchNo}`} size='small' variant='outlined' />
                       <Chip label={`Bag: ${scan.bagNo}`} size='small' variant='outlined' />
-                      <Chip label={`Qty: ${scan.qty}`} size='small' />
                     </Box>
                     {(() => {
                       const batchInfo = parseBatchInfo(scan.batchNo);
@@ -1254,7 +1251,6 @@ function App() {
                 <IconButton size='small' onClick={() => handleRemoveItem(item.tempId)} sx={{ position: 'absolute', top: { xs: 8, sm: 12 }, right: { xs: 8, sm: 12 }, color: 'error.main', bgcolor: 'error.50', transition: 'all 0.3s', '&:hover': { bgcolor: 'error.main', color: 'white', transform: 'rotate(90deg) scale(1.1)' }, width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}><Delete fontSize='small' sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} /></IconButton>
                 <Typography variant='h6' fontWeight='800' sx={{ pr: { xs: 4, sm: 5 }, color: 'primary.main', mb: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }}>{item.name}</Typography>
                 <Box sx={{ display: 'flex', gap: { xs: 1, sm: 1.5 }, my: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
-                  <Chip label={`Weight: ${item.qty}`} size='medium' sx={{ bgcolor: 'primary.main', color: 'white', fontWeight: 700, px: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />
                   <Chip label={item.id} size='medium' sx={{ bgcolor: 'info.main', color: 'white', fontWeight: 600, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />
                   {item.price > 0 && <Chip label={`Rs. ${item.price.toLocaleString()}`} size='medium' sx={{ bgcolor: 'success.main', color: 'white', fontWeight: 700, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />}
                 </Box>
@@ -1424,11 +1420,10 @@ function App() {
                   </Box>
                   <Divider sx={{ my: 1 }} />
                   <Typography variant='body2' color='text.secondary'>Product: <Box component='span' color='text.primary' fontWeight={600}>{item.productName}</Box></Typography>
-                  <Typography variant='body2' color='text.secondary'>Product ID: {item.productNo}</Typography>
+                  <Typography variant='body2' color='text.secondary'>PRODUCT: {item.productNo}</Typography>
                   <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                     <Chip label={`Batch: ${item.batchNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
                     <Chip label={`Bag: ${item.bagNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
-                    <Chip label={`Weight: ${item.qty.includes('kg') ? item.qty : extractPackSize(item.qty)}`} size='small' color='primary' sx={{ fontSize: '0.7rem' }} />
                     {item.price > 0 && <Chip label={`Rs. ${item.price.toLocaleString()}`} size='small' color='success' sx={{ fontSize: '0.7rem' }} />}
                   </Box>
                   {(() => {
