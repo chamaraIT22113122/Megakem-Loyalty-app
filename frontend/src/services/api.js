@@ -27,12 +27,48 @@ api.interceptors.request.use(
 // Handle response errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Clear token if unauthorized
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If error is 401 and we haven't tried to refresh yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        
+        if (refreshToken) {
+          // Try to refresh the token
+          const response = await api.post('/auth/refresh', { refreshToken });
+          const { token, refreshToken: newRefreshToken } = response.data.data;
+          
+          // Update tokens
+          localStorage.setItem('token', token);
+          localStorage.setItem('refreshToken', newRefreshToken);
+          
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        // Refresh failed, clear tokens and redirect to login
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        localStorage.removeItem('adminAuth');
+        window.location.href = '/';
+        return Promise.reject(refreshError);
+      }
     }
+
+    // For other errors, just clear token if unauthorized
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('adminAuth');
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -44,6 +80,7 @@ export const authAPI = {
   anonymous: () => api.post('/auth/anonymous'),
   getMe: () => api.get('/auth/me'),
   adminLogin: (credentials) => api.post('/auth/admin/login', credentials),
+  refreshToken: (refreshToken) => api.post('/auth/refresh', { refreshToken }),
   updateProfile: (data) => api.put('/auth/profile', data),
   changePassword: (data) => api.put('/auth/change-password', data),
   getUsers: () => api.get('/auth/users'),

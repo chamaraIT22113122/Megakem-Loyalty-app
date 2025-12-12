@@ -3,8 +3,8 @@ import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent,
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Brightness4, Brightness7, Star, GetApp } from '@mui/icons-material';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, rewardsAPI, analyticsAPI } from './services/api';
-import megakemLogo from './assets/Megakem  Logo.png';
-import megakemBrandLogo from './assets/Megakem  Brand Logo-01.png';
+import megakemLogo from './assets/Megakem Logo.png';
+import megakemBrandLogo from './assets/Megakem Brand Logo-01.png';
 
 
 const getTheme = (mode) => createTheme({
@@ -124,6 +124,9 @@ function App() {
   const [searchMemberId, setSearchMemberId] = useState('');
   const [searchPhone, setSearchPhone] = useState('');
   const [memberHistory, setMemberHistory] = useState([]);
+  const [historyDateRange, setHistoryDateRange] = useState({ start: '', end: '' });
+  const [historyProductFilter, setHistoryProductFilter] = useState('');
+  const [historySortBy, setHistorySortBy] = useState('date-desc');
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -137,6 +140,12 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [scanSearchQuery, setScanSearchQuery] = useState('');
+  const [scanDateFilter, setScanDateFilter] = useState({ start: '', end: '' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [scansPerPage] = useState(10);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
   const [rewards, setRewards] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [userStats, setUserStats] = useState(null);
@@ -273,16 +282,50 @@ function App() {
     }
   }, []);
 
+  // Function to recalculate prices for scans based on current product catalog
+  const recalculateScanPrices = (scans, currentProducts) => {
+    return scans.map(scan => {
+      // Skip if price is already set and greater than 0
+      if (scan.price > 0) return scan;
+      
+      // Try to find matching product by code and pack size
+      const product = currentProducts.find(p => 
+        p.productNo.toUpperCase() === scan.productNo.toUpperCase() &&
+        p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+      );
+      
+      // Update price if product found
+      if (product && product.price > 0) {
+        return { ...scan, price: product.price };
+      }
+      
+      return scan;
+    });
+  };
+
+  // Function to refresh scan history
+  const refreshScanHistory = async () => {
+    if (!user) return;
+    try { 
+      const response = await scansAPI.getLive(); 
+      const scans = response.data.data;
+      
+      // Recalculate prices for scans with price = 0 using current product catalog
+      const scansWithUpdatedPrices = recalculateScanPrices(scans, products);
+      setScanHistory(scansWithUpdatedPrices);
+      setLastUpdateTime(new Date());
+    }
+    catch (error) { console.error('Error fetching scans:', error); }
+  };
+
   useEffect(() => {
-    if (!user || view !== 'admin') return;
-    const fetchLiveScans = async () => {
-      try { const response = await scansAPI.getLive(); setScanHistory(response.data.data); }
-      catch (error) { console.error('Error fetching scans:', error); }
-    };
-    fetchLiveScans();
-    pollIntervalRef.current = setInterval(fetchLiveScans, 3000);
+    if (!user) return;
+    // Fetch scans immediately
+    refreshScanHistory();
+    // Set up polling to refresh every 3 seconds
+    pollIntervalRef.current = setInterval(refreshScanHistory, 3000);
     return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
-  }, [user, view]);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -356,18 +399,43 @@ function App() {
             }
           }
           
-          // Find product by exact product code match from admin products
-          console.log('Looking for product with code:', productCode);
-          console.log('Available products:', currentProducts.map(p => ({ name: p.name, code: p.productNo })));
-          
-          const product = currentProducts.find(p => 
-            p.productNo.toUpperCase() === productCode.toUpperCase()
-          );
-          
-          console.log('Found product:', product);
+          // Find product by exact product code AND pack size match from admin products
+          console.log('=== PRODUCT MATCHING DEBUG ===');
+          console.log('Searching for:');
+          console.log('  - Product Code:', productCode);
+          console.log('  - Pack Size from batch:', packSize, '→', extractPackSize(packSize));
+          console.log('');
+          console.log('Available products in database:');
+          currentProducts.forEach((p, idx) => {
+            console.log(`  ${idx + 1}. "${p.name}"`);
+            console.log(`     Code: ${p.productNo} | Pack Size: ${p.category} | Price: Rs. ${p.price?.toLocaleString() || '0'}`);
+          });
+          console.log('');
           
           const packSizeFormatted = extractPackSize(packSize);
-          const itemPrice = getProductPrice(productCode, packSizeFormatted);
+          console.log('Formatted pack size for matching:', packSizeFormatted);
+          
+          // First try to find exact match: same product code AND pack size
+          let product = currentProducts.find(p => 
+            p.productNo.toUpperCase() === productCode.toUpperCase() &&
+            p.category && p.category.toUpperCase() === packSizeFormatted.toUpperCase()
+          );
+          
+          if (product) {
+            console.log('✅ EXACT MATCH FOUND:');
+            console.log('   Product:', product.name);
+            console.log('   Code:', product.productNo);
+            console.log('   Pack Size:', product.category);
+            console.log('   Price: Rs.', product.price?.toLocaleString());
+          } else {
+            console.log('⚠️ NO EXACT MATCH - Pack size not found in products');
+            console.log('❌ Product with code', productCode, 'and pack size', packSizeFormatted, 'does not exist');
+            console.log('   Please add this product variant to the Products tab');
+          }
+          console.log('================================');
+          console.log('');
+          
+          const itemPrice = product ? product.price : 0;
           
           if (product) {
             data = {
@@ -378,17 +446,17 @@ function App() {
               qty: packSizeFormatted,  // Pack size converted to kg format
               price: itemPrice // Price based on product and pack size
             };
-            showNotification(`Added ${product.name}!`);
+            showNotification(`Added ${product.name} (${packSizeFormatted})!`, 'success');
           } else {
             data = {
-              name: `Unknown Item (Code: ${productCode})`,
+              name: `${productCode} - Pack Size Not Found`,
               batch: qrString,
               bag: packNo || 'N/A',
               id: productCode,
-              qty: extractPackSize(packSize) || '1kg',
+              qty: packSizeFormatted || '1kg',
               price: 0
             };
-            showNotification(`Product with code "${productCode}" not found. Please add it in Admin > Products.`, 'warning');
+            showNotification(`Product "${productCode}" with pack size "${packSizeFormatted}" not found in Products tab. Please add it first.`, 'warning');
           }
         } else {
           // Unknown format
@@ -431,6 +499,9 @@ function App() {
         location: location || '' 
       }));
       const response = await scansAPI.createBatch(scansData);
+      
+      // Refresh dashboard immediately after submission
+      await refreshScanHistory();
       
       if (response.data.duplicates && response.data.duplicates.length > 0) {
         showNotification(`${response.data.count} items submitted. ${response.data.duplicates.length} duplicates skipped.`, 'warning');
@@ -542,17 +613,27 @@ function App() {
       if (pendingScan && role && (view === 'scanner' || view === 'cart')) {
         console.log('Processing pending scan:', pendingScan);
         try {
-          // Find product by exact product code match from admin products
-          console.log('Processing pending scan with productCode:', pendingScan.productCode);
-          console.log('Available products:', products.map(p => ({ name: p.name, code: p.productNo })));
+          // Find product by exact product code AND pack size match from admin products
+          console.log('Processing pending scan with productCode:', pendingScan.productCode, 'and packSize:', pendingScan.packSize);
+          console.log('Available products:', products.map(p => ({ name: p.name, code: p.productNo, packSize: p.category })));
           
-          const product = products.find(p => 
-            (pendingScan.productCode && p.productNo.toUpperCase() === pendingScan.productCode.toUpperCase())
+          // First try to find exact match: same product code AND pack size
+          let product = products.find(p => 
+            (pendingScan.productCode && p.productNo.toUpperCase() === pendingScan.productCode.toUpperCase()) &&
+            (pendingScan.packSize && p.category && p.category.toUpperCase() === pendingScan.packSize.toUpperCase())
           );
           
-          console.log('Matched product:', product);
+          // If no exact match, fall back to just product code match
+          if (!product) {
+            product = products.find(p => 
+              (pendingScan.productCode && p.productNo.toUpperCase() === pendingScan.productCode.toUpperCase())
+            );
+            console.log('No exact pack size match, using fallback product:', product);
+          } else {
+            console.log('Found exact match:', product);
+          }
           
-          const itemPrice = product ? getProductPrice(pendingScan.productCode, pendingScan.packSize || '1kg') : 0;
+          const itemPrice = product ? product.price : 0;
           
           if (product) {
             const newItem = {
@@ -1252,7 +1333,7 @@ function App() {
                 <Typography variant='h6' fontWeight='800' sx={{ pr: { xs: 4, sm: 5 }, color: 'primary.main', mb: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }}>{item.name}</Typography>
                 <Box sx={{ display: 'flex', gap: { xs: 1, sm: 1.5 }, my: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
                   <Chip label={item.id} size='medium' sx={{ bgcolor: 'info.main', color: 'white', fontWeight: 600, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />
-                  {item.price > 0 && <Chip label={`Rs. ${item.price.toLocaleString()}`} size='medium' sx={{ bgcolor: 'success.main', color: 'white', fontWeight: 700, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />}
+                  {item.qty && <Chip label={item.qty} size='medium' sx={{ bgcolor: 'success.main', color: 'white', fontWeight: 700, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />}
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: { xs: 1, sm: 2 }, pt: { xs: 1, sm: 2 }, borderTop: '2px solid', borderColor: 'grey.100', flexWrap: 'wrap', gap: 1 }}>
                   <Typography variant='body2' color='text.secondary' fontWeight={600} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Batch: {item.batch}</Typography>
@@ -1263,16 +1344,6 @@ function App() {
             <Button variant='outlined' fullWidth startIcon={<Add />} onClick={() => setView('scanner')} sx={{ borderStyle: 'dashed', borderWidth: 3, borderColor: 'primary.main', py: 3, fontSize: '1rem', fontWeight: 700, color: 'primary.main', transition: 'all 0.3s', '&:hover': { borderWidth: 3, bgcolor: 'primary.50', transform: 'scale(1.02)' } }}>Scan Another Item</Button>
           </Box>
           <Paper elevation={6} sx={{ p: { xs: 2, sm: 3 }, borderRadius: { xs: 3, sm: 4 }, background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.light', boxShadow: '0 12px 40px rgba(0,51,102,0.2)' }}>
-            {cart.length > 0 && cart.some(item => item.price > 0) && (
-              <Box sx={{ mb: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, border: '2px solid', borderColor: 'success.light', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant='body1' fontWeight='bold' color='success.dark' sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
-                  💰 Total Estimated Value:
-                </Typography>
-                <Typography variant='h5' fontWeight='800' color='success.dark' sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-                  Rs. {cart.reduce((sum, item) => sum + (item.price || 0), 0).toLocaleString()}
-                </Typography>
-              </Box>
-            )}
             {role === 'customer' && (
               <Box sx={{ mb: 2, p: 2, bgcolor: 'info.50', borderRadius: 2, border: '1px solid', borderColor: 'info.light' }}>
                 <Typography variant='caption' fontWeight='bold' color='info.dark' sx={{ display: 'block', mb: 1, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
@@ -1330,15 +1401,106 @@ function App() {
             
             <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>📍 Top Locations</Typography><List dense>{scanHistory.filter(s => s.location).reduce((acc, scan) => { const existing = acc.find(l => l.location === scan.location); if (existing) { existing.count++; } else { acc.push({ location: scan.location, count: 1 }); } return acc; }, []).sort((a, b) => b.count - a.count).slice(0, 5).map((loc, i) => <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: i === 0 ? 'success.main' : 'grey.400', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}><ListItemText primary={<Typography variant='body1' fontWeight={600}>{loc.location}</Typography>} secondary={<Chip label={`${loc.count} scans`} size='small' color={i === 0 ? 'success' : 'default'} />} /></ListItem>)}</List></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={6}><Card sx={{ background: 'linear-gradient(135deg, #FAD961 0%, #F76B1C 100%)', color: 'white' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>💰 Total Product Value (Estimated)</Typography><Typography variant='h3' fontWeight='bold' sx={{ my: 2 }}>Rs. {scanHistory.reduce((total, scan) => { const product = products.find(p => p.productNo === scan.productNo); return total + ((product?.price || 0) * (scan.qty || 1)); }, 0).toLocaleString()}</Typography><Typography variant='body2' sx={{ opacity: 0.9 }}>Based on {scanHistory.length} scans with product pricing</Typography></CardContent></Card></Grid>
+            <Grid item xs={12} md={6}><Card sx={{ background: 'linear-gradient(135deg, #FAD961 0%, #F76B1C 100%)', color: 'white' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>💰 Total Product Value (Estimated)</Typography><Typography variant='h3' fontWeight='bold' sx={{ my: 2 }}>Rs. {scanHistory.reduce((total, scan) => { 
+              const product = products.find(p => 
+                p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+              ); 
+              const price = product ? product.price : (scan.price || 0);
+              return total + price; 
+            }, 0).toLocaleString()}</Typography><Typography variant='body2' sx={{ opacity: 0.9 }}>Based on {scanHistory.length} scans with product pricing</Typography></CardContent></Card></Grid>
             
-            <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>💵 Price Estimation by Product</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell><TableCell sx={{ fontWeight: 700 }}>Pack Size</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Unit Price</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Qty</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Est. Value</TableCell></TableRow></TableHead><TableBody>{(() => { const productStats = scanHistory.reduce((acc, scan) => { const product = products.find(p => p.productNo === scan.productNo); if (!product) return acc; const key = product.productNo; if (!acc[key]) { acc[key] = { name: product.name, packSize: product.category || 'N/A', price: product.price || 0, scans: 0, totalQty: 0 }; } acc[key].scans += 1; acc[key].totalQty += parseInt(scan.qty) || 1; return acc; }, {}); return Object.entries(productStats).sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty)).map(([code, data]) => <TableRow key={code} sx={{ '&:hover': { bgcolor: 'action.hover' } }}><TableCell><Typography variant='body2' fontWeight={600}>{data.name}</Typography><Typography variant='caption' color='text.secondary'>{code}</Typography></TableCell><TableCell><Chip label={data.packSize} size='small' variant='outlined' /></TableCell><TableCell align='right'><Typography variant='body2' fontWeight={600}>Rs. {data.price.toLocaleString()}</Typography></TableCell><TableCell align='right'><Chip label={data.scans} size='small' color='primary' /></TableCell><TableCell align='right'><Typography variant='body2' fontWeight={600}>{data.totalQty}</Typography></TableCell><TableCell align='right'><Typography variant='body1' fontWeight={700} color='success.main'>Rs. {(data.price * data.totalQty).toLocaleString()}</Typography></TableCell></TableRow>); })()}</TableBody></Table></TableContainer><Box sx={{ mt: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Typography variant='body1' fontWeight={700} color='success.dark'>Grand Total Estimated Value:</Typography><Typography variant='h5' fontWeight={800} color='success.dark'>Rs. {scanHistory.reduce((total, scan) => { const product = products.find(p => p.productNo === scan.productNo); return total + ((product?.price || 0) * ((parseInt(scan.qty) || 1))); }, 0).toLocaleString()}</Typography></Box></CardContent></Card></Grid>
+            <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>💵 Price Estimation by Product</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell><TableCell sx={{ fontWeight: 700 }}>Pack Size</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Unit Price</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Est. Value</TableCell></TableRow></TableHead><TableBody>{(() => { const productStats = scanHistory.reduce((acc, scan) => { 
+              // Find product by BOTH product code AND pack size
+              const product = products.find(p => 
+                p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+              ); 
+              
+              // Use unique key: productCode + packSize
+              const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
+              
+              if (!acc[key]) { 
+                acc[key] = { 
+                  productNo: scan.productNo,
+                  name: product ? product.name : scan.productName || 'Unknown Product',
+                  packSize: scan.qty || 'N/A', 
+                  price: product ? product.price : (scan.price || 0),
+                  scans: 0, 
+                  totalQty: 0 
+                }; 
+              } 
+              acc[key].scans += 1; 
+              
+              // Total Qty = number of packs (same as scans)
+              acc[key].totalQty += 1; 
+              return acc; 
+            }, {}); 
+            
+            return Object.entries(productStats).sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty)).map(([key, data]) => <TableRow key={key} sx={{ '&:hover': { bgcolor: 'action.hover' }, bgcolor: data.price === 0 ? 'warning.50' : 'inherit' }}><TableCell><Typography variant='body2' fontWeight={600}>{data.name}</Typography><Typography variant='caption' color='text.secondary'>{data.productNo}</Typography></TableCell><TableCell><Chip label={data.packSize} size='small' variant='outlined' color={data.price === 0 ? 'warning' : 'default'} /></TableCell><TableCell align='right'>{data.price > 0 ? <Typography variant='body2' fontWeight={600}>Rs. {data.price.toLocaleString()}</Typography> : <Typography variant='body2' fontWeight={600} color='warning.main'>Not Set</Typography>}</TableCell><TableCell align='right'><Chip label={data.scans} size='small' color='primary' /></TableCell><TableCell align='right'><Typography variant='body1' fontWeight={700} color={data.price > 0 ? 'success.main' : 'warning.main'}>Rs. {(data.price * data.totalQty).toLocaleString()}</Typography></TableCell></TableRow>); })()}</TableBody></Table></TableContainer><Box sx={{ mt: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Typography variant='body1' fontWeight={700} color='success.dark'>Grand Total Estimated Value:</Typography><Typography variant='h5' fontWeight={800} color='success.dark'>Rs. {scanHistory.reduce((total, scan) => { 
+              const product = products.find(p => 
+                p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+              ); 
+              const price = product ? product.price : (scan.price || 0);
+              return total + price; 
+            }, 0).toLocaleString()}</Typography></Box></CardContent></Card></Grid>
             
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><Category /> Product Scan Details</Typography><List dense>{stats.topProducts?.map((p, i) => <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}><ListItemText primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} secondary={<Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}><Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} /><Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography></Box>} /></ListItem>)}</List></CardContent></Card></Grid>
           </Grid>}
 
           {adminTab === 1 && <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-            <Box sx={{ mb: 2, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+            <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              <TextField 
+                size='small' 
+                placeholder='Search by member, product, batch...' 
+                value={scanSearchQuery}
+                onChange={(e) => { setScanSearchQuery(e.target.value); setCurrentPage(1); }}
+                sx={{ flexGrow: 1, minWidth: 200 }}
+                InputProps={{
+                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+                }}
+              />
+              <TextField 
+                type='date'
+                size='small'
+                label='Start Date'
+                value={scanDateFilter.start}
+                onChange={(e) => { setScanDateFilter({ ...scanDateFilter, start: e.target.value }); setCurrentPage(1); }}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: 150 }}
+              />
+              <TextField 
+                type='date'
+                size='small'
+                label='End Date'
+                value={scanDateFilter.end}
+                onChange={(e) => { setScanDateFilter({ ...scanDateFilter, end: e.target.value }); setCurrentPage(1); }}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: 150 }}
+              />
+              {(scanSearchQuery || scanDateFilter.start || scanDateFilter.end) && (
+                <Button 
+                  size='small' 
+                  onClick={() => { 
+                    setScanSearchQuery(''); 
+                    setScanDateFilter({ start: '', end: '' }); 
+                    setCurrentPage(1);
+                  }}
+                  sx={{ whiteSpace: 'nowrap' }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+              <Box sx={{ flexGrow: 1 }} />
+              {lastUpdateTime && (
+                <Chip 
+                  label={`Updated ${lastUpdateTime.toLocaleTimeString()}`}
+                  size='small'
+                  color='success'
+                  sx={{ fontWeight: 600 }}
+                />
+              )}
               <Button 
                 variant='outlined' 
                 startIcon={<GetApp />} 
@@ -1391,8 +1553,52 @@ function App() {
                 Download Excel
               </Button>
             </Box>
-            {scanHistory.length === 0 ? <Box sx={{ textAlign: 'center', mt: 8, opacity: 0.5 }}><HistoryIcon sx={{ fontSize: 60, mb: 2 }} /><Typography>No scans yet.</Typography></Box> :
-              scanHistory.map((item, i) => <Card key={item._id || i} sx={{ mb: 2, borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
+            {(() => {
+              // Filter scans
+              let filteredScans = scanHistory.filter(item => {
+                const matchesSearch = !scanSearchQuery || 
+                  item.memberName?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
+                  item.memberId?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
+                  item.productName?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
+                  item.productNo?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
+                  item.batchNo?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
+                  item.location?.toLowerCase().includes(scanSearchQuery.toLowerCase());
+                
+                const scanDate = item.timestamp ? new Date(item.timestamp) : new Date();
+                const matchesStartDate = !scanDateFilter.start || scanDate >= new Date(scanDateFilter.start);
+                const matchesEndDate = !scanDateFilter.end || scanDate <= new Date(scanDateFilter.end + 'T23:59:59');
+                
+                return matchesSearch && matchesStartDate && matchesEndDate;
+              });
+              
+              // Pagination
+              const indexOfLastScan = currentPage * scansPerPage;
+              const indexOfFirstScan = indexOfLastScan - scansPerPage;
+              const currentScans = filteredScans.slice(indexOfFirstScan, indexOfLastScan);
+              const totalPages = Math.ceil(filteredScans.length / scansPerPage);
+              
+              return (
+                <>
+                  {filteredScans.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', mt: 8, opacity: 0.5 }}>
+                      <HistoryIcon sx={{ fontSize: 60, mb: 2 }} />
+                      <Typography variant='h6' gutterBottom>
+                        {scanHistory.length === 0 ? 'No scans yet.' : 'No scans match your filters.'}
+                      </Typography>
+                      {scanHistory.length > 0 && (
+                        <Button onClick={() => { setScanSearchQuery(''); setScanDateFilter({ start: '', end: '' }); }} sx={{ mt: 2 }}>
+                          Clear Filters
+                        </Button>
+                      )}
+                    </Box>
+                  ) : (
+                    <>
+                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant='body2' color='text.secondary'>
+                          Showing {indexOfFirstScan + 1}-{Math.min(indexOfLastScan, filteredScans.length)} of {filteredScans.length} scans
+                        </Typography>
+                      </Box>
+                      {currentScans.map((item, i) => <Card key={item._id || i} sx={{ mb: 2, borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                     <Box>
@@ -1424,8 +1630,20 @@ function App() {
                   <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                     <Chip label={`Batch: ${item.batchNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
                     <Chip label={`Bag: ${item.bagNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
-                    {item.price > 0 && <Chip label={`Rs. ${item.price.toLocaleString()}`} size='small' color='success' sx={{ fontSize: '0.7rem' }} />}
+                    {item.qty && <Chip label={item.qty} size='small' variant='outlined' sx={{ fontSize: '0.7rem', bgcolor: 'success.light', color: 'success.dark', fontWeight: 600 }} />}
+                    {item.price > 0 ? (
+                      <Chip label={`Rs. ${item.price.toLocaleString()}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem', bgcolor: 'primary.light', color: 'primary.dark', fontWeight: 600 }} />
+                    ) : (
+                      <Chip label="⚠️ Price Not Set" size='small' variant='outlined' sx={{ fontSize: '0.7rem', bgcolor: 'warning.light', color: 'warning.dark', fontWeight: 600 }} />
+                    )}
                   </Box>
+                  {item.price === 0 && (
+                    <Box sx={{ mt: 1, p: 1, bgcolor: 'warning.light', borderRadius: 1, border: '1px solid', borderColor: 'warning.main' }}>
+                      <Typography variant='caption' color='warning.dark' sx={{ fontSize: '0.7rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        ⚠️ Product with pack size "{item.qty}" not found in Products tab. Please add it to set the correct price.
+                      </Typography>
+                    </Box>
+                  )}
                   {(() => {
                     const batchInfo = parseBatchInfo(item.batchNo);
                     if (batchInfo?.parsed) {
@@ -1443,6 +1661,55 @@ function App() {
                   <Typography variant='caption' sx={{ display: 'block', textAlign: 'right', mt: 1, color: 'text.disabled' }}>{item.timestamp ? new Date(item.timestamp).toLocaleString() : 'Pending'}</Typography>
                 </CardContent>
               </Card>)}
+              
+              {totalPages > 1 && (
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 1, alignItems: 'center' }}>
+                  <Button 
+                    size='small' 
+                    onClick={() => setCurrentPage(currentPage - 1)} 
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <Button
+                          key={pageNum}
+                          size='small'
+                          variant={currentPage === pageNum ? 'contained' : 'outlined'}
+                          onClick={() => setCurrentPage(pageNum)}
+                          sx={{ minWidth: 40 }}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </Box>
+                  <Button 
+                    size='small' 
+                    onClick={() => setCurrentPage(currentPage + 1)} 
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </Box>
+              )}
+            </>
+          )}
+        </>
+      );
+    })()}
           </Box>}
 
           {adminTab === 2 && <Box>
@@ -1472,16 +1739,53 @@ function App() {
           </Box>}
 
           {adminTab === 3 && <Box>
-            <Box sx={{ mb: 2 }}><Button variant='contained' startIcon={<Add />} onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0 } })}>Add Product</Button></Box>
+            <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Button variant='contained' startIcon={<Add />} onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0 } })}>Add Product</Button>
+              <TextField 
+                size='small' 
+                placeholder='Search products...' 
+                value={productSearchQuery}
+                onChange={(e) => setProductSearchQuery(e.target.value)}
+                sx={{ flexGrow: 1 }}
+                InputProps={{
+                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+                }}
+              />
+              {productSearchQuery && (
+                <Button size='small' onClick={() => setProductSearchQuery('')}>Clear</Button>
+              )}
+            </Box>
             {console.log('🏷️ Rendering Products tab, products array:', products, 'Count:', products.length)}
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table><TableHead><TableRow><TableCell>Product Name</TableCell><TableCell>Product Code</TableCell><TableCell>Pack Size</TableCell><TableCell>Price (LKR)</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
                 <TableBody>
-                  {products.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} align="center">No products found. Click "Add Product" to create one.</TableCell></TableRow>
-                  ) : (
-                    products.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell><TableCell><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })}><Edit /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)}><Delete /></IconButton></TableCell></TableRow>)
-                  )}
+                  {(() => {
+                    const filteredProducts = products.filter(p => 
+                      !productSearchQuery ||
+                      p.name?.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
+                      p.productNo?.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
+                      p.category?.toLowerCase().includes(productSearchQuery.toLowerCase())
+                    );
+                    
+                    if (filteredProducts.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={5} align="center">
+                            <Box sx={{ py: 4 }}>
+                              <Typography variant='body1' color='text.secondary'>
+                                {products.length === 0 ? 'No products found. Click "Add Product" to create one.' : 'No products match your search.'}
+                              </Typography>
+                              {products.length > 0 && (
+                                <Button onClick={() => setProductSearchQuery('')} sx={{ mt: 2 }}>Clear Search</Button>
+                              )}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    
+                    return filteredProducts.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell><TableCell><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })}><Edit /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)}><Delete /></IconButton></TableCell></TableRow>);
+                  })()}
                 </TableBody>
               </Table>
             </TableContainer>

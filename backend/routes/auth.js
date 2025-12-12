@@ -1,21 +1,56 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
 // Generate JWT Token
-const generateToken = (id) => {
+const generateToken = (id, expiresIn = null) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d'
+    expiresIn: expiresIn || process.env.JWT_EXPIRE || '7d'
+  });
+};
+
+// Generate Refresh Token
+const generateRefreshToken = (id) => {
+  return jwt.sign({ id, type: 'refresh' }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d'
   });
 };
 
 // @route   POST /api/auth/register
 // @desc    Register a new user
 // @access  Public
-router.post('/register', async (req, res) => {
+router.post('/register', [
+  body('username')
+    .trim()
+    .isLength({ min: 3, max: 30 })
+    .withMessage('Username must be between 3 and 30 characters')
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Username can only contain letters, numbers, underscores and hyphens'),
+  body('email')
+    .trim()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number')
+], async (req, res) => {
   try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { username, email, password } = req.body;
 
     // Check if user exists
@@ -34,6 +69,9 @@ router.post('/register', async (req, res) => {
       password
     });
 
+    const token = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
     res.status(201).json({
       success: true,
       data: {
@@ -41,7 +79,8 @@ router.post('/register', async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        token: generateToken(user._id)
+        token,
+        refreshToken
       }
     });
   } catch (error) {
@@ -55,19 +94,30 @@ router.post('/register', async (req, res) => {
 // @route   POST /api/auth/login
 // @desc    Login user
 // @access  Public
-router.post('/login', async (req, res) => {
+router.post('/login', [
+  body('email')
+    .trim()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required')
+], async (req, res) => {
   try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { email, password } = req.body;
 
     console.log('🔑 User login attempt:', { email, hasPassword: !!password });
-
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and password'
-      });
-    }
 
     // Check for user
     const user = await User.findOne({ email }).select('+password');
@@ -107,6 +157,9 @@ router.post('/login', async (req, res) => {
 
     console.log('✅ User login successful');
 
+    const token = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
     res.json({
       success: true,
       data: {
@@ -118,7 +171,8 @@ router.post('/login', async (req, res) => {
         tier: user.tier,
         totalScans: user.totalScans,
         achievements: user.achievements,
-        token: generateToken(user._id)
+        token,
+        refreshToken
       }
     });
   } catch (error) {
@@ -133,20 +187,30 @@ router.post('/login', async (req, res) => {
 // @route   POST /api/auth/admin/login
 // @desc    Admin login with role verification
 // @access  Public
-router.post('/admin/login', async (req, res) => {
+router.post('/admin/login', [
+  body('email')
+    .trim()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required')
+], async (req, res) => {
   try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { email, password } = req.body;
 
     console.log('🔑 Admin login attempt:', { email, hasPassword: !!password });
-
-    // Validate input
-    if (!email || !password) {
-      console.log('❌ Missing email or password');
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and password'
-      });
-    }
 
     // Check for user with admin role
     const user = await User.findOne({ email, role: 'admin' }).select('+password');
@@ -186,6 +250,9 @@ router.post('/admin/login', async (req, res) => {
     user.lastLogin = Date.now();
     await user.save();
 
+    const token = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
     res.json({
       success: true,
       data: {
@@ -193,13 +260,67 @@ router.post('/admin/login', async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        token: generateToken(user._id)
+        token,
+        refreshToken
       }
     });
   } catch (error) {
     res.status(400).json({
       success: false,
       message: error.message
+    });
+  }
+});
+
+// @route   POST /api/auth/refresh
+// @desc    Refresh access token
+// @access  Public
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Refresh token is required'
+      });
+    }
+
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+
+    if (decoded.type !== 'refresh') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid refresh token'
+      });
+    }
+
+    // Get user
+    const user = await User.findById(decoded.id);
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found or inactive'
+      });
+    }
+
+    // Generate new tokens
+    const newToken = generateToken(user._id);
+    const newRefreshToken = generateRefreshToken(user._id);
+
+    res.json({
+      success: true,
+      data: {
+        token: newToken,
+        refreshToken: newRefreshToken
+      }
+    });
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or expired refresh token'
     });
   }
 });
@@ -249,8 +370,32 @@ router.get('/me', protect, async (req, res) => {
 // @route   PUT /api/auth/profile
 // @desc    Update user profile
 // @access  Private
-router.put('/profile', protect, async (req, res) => {
+router.put('/profile', protect, [
+  body('username')
+    .optional()
+    .trim()
+    .isLength({ min: 3, max: 30 })
+    .withMessage('Username must be between 3 and 30 characters')
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Username can only contain letters, numbers, underscores and hyphens'),
+  body('email')
+    .optional()
+    .trim()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email')
+], async (req, res) => {
   try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { username, email } = req.body;
     const user = await User.findById(req.user._id);
 
@@ -307,23 +452,28 @@ router.put('/profile', protect, async (req, res) => {
 // @route   PUT /api/auth/change-password
 // @desc    Change user password
 // @access  Private
-router.put('/change-password', protect, async (req, res) => {
+router.put('/change-password', protect, [
+  body('currentPassword')
+    .notEmpty()
+    .withMessage('Current password is required'),
+  body('newPassword')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number')
+], async (req, res) => {
   try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide current and new password'
-      });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'New password must be at least 6 characters'
-      });
-    }
 
     const user = await User.findById(req.user._id).select('+password');
 

@@ -16,18 +16,24 @@ const initializeApp = async () => {
   
   try {
     // Ensure admin user exists
-    const adminExists = await User.findOne({ email: 'admin@megakem.com' });
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@megakem.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123456!';
+    
+    const adminExists = await User.findOne({ email: adminEmail });
     if (!adminExists) {
       await User.create({
         username: 'admin',
-        email: 'admin@megakem.com',
-        password: 'Admin@123',
+        email: adminEmail,
+        password: adminPassword,
         role: 'admin',
         isActive: true
       });
       console.log('✅ Admin user created automatically');
+      console.log(`📝 Admin login: ${adminEmail} | Password: ${adminPassword}`);
+      console.log('⚠️  IMPORTANT: Change admin password after first login!');
+    } else {
+      console.log(`📝 Admin login: ${adminEmail}`);
     }
-    console.log('📝 Admin login: admin@megakem.com | Password: Admin@123');
   } catch (error) {
     console.error('⚠️  Error with admin user:', error.message);
   }
@@ -39,22 +45,27 @@ initializeApp();
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://chamarait22113122.github.io',
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_PROD
 ].filter(Boolean);
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or Postman)
+    // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+    // Check if the origin is in the allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.warn(`⚠️  Blocked CORS request from origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400 // 24 hours
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -112,15 +112,16 @@ router.post('/', optionalAuth, async (req, res) => {
       qty
     } = req.body;
 
-    // Check for duplicate scan - only check if this batch number has been scanned before
+    // Check for duplicate scan - check if this batch number has been scanned by the same role
     const duplicateScan = await Scan.findOne({
-      batchNo
+      batchNo,
+      role  // Check within the same role only
     });
 
     if (duplicateScan) {
       return res.status(400).json({
         success: false,
-        message: `This batch number (${batchNo}) has already been scanned`,
+        message: `This batch number (${batchNo}) has already been scanned by a ${role}`,
         duplicate: true
       });
     }
@@ -200,7 +201,8 @@ router.post('/batch', optionalAuth, async (req, res) => {
 
     for (const scan of scans) {
       const duplicateScan = await Scan.findOne({
-        batchNo: scan.batchNo
+        batchNo: scan.batchNo,
+        role: scan.role  // Check within the same role only
       });
 
       if (duplicateScan) {

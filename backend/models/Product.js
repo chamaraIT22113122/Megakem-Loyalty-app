@@ -42,8 +42,8 @@ const productSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster product lookups
-productSchema.index({ productNo: 1 });
+// Index for faster product lookups - compound index with productNo and category (pack size)
+productSchema.index({ productNo: 1, category: 1 }, { unique: true });
 productSchema.index({ name: 'text' });
 
 module.exports = mongoose.model('Product', productSchema);
