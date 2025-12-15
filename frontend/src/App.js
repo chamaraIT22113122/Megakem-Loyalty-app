@@ -1,21 +1,54 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Brightness4, Brightness7, Star, GetApp } from '@mui/icons-material';
+import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment } from '@mui/icons-material';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, rewardsAPI, analyticsAPI } from './services/api';
 import megakemLogo from './assets/Megakem Logo.png';
 import megakemBrandLogo from './assets/Megakem Brand Logo-01.png';
 
 
-const getTheme = (mode) => createTheme({
+const getTheme = () => createTheme({
   palette: { 
-    mode,
-    primary: { main: '#003366', light: '#4A90A4', dark: '#001a33' }, 
-    secondary: { main: '#A4D233', light: '#c5e066', dark: '#7fa326' },
-    info: { main: '#00B4D8' },
+    mode: 'light',
+    primary: { 
+      main: '#003366', 
+      light: '#4A90A4', 
+      dark: '#001a33', 
+      lighter: '#e6f2ff' 
+    }, 
+    secondary: { 
+      main: '#A4D233', 
+      light: '#c5e066', 
+      dark: '#7fa326', 
+      lighter: '#f5fce8' 
+    },
+    success: { 
+      main: '#10b981', 
+      lighter: '#d1fae5', 
+      light: '#34d399', 
+      dark: '#059669' 
+    },
+    warning: { 
+      main: '#f59e0b', 
+      lighter: '#fef3c7', 
+      light: '#fbbf24', 
+      dark: '#d97706' 
+    },
+    error: { 
+      main: '#ef4444', 
+      lighter: '#fee2e2', 
+      light: '#f87171', 
+      dark: '#dc2626' 
+    },
+    info: { 
+      main: '#00B4D8', 
+      lighter: '#cffafe', 
+      light: '#22d3ee', 
+      dark: '#0891b2' 
+    },
     background: { 
-      default: mode === 'dark' ? '#0a1929' : 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', 
-      paper: mode === 'dark' ? '#132f4c' : '#ffffff'
+      default: '#f8fafc', 
+      paper: '#ffffff'
     }
   },
   shape: { borderRadius: 16 },
@@ -34,32 +67,46 @@ const getTheme = (mode) => createTheme({
         root: { 
           textTransform: 'none', 
           fontWeight: 600, 
-          padding: '12px 32px',
+          padding: '12px 28px',
           borderRadius: '12px',
-          boxShadow: '0 4px 14px 0 rgba(0,51,102,0.25)',
-          transition: 'all 0.3s ease',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           '@media (max-width: 600px)': {
             padding: '10px 20px',
-            fontSize: '0.9rem'
-          },
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: '0 6px 20px 0 rgba(0,51,102,0.35)'
+            fontSize: '0.875rem'
           }
         },
         contained: {
-          background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)'
+          background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)',
+          boxShadow: '0 4px 14px 0 rgba(0,51,102,0.3)',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: '0 8px 24px 0 rgba(0,51,102,0.4)',
+            background: 'linear-gradient(135deg, #001a33 0%, #003366 100%)'
+          },
+          '&:active': {
+            transform: 'translateY(0px)',
+            boxShadow: '0 2px 8px 0 rgba(0,51,102,0.3)'
+          }
+        },
+        outlined: {
+          borderWidth: '2px',
+          '&:hover': {
+            borderWidth: '2px',
+            transform: 'translateY(-2px)',
+            boxShadow: '0 4px 12px 0 rgba(0,51,102,0.15)'
+          }
         }
       } 
     },
     MuiCard: { 
       styleOverrides: { 
         root: { 
-          boxShadow: '0 8px 24px -4px rgba(0,51,102,0.12)',
-          transition: 'all 0.3s ease',
+          boxShadow: '0 2px 8px -2px rgba(0,51,102,0.1), 0 4px 12px -2px rgba(0,51,102,0.05)',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          borderRadius: '16px',
           '@media (hover: hover)': {
             '&:hover': {
-              boxShadow: '0 12px 32px -4px rgba(0,51,102,0.2)',
+              boxShadow: '0 8px 24px -4px rgba(0,51,102,0.15), 0 12px 32px -4px rgba(0,51,102,0.1)',
               transform: 'translateY(-4px)'
             }
           }
@@ -87,6 +134,32 @@ const getTheme = (mode) => createTheme({
           }
         }
       }
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            transition: 'all 0.3s ease',
+            '&:hover fieldset': {
+              borderWidth: '2px'
+            },
+            '&.Mui-focused fieldset': {
+              borderWidth: '2px',
+              boxShadow: '0 0 0 3px rgba(0,51,102,0.1)'
+            }
+          }
+        }
+      }
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none'
+        },
+        elevation1: {
+          boxShadow: '0 2px 8px -2px rgba(0,51,102,0.1), 0 4px 12px -2px rgba(0,51,102,0.05)'
+        }
+      }
     }
   }
 });
@@ -99,7 +172,10 @@ const loadScript = (src) => new Promise((resolve, reject) => {
 });
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem('user');
+    return stored ? JSON.parse(stored) : null;
+  });
   const [view, setView] = useState('welcome');
   const [role, setRole] = useState('applicator');
   const [memberId, setMemberId] = useState('');
@@ -109,13 +185,20 @@ function App() {
   const [pendingScan, setPendingScan] = useState(null);
   const [scanHistory, setScanHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [pullToRefreshY, setPullToRefreshY] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, msg: '', type: 'success' });
   const [adminAuth, setAdminAuth] = useState(() => {
     const stored = localStorage.getItem('adminAuth');
     return stored === 'true';
   });
-  const [adminEmail, setAdminEmail] = useState('');
+  const [adminEmail, setAdminEmail] = useState(() => {
+    return localStorage.getItem('adminEmail') || '';
+  });
   const [adminPassword, setAdminPassword] = useState('');
   const [adminTab, setAdminTab] = useState(0);
   const [userLoginEmail, setUserLoginEmail] = useState('');
@@ -137,8 +220,6 @@ function App() {
   const [userDialog, setUserDialog] = useState({ open: false, user: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, scanId: null, scanDetails: null });
   const [userDeleteDialog, setUserDeleteDialog] = useState({ open: false, userId: null, userDetails: null });
-  const [darkMode, setDarkMode] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [scanSearchQuery, setScanSearchQuery] = useState('');
   const [scanDateFilter, setScanDateFilter] = useState({ start: '', end: '' });
@@ -150,6 +231,11 @@ function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [userStats, setUserStats] = useState(null);
   const [rewardDialog, setRewardDialog] = useState({ open: false, reward: null });
+  const [notificationPrefs, setNotificationPrefs] = useState({ email: true, push: true, autoRefresh: true, soundEnabled: false });
+  const [activityLog, setActivityLog] = useState([]);
+  const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true });
+  const [backupPasswordDialog, setBackupPasswordDialog] = useState({ open: false, password: '' });
+  const [restorePasswordDialog, setRestorePasswordDialog] = useState({ open: false, password: '', file: null, backupData: null });
   const scannerRef = useRef(null);
   const pollIntervalRef = useRef(null);
 
@@ -174,7 +260,10 @@ function App() {
             await createAnonymousSession(); 
           }
         } else { await createAnonymousSession(); }
-      } catch (error) { console.error('Auth error:', error); showNotification('Connection Error', 'error'); }
+      } catch (error) { 
+        console.error('Auth error:', error); 
+        showNotification(getUserFriendlyError(error), 'error', 5000); 
+      }
       finally { setInitializing(false); }
     };
     initAuth();
@@ -350,26 +439,64 @@ function App() {
     loadData();
   }, [user]);
 
+  const initializeScanner = () => {
+    if (!window.Html5QrcodeScanner) return;
+    
+    const container = document.getElementById('reader');
+    if (container) container.innerHTML = '';
+    
+    const scanner = new window.Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+    scanner.render(async (decodedText) => {
+      // Clear the scanner temporarily
+      await scanner.clear().catch(err => console.error('Failed to clear scanner', err));
+      
+      // Process the scan
+      await handleScan(decodedText);
+      
+      // Restart the scanner after a short delay
+      setTimeout(() => {
+        if (view === 'scanner') {
+          initializeScanner();
+        }
+      }, 500);
+    }, () => {});
+    
+    scannerRef.current = scanner;
+  };
+
   useEffect(() => {
-    let html5QrcodeScanner;
     if (view === 'scanner') {
       loadScript('https://unpkg.com/html5-qrcode').then(() => {
         if (window.Html5QrcodeScanner) {
-          const container = document.getElementById('reader');
-          if (container) container.innerHTML = '';
-          html5QrcodeScanner = new window.Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-          html5QrcodeScanner.render((decodedText) => {
-            handleScan(decodedText);
-            html5QrcodeScanner.clear().catch(err => console.error('Failed to clear scanner', err));
-          }, () => {});
-          scannerRef.current = html5QrcodeScanner;
+          initializeScanner();
         }
       }).catch(err => console.error('Failed to load QR library', err));
     }
     return () => { if (scannerRef.current) { scannerRef.current.clear().catch(() => {}); scannerRef.current = null; } };
   }, [view]);
 
-  const showNotification = (msg, type = 'success') => setSnackbar({ open: true, msg, type });
+  // User-friendly error messages
+  const getUserFriendlyError = (error) => {
+    if (!navigator.onLine) return 'No internet connection. Please check your network.';
+    if (error.code === 'ECONNABORTED') return 'Request timeout. Please try again.';
+    if (error.response) {
+      const status = error.response.status;
+      if (status === 400) return error.response.data?.message || 'Invalid request. Please check your input.';
+      if (status === 401) return 'Session expired. Please log in again.';
+      if (status === 403) return 'Access denied. You don\'t have permission.';
+      if (status === 404) return 'Resource not found.';
+      if (status === 429) return 'Too many requests. Please wait a moment.';
+      if (status >= 500) return 'Server error. Please try again later.';
+      return error.response.data?.message || 'Something went wrong.';
+    }
+    if (error.request) return 'No response from server. Please check your connection.';
+    return error.message || 'An unexpected error occurred.';
+  };
+
+  const showNotification = (msg, type = 'success', duration = 4000) => {
+    setSnackbar({ open: true, msg, type, duration });
+  };
+  
   const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
   const handleScan = async (qrString) => {
@@ -527,10 +654,13 @@ function App() {
     setLoading(true);
     try {
       const response = await authAPI.adminLogin({ email: adminEmail, password: adminPassword });
-      const { token, id, username, role } = response.data.data;
+      const { token, id, username, role, email } = response.data.data;
+      const userData = { id, username, role, email };
       localStorage.setItem('token', token);
       localStorage.setItem('adminAuth', 'true');
-      setUser({ id, username, role });
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('adminEmail', email || adminEmail);
+      setUser(userData);
       setAdminAuth(true);
       showNotification('Admin login successful!', 'success');
     } catch (error) {
@@ -544,7 +674,10 @@ function App() {
   const handleAdminLogout = () => {
     localStorage.removeItem('adminAuth');
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('adminEmail');
     setAdminAuth(false);
+    setUser(null);
     setAdminEmail('');
     setAdminPassword('');
     setView('welcome');
@@ -557,8 +690,10 @@ function App() {
     try {
       const response = await authAPI.login({ email: userLoginEmail, password: userLoginPassword });
       const { token, id, username, email, role } = response.data.data;
+      const userData = { id, username, email, role, anonymous: false };
       localStorage.setItem('token', token);
-      setUser({ id, username, email, role, anonymous: false });
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
       setShowUserLogin(false);
       setView('welcome');
       showNotification(`Welcome back, ${username}!`, 'success');
@@ -746,22 +881,33 @@ function App() {
   };
 
   const handleDeleteProduct = async (productId) => {
+    if (!hasPermission('canManageProducts')) {
+      showNotification('You do not have permission to delete products', 'error');
+      return;
+    }
     if (!window.confirm('Delete this product?')) return;
     try {
       await productsAPI.delete(productId);
       setProducts(products.filter(p => p._id !== productId));
       showNotification('Product deleted!', 'success');
+      addToActivityLog('Product Deleted', `Deleted product ID: ${productId}`, 'warning');
     } catch (error) {
       showNotification('Failed to delete product', 'error');
     }
   };
 
   const handleDeleteScan = async () => {
+    if (!hasPermission('canDelete')) {
+      showNotification('You do not have permission to delete scans', 'error');
+      setDeleteDialog({ open: false, scanId: null, scanDetails: null });
+      return;
+    }
     setLoading(true);
     try {
       await scansAPI.delete(deleteDialog.scanId);
       setScanHistory(scanHistory.filter(s => s._id !== deleteDialog.scanId));
       showNotification('Scan deleted successfully!', 'success');
+      addToActivityLog('Scan Deleted', `Deleted scan ID: ${deleteDialog.scanId}`, 'warning');
       setDeleteDialog({ open: false, scanId: null, scanDetails: null });
     } catch (error) {
       showNotification('Failed to delete scan', 'error');
@@ -771,11 +917,17 @@ function App() {
   };
 
   const handleDeleteUser = async () => {
+    if (!isMainAdmin()) {
+      showNotification('Only the main admin can delete co-admins', 'error');
+      setUserDeleteDialog({ open: false, userId: null, userDetails: null });
+      return;
+    }
     setLoading(true);
     try {
       await authAPI.deleteUser(userDeleteDialog.userId);
       setUsers(users.filter(u => u._id !== userDeleteDialog.userId));
       showNotification('User deleted successfully!', 'success');
+      addToActivityLog('User Deleted', `Deleted user: ${userDeleteDialog.userDetails?.username || 'Unknown'}`, 'warning');
       setUserDeleteDialog({ open: false, userId: null, userDetails: null });
     } catch (error) {
       showNotification(error.response?.data?.message || 'Failed to delete user', 'error');
@@ -785,31 +937,368 @@ function App() {
   };
 
   const handleCreateUser = async () => {
+    if (!isMainAdmin()) {
+      showNotification('Only the main admin can manage co-admins', 'error');
+      setUserDialog({ open: false, user: null });
+      return;
+    }
+    
     setLoading(true);
     try {
-      const { username, email, password, role } = userDialog.user;
+      const { _id, username, email, password, role, permissions } = userDialog.user;
       
-      if (!username || !email || !password) {
+      if (!username || !email) {
         showNotification('Please fill all required fields', 'error');
         setLoading(false);
         return;
       }
 
-      if (password.length < 6) {
+      if (!_id && (!password || password.length < 6)) {
         showNotification('Password must be at least 6 characters', 'error');
         setLoading(false);
         return;
       }
 
-      const res = await authAPI.createUser({ username, email, password, role: role || 'user' });
-      setUsers([res.data.data, ...users]);
-      showNotification('User created successfully!', 'success');
+      const userData = {
+        username,
+        email,
+        role: role || 'admin',
+        permissions: {
+          canDelete: permissions?.canDelete === true,
+          canExport: permissions?.canExport === true,
+          canManageUsers: permissions?.canManageUsers === true,
+          canManageProducts: permissions?.canManageProducts === true
+        }
+      };
+
+      if (!_id) {
+        userData.password = password;
+      }
+
+      if (_id) {
+        // Update existing user
+        // In real app: await authAPI.updateUser(_id, userData);
+        setUsers(users.map(u => u._id === _id ? { ...u, ...userData } : u));
+        showNotification('User updated successfully!', 'success');
+        addToActivityLog('User Updated', `Updated permissions for ${username}`, 'info');
+      } else {
+        // Create new user
+        const res = await authAPI.createUser(userData);
+        setUsers([{ ...res.data.data, permissions: userData.permissions }, ...users]);
+        showNotification('User created successfully!', 'success');
+        addToActivityLog('User Created', `Created new co-admin: ${username}`, 'success');
+      }
+      
       setUserDialog({ open: false, user: null });
     } catch (error) {
-      showNotification(error.response?.data?.message || 'Failed to create user', 'error');
+      showNotification(error.response?.data?.message || 'Failed to save user', 'error');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Export data with filters
+  const handleExportData = async (format = 'csv') => {
+    if (!hasPermission('canExport')) {
+      showNotification('You do not have permission to export data', 'error');
+      return;
+    }
+    try {
+      setLoading(true);
+      
+      // Apply filters to data before export
+      let dataToExport = scanHistory.filter(scan => {
+        const matchesSearch = !scanSearchQuery || 
+          scan.memberId?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
+          scan.memberName?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
+          scan.product?.name?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
+          scan.batchNo?.toLowerCase().includes(scanSearchQuery.toLowerCase());
+        
+        const matchesDateRange = (!scanDateFilter.start || new Date(scan.createdAt) >= new Date(scanDateFilter.start)) &&
+                                 (!scanDateFilter.end || new Date(scan.createdAt) <= new Date(scanDateFilter.end));
+        
+        return matchesSearch && matchesDateRange;
+      });
+
+      if (dataToExport.length === 0) {
+        showNotification('No data to export with current filters', 'warning', 3000);
+        return;
+      }
+
+      // Create CSV or Excel data
+      if (format === 'csv') {
+        const headers = ['Date', 'Member ID', 'Member Name', 'Product', 'Batch No', 'Pack Size', 'Location', 'Points'];
+        const rows = dataToExport.map(scan => [
+          new Date(scan.createdAt).toLocaleDateString(),
+          scan.memberId,
+          scan.memberName,
+          scan.product?.name || 'N/A',
+          scan.batchNo,
+          scan.packSize || 'N/A',
+          scan.location || 'N/A',
+          scan.points || 0
+        ]);
+        
+        const csvContent = [
+          headers.join(','),
+          ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `megakem-scans-${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        showNotification(`Exported ${dataToExport.length} records to CSV`, 'success', 3000);
+      } else {
+        // For JSON export
+        const jsonContent = JSON.stringify(dataToExport, null, 2);
+        const blob = new Blob([jsonContent], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `megakem-scans-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        showNotification(`Exported ${dataToExport.length} records to JSON`, 'success', 3000);
+      }
+    } catch (error) {
+      showNotification(getUserFriendlyError(error), 'error', 5000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Backup all data
+  // Open backup password dialog
+  const handleBackupData = () => {
+    setBackupPasswordDialog({ open: true, password: '' });
+  };
+
+  // Confirm backup with password
+  const handleConfirmBackup = async () => {
+    if (!backupPasswordDialog.password) {
+      showNotification('Please enter your password', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Verify password
+      const response = await authAPI.adminLogin({ 
+        email: adminEmail, 
+        password: backupPasswordDialog.password 
+      });
+
+      if (!response.data.success) {
+        showNotification('Invalid password', 'error');
+        setLoading(false);
+        return;
+      }
+
+      // Create backup
+      const backupData = {
+        version: '1.0',
+        timestamp: new Date().toISOString(),
+        data: {
+          scans: scanHistory,
+          products: products,
+          rewards: rewards,
+          users: users.map(u => ({ ...u, password: undefined })) // Exclude passwords
+        }
+      };
+      
+      const jsonContent = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonContent], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `megakem-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      
+      showNotification('Backup created successfully!', 'success', 3000);
+      addToActivityLog('Backup Created', 'System backup generated', 'success');
+      setBackupPasswordDialog({ open: false, password: '' });
+    } catch (error) {
+      showNotification('Failed to create backup. Invalid password.', 'error', 5000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Restore data from backup - open password dialog
+  const handleRestoreData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsedData = JSON.parse(e.target.result);
+        
+        // Handle both old format (array of scans) and new format (structured backup)
+        let backupData;
+        if (Array.isArray(parsedData)) {
+          // Old format - just scans array
+          backupData = {
+            version: '1.0',
+            timestamp: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString(),
+            data: {
+              scans: parsedData,
+              products: [],
+              rewards: [],
+              users: []
+            }
+          };
+        } else if (parsedData.version && parsedData.data) {
+          // New format - structured backup
+          backupData = parsedData;
+        } else {
+          showNotification('Invalid backup file format', 'error', 5000);
+          return;
+        }
+
+        // Open password dialog with backup data
+        setRestorePasswordDialog({ 
+          open: true, 
+          password: '', 
+          file: file,
+          backupData: backupData 
+        });
+      } catch (error) {
+        showNotification('Failed to read backup file', 'error', 5000);
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset file input
+    event.target.value = '';
+  };
+
+  // Confirm restore with password
+  const handleConfirmRestore = async () => {
+    if (!restorePasswordDialog.password) {
+      showNotification('Please enter your password', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Verify password
+      const response = await authAPI.adminLogin({ 
+        email: adminEmail, 
+        password: restorePasswordDialog.password 
+      });
+
+      if (!response.data.success) {
+        showNotification('Invalid password', 'error');
+        setLoading(false);
+        return;
+      }
+
+      const backupData = restorePasswordDialog.backupData;
+
+      // Confirm restore
+      if (!window.confirm(`This will restore data from ${new Date(backupData.timestamp).toLocaleString()}. This will replace all current data. Continue?`)) {
+        setLoading(false);
+        setRestorePasswordDialog({ open: false, password: '', file: null, backupData: null });
+        return;
+      }
+
+      // Restore scans to backend
+      let restoredItems = 0;
+      if (backupData.data.scans && Array.isArray(backupData.data.scans) && backupData.data.scans.length > 0) {
+        try {
+          // Send scans to backend using batch create
+          const scansToRestore = backupData.data.scans.map(scan => ({
+            memberName: scan.memberName,
+            memberId: scan.memberId,
+            phone: scan.phone || '',
+            role: scan.role,
+            productName: scan.productName,
+            productNo: scan.productNo,
+            batchNo: scan.batchNo,
+            bagNo: scan.bagNo,
+            qty: scan.qty,
+            price: scan.price,
+            location: scan.location,
+            timestamp: scan.timestamp
+          }));
+          
+          await scansAPI.createBatch(scansToRestore);
+          restoredItems = scansToRestore.length;
+          
+          // Reload scans from backend to get updated data
+          const scansRes = await scansAPI.getLive();
+          setScanHistory(scansRes.data.data);
+        } catch (error) {
+          console.error('Error restoring scans:', error);
+          showNotification('Failed to restore scans to database', 'error', 5000);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Update frontend state for products and rewards (if backend endpoints exist)
+      if (backupData.data.products && Array.isArray(backupData.data.products)) {
+        setProducts(backupData.data.products);
+      }
+      if (backupData.data.rewards && Array.isArray(backupData.data.rewards)) {
+        setRewards(backupData.data.rewards);
+      }
+        
+      showNotification(`Backup restored successfully! (${restoredItems} scans from ${new Date(backupData.timestamp).toLocaleString()})`, 'success', 3000);
+      addToActivityLog('Backup Restored', `Data restored from ${new Date(backupData.timestamp).toLocaleDateString()}`, 'warning');
+      setRestorePasswordDialog({ open: false, password: '', file: null, backupData: null });
+    } catch (error) {
+      showNotification('Failed to restore backup. Invalid password.', 'error', 5000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Activity Log Functions
+  const addToActivityLog = (action, details, severity = 'info') => {
+    const logEntry = {
+      id: Date.now(),
+      timestamp: new Date().toISOString(),
+      action,
+      details,
+      severity, // 'info', 'warning', 'error', 'success'
+      user: adminEmail || 'admin@megakem.com'
+    };
+    setActivityLog(prev => [logEntry, ...prev].slice(0, 100)); // Keep last 100 entries
+  };
+
+  // Notification Preferences
+  const handleNotificationPrefChange = (pref, value) => {
+    setNotificationPrefs(prev => ({ ...prev, [pref]: value }));
+    localStorage.setItem('notificationPrefs', JSON.stringify({ ...notificationPrefs, [pref]: value }));
+    showNotification('Notification preferences updated', 'success', 2000);
+    addToActivityLog('Settings Changed', `Updated notification preference: ${pref}`, 'info');
+  };
+
+  // Check if current user is the main admin
+  const isMainAdmin = () => {
+    return adminEmail === 'admin@megakem.com';
+  };
+
+  // User Permissions Check
+  const hasPermission = (permission) => {
+    // Main admin has all permissions
+    if (isMainAdmin()) {
+      return true;
+    }
+    
+    // Find current logged-in user from users array
+    const currentUser = users.find(u => u.email === adminEmail);
+    
+    // If user found, check their specific permission (must be explicitly true)
+    if (currentUser && currentUser.permissions) {
+      return currentUser.permissions[permission] === true;
+    }
+    
+    // Default to false if no permission found
+    return false;
   };
 
   if (initializing) return (
@@ -822,7 +1311,7 @@ function App() {
   );
 
   return (
-    <ThemeProvider theme={getTheme(darkMode ? 'dark' : 'light')}><CssBaseline /><Box sx={{ minHeight: '100vh', background: darkMode ? '#0a1929' : 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', display: 'flex', flexDirection: 'column' }}>
+    <ThemeProvider theme={getTheme()}><CssBaseline /><Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', display: 'flex', flexDirection: 'column' }}>
       <AppBar position='static' elevation={0} sx={{ background: 'linear-gradient(135deg, #003366 0%, #004d7a 50%, #4A90A4 100%)', boxShadow: '0 4px 20px rgba(0,51,102,0.3)' }}><Toolbar sx={{ minHeight: { xs: '56px', sm: '64px' }, px: { xs: 1, sm: 2 } }}>
         <img src={megakemBrandLogo} alt='Megakem Logo' style={{ height: '40px', width: 'auto', marginRight: '12px' }} />
         <Box sx={{ flexGrow: 1 }}>
@@ -917,44 +1406,69 @@ function App() {
           )}
         </Box>}
 
-        {view === 'history' && <Box sx={{ py: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-            <IconButton onClick={() => setView('welcome')} sx={{ mr: 2 }}>
-              <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
-            </IconButton>
-            <Typography variant='h4' fontWeight={700}>Purchase History Search</Typography>
-          </Box>
-          <Card sx={{ mb: 3, p: 3 }}>
-            <Typography variant='subtitle1' fontWeight={600} sx={{ mb: 2 }}>Search Purchase History</Typography>
-            <TextField 
-              fullWidth 
-              label='Member ID (for Applicators)' 
-              placeholder='e.g., APP-001' 
-              value={searchMemberId} 
-              onChange={(e) => {
-                setSearchMemberId(e.target.value.toUpperCase());
-                setSearchPhone('');
+        {view === 'history' && <Box sx={{ py: { xs: 2, sm: 3 }, animation: 'fadeIn 0.5s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
+            <IconButton 
+              onClick={() => setView('welcome')} 
+              sx={{ 
+                bgcolor: 'primary.lighter',
+                '&:hover': { bgcolor: 'primary.light', transform: 'translateX(-4px)' },
+                transition: 'all 0.3s'
               }}
-              sx={{ mb: 2 }}
-            />
-            <Typography variant='body2' color='text.secondary' sx={{ mb: 1, textAlign: 'center', fontWeight: 600 }}>OR</Typography>
-            <TextField 
-              fullWidth 
-              label='Phone Number (for Customers)' 
-              placeholder='e.g., 0712345678' 
+            >
+              <ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main' }} />
+            </IconButton>
+            <Box>
+              <Typography variant='h4' fontWeight={800} sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>Purchase History</Typography>
+              <Typography variant='body2' color='text.secondary'>Search and track your loyalty rewards</Typography>
+            </Box>
+          </Box>
+          <Card sx={{ mb: 3, overflow: 'hidden', boxShadow: '0 8px 32px -8px rgba(0,51,102,0.2)', bgcolor: 'background.paper' }}>
+            <Box sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', p: 2, color: 'white' }}>
+              <Typography variant='h6' fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <HistoryIcon /> Search Your History
+              </Typography>
+            </Box>
+            <Box sx={{ p: 3 }}>
+              <TextField 
+                fullWidth 
+                label='Member ID (for Applicators)' 
+                placeholder='e.g., APP-001' 
+                value={searchMemberId} 
+                onChange={(e) => {
+                  setSearchMemberId(e.target.value.toUpperCase());
+                  setSearchPhone('');
+                }}
+                sx={{ mb: 2 }}
+                InputProps={{
+                  startAdornment: <Inventory2 sx={{ mr: 1, color: 'primary.main' }} />
+                }}
+              />
+              <Box sx={{ display: 'flex', alignItems: 'center', my: 2 }}>
+                <Divider sx={{ flex: 1 }} />
+                <Typography variant='body2' color='text.secondary' sx={{ px: 2, fontWeight: 600 }}>OR</Typography>
+                <Divider sx={{ flex: 1 }} />
+              </Box>
+              <TextField 
+                fullWidth 
+                label='Phone Number (for Customers)' 
+                placeholder='e.g., 0712345678' 
               value={searchPhone} 
               onChange={(e) => {
                 setSearchPhone(e.target.value);
                 setSearchMemberId('');
               }}
               inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-              sx={{ mb: 2 }}
+              sx={{ mb: 3 }}
+              InputProps={{
+                startAdornment: <Person sx={{ mr: 1, color: 'secondary.main' }} />
+              }}
             />
             <Button 
               fullWidth 
               variant='contained' 
               size='large'
-              startIcon={<TrendingUp />}
+              startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <TrendingUp />}
               disabled={loading || (!searchMemberId.trim() && !searchPhone.trim())}
               onClick={async () => {
                 setLoading(true);
@@ -987,17 +1501,185 @@ function App() {
                 }
               }}
             >
-              {loading ? 'Searching...' : 'Search'}
+              {loading ? 'Searching...' : 'Search History'}
             </Button>
+            </Box>
           </Card>
-          {memberHistory.length > 0 && (
+          {memberHistory.length > 0 && (() => {
+            const totalPoints = memberHistory.reduce((total, scan) => {
+              const basePoints = Math.floor((scan.price || 0) / 1000);
+              const bonusPoints = scan.role === 'applicator' ? Math.floor(basePoints * 0.1) : 0;
+              return total + basePoints + bonusPoints;
+            }, 0);
+            
+            // Calculate tier and progress
+            const tierThresholds = [
+              { name: 'Bronze', min: 0, max: 500, color: '#CD7F32' },
+              { name: 'Silver', min: 500, max: 1500, color: '#C0C0C0' },
+              { name: 'Gold', min: 1500, max: 3000, color: '#FFD700' },
+              { name: 'Platinum', min: 3000, max: Infinity, color: '#E5E4E2' }
+            ];
+            
+            const currentTier = tierThresholds.find(tier => totalPoints >= tier.min && totalPoints < tier.max) || tierThresholds[tierThresholds.length - 1];
+            const nextTier = tierThresholds[tierThresholds.indexOf(currentTier) + 1];
+            const tierProgress = nextTier ? ((totalPoints - currentTier.min) / (nextTier.min - currentTier.min)) * 100 : 100;
+            
+            // Group purchases by month for chart
+            const monthlyData = {};
+            memberHistory.forEach(scan => {
+              const month = new Date(scan.timestamp).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+              if (!monthlyData[month]) monthlyData[month] = 0;
+              const scanPoints = Math.floor((scan.price || 0) / 1000) + (scan.role === 'applicator' ? Math.floor(Math.floor((scan.price || 0) / 1000) * 0.1) : 0);
+              monthlyData[month] += scanPoints;
+            });
+            const months = Object.keys(monthlyData).slice(-6);
+            const maxPoints = Math.max(...Object.values(monthlyData));
+            
+            return (
             <Box>
-              <Typography variant='h6' gutterBottom>
-                Found {memberHistory.length} records for {searchPhone || searchMemberId}
-              </Typography>
-              {memberHistory.map((scan, idx) => (
-                <Card key={scan._id || idx} sx={{ mb: 2 }}>
-                  <CardContent>
+              {/* Enhanced Total Points Card */}
+              <Card sx={{ mb: 3, overflow: 'hidden', boxShadow: 3 }}>
+                <Box sx={{ p: 3, background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant='h5' fontWeight={700}>
+                      🎉 Loyalty Points Summary
+                    </Typography>
+                    <Chip 
+                      label={currentTier.name} 
+                      sx={{ 
+                        bgcolor: currentTier.color, 
+                        color: currentTier.name === 'Gold' ? '#000' : '#fff',
+                        fontWeight: 700,
+                        fontSize: '1rem',
+                        px: 2
+                      }} 
+                    />
+                  </Box>
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={6} sm={4}>
+                      <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
+                        <Star sx={{ fontSize: 40, mb: 1 }} />
+                        <Typography variant='h3' fontWeight={700}>{totalPoints}</Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Total Points</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
+                        <EmojiEvents sx={{ fontSize: 40, mb: 1 }} />
+                        <Typography variant='h3' fontWeight={700}>{memberHistory.length}</Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Transactions</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
+                        <TrendingUp sx={{ fontSize: 40, mb: 1 }} />
+                        <Typography variant='h3' fontWeight={700}>
+                          {memberHistory.filter(s => s.role === 'applicator').length}
+                        </Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Bonus Eligible</Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                  
+                  {/* Progress to Next Tier */}
+                  {nextTier && (
+                    <Box sx={{ mt: 3 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant='body2' fontWeight={600}>
+                          Progress to {nextTier.name} Tier
+                        </Typography>
+                        <Typography variant='body2' fontWeight={600}>
+                          {totalPoints} / {nextTier.min} pts
+                        </Typography>
+                      </Box>
+                      <LinearProgress 
+                        variant='determinate' 
+                        value={tierProgress} 
+                        sx={{ 
+                          height: 10, 
+                          borderRadius: 5,
+                          bgcolor: 'rgba(255,255,255,0.2)',
+                          '& .MuiLinearProgress-bar': {
+                            bgcolor: nextTier.color,
+                            borderRadius: 5
+                          }
+                        }} 
+                      />
+                      <Typography variant='caption' sx={{ opacity: 0.8, mt: 0.5, display: 'block' }}>
+                        {nextTier.min - totalPoints} points to unlock {nextTier.name} tier rewards!
+                      </Typography>
+                    </Box>
+                  )}
+                  {!nextTier && (
+                    <Box sx={{ mt: 3, textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
+                      <EmojiEvents sx={{ fontSize: 48, mb: 1 }} />
+                      <Typography variant='h6' fontWeight={700}>Maximum Tier Achieved!</Typography>
+                      <Typography variant='caption'>You've reached Platinum status 🎉</Typography>
+                    </Box>
+                  )}
+                </Box>
+                
+                {/* Purchase Pattern Chart */}
+                <Box sx={{ p: 3, bgcolor: 'background.paper' }}>
+                  <Typography variant='h6' fontWeight={600} gutterBottom color='text.primary'>
+                    📊 Purchase Pattern (Last 6 Months)
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 120, mt: 2 }}>
+                    {months.map((month, idx) => {
+                      const height = (monthlyData[month] / maxPoints) * 100;
+                      return (
+                        <Box key={idx} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <Tooltip title={`${monthlyData[month]} points`}>
+                            <Box 
+                              sx={{ 
+                                width: '100%', 
+                                height: `${height}%`, 
+                                minHeight: monthlyData[month] > 0 ? '20px' : '5px',
+                                bgcolor: 'primary.main',
+                                borderRadius: '4px 4px 0 0',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s',
+                                '&:hover': {
+                                  bgcolor: 'primary.dark',
+                                  transform: 'translateY(-4px)'
+                                }
+                              }}
+                            />
+                          </Tooltip>
+                          <Typography variant='caption' sx={{ mt: 1, fontSize: '0.65rem' }}>
+                            {month.split(' ')[0]}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              </Card>
+              {memberHistory.map((scan, idx) => {
+                const basePoints = Math.floor((scan.price || 0) / 1000);
+                const bonusPoints = scan.role === 'applicator' ? Math.floor(basePoints * 0.1) : 0;
+                const totalPoints = basePoints + bonusPoints;
+                return (
+                <Card key={scan._id || idx} sx={{ mb: 2, position: 'relative', overflow: 'visible' }}>
+                  {/* Prominent Points Badge */}
+                  <Box sx={{ position: 'absolute', top: -12, right: 16, zIndex: 1 }}>
+                    <Chip 
+                      icon={<Star sx={{ color: '#fff !important' }} />}
+                      label={`${totalPoints} pts`} 
+                      color='primary' 
+                      sx={{ 
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        height: 32,
+                        boxShadow: 2,
+                        '& .MuiChip-icon': {
+                          color: '#fff'
+                        }
+                      }}
+                    />
+                  </Box>
+                  <CardContent sx={{ pt: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant='h6' fontWeight='bold'>{scan.productName}</Typography>
                       <Chip label={scan.role} size='small' color={scan.role === 'applicator' ? 'primary' : 'secondary'} />
@@ -1024,15 +1706,52 @@ function App() {
                       }
                       return null;
                     })()}
+                    
+                    {/* Points Information */}
+                    <Box sx={{ mt: 2, p: 1.5, bgcolor: 'success.lighter', borderRadius: 1, border: '1px solid', borderColor: 'success.light' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                        <Typography variant='caption' color='text.secondary'>
+                          🎯 Base Points:
+                        </Typography>
+                        <Typography variant='body2' fontWeight={600} color='primary.main'>
+                          {basePoints} pts
+                        </Typography>
+                      </Box>
+                      {bonusPoints > 0 && (
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                          <Typography variant='caption' color='text.secondary'>
+                            ⭐ Applicator Bonus (10%):
+                          </Typography>
+                          <Typography variant='body2' fontWeight={600} color='warning.main'>
+                            +{bonusPoints} pts
+                          </Typography>
+                        </Box>
+                      )}
+                      <Divider sx={{ my: 1 }} />
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant='body2' fontWeight={700} color='primary.main'>
+                          Total Points Earned:
+                        </Typography>
+                        <Chip 
+                          label={`${totalPoints} points`} 
+                          color='primary' 
+                          size='small'
+                          sx={{ fontWeight: 700 }}
+                        />
+                      </Box>
+                    </Box>
+                    
                     {scan.location && <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mt: 1 }}>📍 {scan.location}</Typography>}
                     <Typography variant='caption' color='text.disabled' sx={{ display: 'block', mt: 1 }}>
                       {new Date(scan.timestamp).toLocaleString()}
                     </Typography>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </Box>
-          )}
+            );
+          })()}
         </Box>}
 
         {view === 'profile' && (
@@ -1362,28 +2081,76 @@ function App() {
             </Grid>
           </Paper>
         </Box>}
-        {view === 'admin' && !adminAuth && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-          <Card sx={{ maxWidth: 400, mx: 'auto', p: 2 }}>
-            <CardContent>
-              <Box sx={{ textAlign: 'center', mb: 3 }}>
-                <Box sx={{ width: 60, height: 60, bgcolor: 'primary.light', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, color: 'white' }}><AdminPanelSettings fontSize='large' /></Box>
-                <Typography variant='h5' fontWeight='bold' gutterBottom>Admin Login</Typography>
-                <Typography variant='body2' color='text.secondary'>Enter your credentials to access the admin panel</Typography>
+        {view === 'admin' && !adminAuth && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', px: 2, animation: 'fadeIn 0.5s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
+          <Card sx={{ maxWidth: 440, width: '100%', overflow: 'hidden', boxShadow: '0 20px 60px -12px rgba(0,51,102,0.25)' }}>
+            <Box sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', p: 4, textAlign: 'center', color: 'white' }}>
+              <Box sx={{ width: 80, height: 80, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, backdropFilter: 'blur(10px)', boxShadow: '0 8px 32px 0 rgba(0,51,102,0.3)' }}>
+                <AdminPanelSettings sx={{ fontSize: 48 }} />
               </Box>
+              <Typography variant='h4' fontWeight='800' gutterBottom sx={{ letterSpacing: '-0.5px' }}>Admin Portal</Typography>
+              <Typography variant='body2' sx={{ opacity: 0.9 }}>Secure access to management dashboard</Typography>
+            </Box>
+            <CardContent sx={{ p: 4 }}>
               <form onSubmit={handleAdminLogin}>
-                <TextField fullWidth label='Email' type='email' variant='outlined' value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} sx={{ mb: 2 }} required />
-                <TextField fullWidth label='Password' type='password' variant='outlined' value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} sx={{ mb: 3 }} required />
-                <Button fullWidth variant='contained' size='large' type='submit' disabled={loading} startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <AdminPanelSettings />}>{loading ? 'Logging in...' : 'Login as Admin'}</Button>
+                <TextField 
+                  fullWidth 
+                  label='Email Address' 
+                  type='email' 
+                  variant='outlined' 
+                  value={adminEmail} 
+                  onChange={(e) => setAdminEmail(e.target.value)} 
+                  sx={{ mb: 3 }} 
+                  required 
+                  autoFocus
+                  placeholder='admin@megakem.com'
+                />
+                <TextField 
+                  fullWidth 
+                  label='Password' 
+                  type='password' 
+                  variant='outlined' 
+                  value={adminPassword} 
+                  onChange={(e) => setAdminPassword(e.target.value)} 
+                  sx={{ mb: 4 }} 
+                  required
+                  placeholder='Enter your password'
+                />
+                <Button 
+                  fullWidth 
+                  variant='contained' 
+                  size='large' 
+                  type='submit' 
+                  disabled={loading}
+                  startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Security />}
+                  sx={{ py: 1.5, fontSize: '1rem', fontWeight: 700 }}
+                >
+                  {loading ? 'Authenticating...' : 'Sign In'}
+                </Button>
               </form>
+              <Box sx={{ mt: 3, textAlign: 'center' }}>
+                <Typography variant='caption' color='text.secondary' sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                  <Security fontSize='small' /> Secured with enterprise-grade encryption
+                </Typography>
+              </Box>
             </CardContent>
           </Card>
+          <Box sx={{ mt: 3, textAlign: 'center' }}>
+            <Button 
+              variant='text' 
+              startIcon={<ArrowForward sx={{ transform: 'rotate(180deg)' }} />}
+              onClick={() => setView('welcome')}
+              sx={{ color: 'text.secondary' }}
+            >
+              Back to Home
+            </Button>
+          </Box>
         </Box>}
         {view === 'admin' && adminAuth && <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
           <Paper sx={{ mb: 2 }}>
             <Tabs value={adminTab} onChange={(e, v) => setAdminTab(v)} variant='scrollable' scrollButtons='auto'>
               <Tab icon={<DashboardIcon />} label='Dashboard' />
               <Tab icon={<HistoryIcon />} label='Scans' />
-              <Tab icon={<People />} label='Co-Admins' />
+              {isMainAdmin() && <Tab icon={<People />} label='Co-Admins' />}
               <Tab icon={<Category />} label='Products' />
               <Tab icon={<Settings />} label='Profile' />
             </Tabs>
@@ -1447,6 +2214,101 @@ function App() {
             }, 0).toLocaleString()}</Typography></Box></CardContent></Card></Grid>
             
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><Category /> Product Scan Details</Typography><List dense>{stats.topProducts?.map((p, i) => <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}><ListItemText primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} secondary={<Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}><Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} /><Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography></Box>} /></ListItem>)}</List></CardContent></Card></Grid>
+            
+            {/* Advanced Analytics Section */}
+            <Grid item xs={12}><Typography variant='h5' sx={{ fontWeight: 700, mt: 2, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}><Assessment /> Advanced Analytics</Typography></Grid>
+            
+            <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>⏰ Peak Activity Hours</Typography><List dense>{(() => {
+              const hourCounts = scanHistory.reduce((acc, scan) => {
+                if (scan.timestamp) {
+                  const hour = new Date(scan.timestamp).getHours();
+                  acc[hour] = (acc[hour] || 0) + 1;
+                }
+                return acc;
+              }, {});
+              return Object.entries(hourCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([hour, count], i) => (
+                  <ListItem key={hour} sx={{ borderLeft: '3px solid', borderLeftColor: i === 0 ? 'primary.main' : 'grey.400', mb: 0.5, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <ListItemText 
+                      primary={<Typography variant='body2' fontWeight={600}>{hour}:00 - {hour}:59</Typography>}
+                      secondary={<Chip label={`${count} scans`} size='small' color={i === 0 ? 'primary' : 'default'} />}
+                    />
+                  </ListItem>
+                ));
+            })()}</List></CardContent></Card></Grid>
+            
+            <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📅 Weekly Trends</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>Scans by Day of Week</Typography>{(() => {
+              const dayCounts = scanHistory.reduce((acc, scan) => {
+                if (scan.timestamp) {
+                  const day = new Date(scan.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
+                  acc[day] = (acc[day] || 0) + 1;
+                }
+                return acc;
+              }, {});
+              const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+              const maxCount = Math.max(...Object.values(dayCounts), 1);
+              return days.map(day => (
+                <Box key={day} sx={{ mb: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant='caption' fontWeight={600}>{day}</Typography>
+                    <Typography variant='caption' color='primary'>{dayCounts[day] || 0}</Typography>
+                  </Box>
+                  <Box sx={{ height: 8, bgcolor: 'grey.200', borderRadius: 1, overflow: 'hidden' }}>
+                    <Box sx={{ height: '100%', bgcolor: 'primary.main', width: `${((dayCounts[day] || 0) / maxCount) * 100}%`, transition: 'width 0.3s' }} />
+                  </Box>
+                </Box>
+              ));
+            })()}</CardContent></Card></Grid>
+            
+            <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🎯 Performance Metrics</Typography><Box sx={{ mt: 2 }}>
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'success.50', borderRadius: 2 }}>
+                <Typography variant='body2' color='text.secondary'>Avg Scans/Day</Typography>
+                <Typography variant='h5' fontWeight='bold' color='success.dark'>{(scanHistory.length / Math.max(1, Math.ceil((Date.now() - new Date(scanHistory[scanHistory.length - 1]?.timestamp || Date.now()).getTime()) / (1000 * 60 * 60 * 24)))).toFixed(1)}</Typography>
+              </Box>
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'info.50', borderRadius: 2 }}>
+                <Typography variant='body2' color='text.secondary'>Unique Products</Typography>
+                <Typography variant='h5' fontWeight='bold' color='info.dark'>{new Set(scanHistory.map(s => s.productNo)).size}</Typography>
+              </Box>
+              <Box sx={{ p: 2, bgcolor: 'warning.50', borderRadius: 2 }}>
+                <Typography variant='body2' color='text.secondary'>Unique Locations</Typography>
+                <Typography variant='h5' fontWeight='bold' color='warning.dark'>{new Set(scanHistory.filter(s => s.location).map(s => s.location)).size}</Typography>
+              </Box>
+            </Box></CardContent></Card></Grid>
+            
+            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📊 Member Activity Ranking</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Rank</TableCell><TableCell sx={{ fontWeight: 700 }}>Member</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Role</TableCell></TableRow></TableHead><TableBody>{(() => {
+              const memberStats = scanHistory.reduce((acc, scan) => {
+                const key = scan.memberId || 'unknown';
+                if (!acc[key]) {
+                  acc[key] = { memberId: scan.memberId, memberName: scan.memberName, role: scan.role, count: 0 };
+                }
+                acc[key].count++;
+                return acc;
+              }, {});
+              return Object.values(memberStats)
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 10)
+                .map((member, i) => (
+                  <TableRow key={member.memberId} sx={{ bgcolor: i < 3 ? 'success.50' : 'inherit' }}>
+                    <TableCell><Chip label={`#${i + 1}`} size='small' color={i === 0 ? 'success' : i < 3 ? 'primary' : 'default'} /></TableCell>
+                    <TableCell><Typography variant='body2' fontWeight={600}>{member.memberName}</Typography><Typography variant='caption' color='text.secondary'>{member.memberId}</Typography></TableCell>
+                    <TableCell align='right'><Typography variant='body2' fontWeight={700}>{member.count}</Typography></TableCell>
+                    <TableCell align='right'><Chip label={member.role} size='small' color={member.role === 'applicator' ? 'warning' : 'info'} /></TableCell>
+                  </TableRow>
+                ));
+            })()}</TableBody></Table></TableContainer></CardContent></Card></Grid>
+            
+            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography><List dense>{activityLog.slice(0, 8).map((log, i) => (
+              <ListItem key={log.id} sx={{ borderLeft: '3px solid', borderLeftColor: log.severity === 'error' ? 'error.main' : log.severity === 'warning' ? 'warning.main' : log.severity === 'success' ? 'success.main' : 'info.main', mb: 0.5, bgcolor: 'grey.50', borderRadius: 1, flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 0.5 }}>
+                  <Typography variant='body2' fontWeight={600}>{log.action}</Typography>
+                  <Typography variant='caption' color='text.secondary'>{new Date(log.timestamp).toLocaleTimeString()}</Typography>
+                </Box>
+                <Typography variant='caption' color='text.secondary'>{log.details}</Typography>
+                <Chip label={log.user} size='small' sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />
+              </ListItem>
+            ))}{activityLog.length === 0 && <Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center', py: 2 }}>No recent activity</Typography>}</List></CardContent></Card></Grid>
           </Grid>}
 
           {adminTab === 1 && <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
@@ -1455,11 +2317,16 @@ function App() {
                 size='small' 
                 placeholder='Search by member, product, batch...' 
                 value={scanSearchQuery}
-                onChange={(e) => { setScanSearchQuery(e.target.value); setCurrentPage(1); }}
+                onChange={(e) => { 
+                  setScanSearchQuery(e.target.value); 
+                  setCurrentPage(1); 
+                }}
                 sx={{ flexGrow: 1, minWidth: 200 }}
                 InputProps={{
-                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>,
+                  endAdornment: scanSearchQuery && loading ? <CircularProgress size={20} /> : null
                 }}
+                helperText={scanSearchQuery && "Search results update automatically"}
               />
               <TextField 
                 type='date'
@@ -1504,53 +2371,11 @@ function App() {
               <Button 
                 variant='outlined' 
                 startIcon={<GetApp />} 
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    const response = await analyticsAPI.export({ type: 'scans', format: 'csv' });
-                    const url = window.URL.createObjectURL(new Blob([response.data]));
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', `scans-export-${Date.now()}.csv`);
-                    document.body.appendChild(link);
-                    link.click();
-                    link.remove();
-                    showNotification('CSV downloaded successfully!', 'success');
-                  } catch (error) {
-                    showNotification('Failed to download CSV', 'error');
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                disabled={loading || scanHistory.length === 0}
+                onClick={() => handleExportData('csv')}
+                disabled={loading || scanHistory.length === 0 || !hasPermission('canExport')}
+                size='small'
               >
-                Download CSV
-              </Button>
-              <Button 
-                variant='contained' 
-                startIcon={<GetApp />} 
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    const response = await analyticsAPI.export({ type: 'scans', format: 'xlsx' });
-                    const url = window.URL.createObjectURL(new Blob([response.data]));
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', `scans-export-${Date.now()}.xlsx`);
-                    document.body.appendChild(link);
-                    link.click();
-                    link.remove();
-                    showNotification('Excel file downloaded successfully!', 'success');
-                  } catch (error) {
-                    showNotification('Failed to download Excel file', 'error');
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                disabled={loading || scanHistory.length === 0}
-                sx={{ background: 'linear-gradient(135deg, #217346 0%, #34a853 100%)', '&:hover': { background: 'linear-gradient(135deg, #1a5c37 0%, #2d8f45 100%)' } }}
-              >
-                Download Excel
+                Export CSV
               </Button>
             </Box>
             {(() => {
@@ -1618,6 +2443,7 @@ function App() {
                           scanId: item._id, 
                           scanDetails: `${item.productName} (${item.batchNo} - ${item.bagNo}) by ${item.memberName}` 
                         })}
+                        disabled={!hasPermission('canDelete')}
                         sx={{ ml: 1 }}
                       >
                         <Delete fontSize='small' />
@@ -1712,9 +2538,30 @@ function App() {
     })()}
           </Box>}
 
-          {adminTab === 2 && <Box>
+          {adminTab === 2 && isMainAdmin() && <Box>
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Button variant='contained' startIcon={<Add />} onClick={() => setUserDialog({ open: true, user: { username: '', email: '', password: '', role: 'admin' } })}>Add Co-Admin</Button>
+              <Button 
+                variant='contained' 
+                startIcon={<Add />} 
+                onClick={() => setUserDialog({ 
+                  open: true, 
+                  user: { 
+                    username: '', 
+                    email: '', 
+                    password: '', 
+                    role: 'admin', 
+                    permissions: { 
+                      canDelete: true, 
+                      canExport: true, 
+                      canManageUsers: true, 
+                      canManageProducts: true 
+                    } 
+                  } 
+                })}
+                disabled={!isMainAdmin()}
+              >
+                Add Co-Admin
+              </Button>
               <Typography variant='body2' color='text.secondary'>Total Co-Admins: {users.filter(u => u.role === 'admin').length}</Typography>
             </Box>
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
@@ -1722,25 +2569,77 @@ function App() {
                 <TableCell><strong>Username</strong></TableCell>
                 <TableCell><strong>Email</strong></TableCell>
                 <TableCell><strong>Role</strong></TableCell>
+                <TableCell><strong>Permissions</strong></TableCell>
                 <TableCell><strong>Status</strong></TableCell>
                 <TableCell><strong>Created</strong></TableCell>
                 <TableCell><strong>Actions</strong></TableCell>
               </TableRow></TableHead>
                 <TableBody>{users.filter(u => u.role === 'admin').map(u => <TableRow key={u._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                  <TableCell><Typography variant='body2' fontWeight={600}>{u.username}</Typography></TableCell>
+                  <TableCell>
+                    <Typography variant='body2' fontWeight={600}>{u.username}</Typography>
+                    {u.email === 'admin@megakem.com' && <Chip label='Main Admin' size='small' color='success' sx={{ mt: 0.5, fontSize: '0.65rem' }} />}
+                  </TableCell>
                   <TableCell><Typography variant='body2'>{u.email}</Typography></TableCell>
-                  <TableCell><Chip label='Admin' size='small' color='error' /></TableCell>
+                  <TableCell><Chip label={u.email === 'admin@megakem.com' ? 'Main Admin' : 'Co-Admin'} size='small' color={u.email === 'admin@megakem.com' ? 'success' : 'error'} /></TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                      {u.permissions?.canExport === true && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                      {u.permissions?.canManageUsers === true && <Chip label='Users' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                      {u.permissions?.canManageProducts === true && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                    </Box>
+                  </TableCell>
                   <TableCell><Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} /></TableCell>
                   <TableCell><Typography variant='caption' color='text.secondary'>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</Typography></TableCell>
-                  <TableCell><IconButton size='small' color='error' onClick={() => setUserDeleteDialog({ open: true, userId: u._id, userDetails: { username: u.username, email: u.email, role: u.role } })}><Delete /></IconButton></TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <IconButton 
+                        size='small' 
+                        color='primary' 
+                        onClick={() => setUserDialog({ 
+                          open: true, 
+                          user: { 
+                            ...u, 
+                            password: '',
+                            permissions: {
+                              canDelete: u.permissions?.canDelete !== false,
+                              canExport: u.permissions?.canExport !== false,
+                              canManageUsers: u.permissions?.canManageUsers !== false,
+                              canManageProducts: u.permissions?.canManageProducts !== false
+                            }
+                          } 
+                        })} 
+                        title='Edit Permissions'
+                        disabled={!isMainAdmin()}
+                      >
+                        <Edit />
+                      </IconButton>
+                      <IconButton 
+                        size='small' 
+                        color='error' 
+                        onClick={() => setUserDeleteDialog({ open: true, userId: u._id, userDetails: { username: u.username, email: u.email, role: u.role } })} 
+                        title='Delete User'
+                        disabled={!isMainAdmin()}
+                      >
+                        <Delete />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
                 </TableRow>)}</TableBody>
               </Table>
             </TableContainer>
           </Box>}
 
-          {adminTab === 3 && <Box>
+          {((adminTab === 3 && isMainAdmin()) || (adminTab === 2 && !isMainAdmin())) && <Box>
             <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-              <Button variant='contained' startIcon={<Add />} onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0 } })}>Add Product</Button>
+              <Button 
+                variant='contained' 
+                startIcon={<Add />} 
+                onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0 } })}
+                disabled={!hasPermission('canManageProducts')}
+              >
+                Add Product
+              </Button>
               <TextField 
                 size='small' 
                 placeholder='Search products...' 
@@ -1784,17 +2683,127 @@ function App() {
                       );
                     }
                     
-                    return filteredProducts.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell><TableCell><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })}><Edit /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)}><Delete /></IconButton></TableCell></TableRow>);
+                    return filteredProducts.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell><TableCell><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')}><Edit /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts')}><Delete /></IconButton></TableCell></TableRow>);
                   })()}
                 </TableBody>
               </Table>
             </TableContainer>
           </Box>}
 
-          {adminTab === 4 && <Grid container spacing={3}>
+          {((adminTab === 4 && isMainAdmin()) || (adminTab === 3 && !isMainAdmin())) && <Grid container spacing={3}>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Profile Settings</Typography>{!editingProfile ? <Box><Typography variant='body1'><strong>Username:</strong> {user?.username}</Typography><Typography variant='body1'><strong>Email:</strong> {user?.email}</Typography><Button variant='outlined' startIcon={<Edit />} onClick={() => { setEditingProfile(true); setProfileData({ username: user?.username, email: user?.email }); }} sx={{ mt: 2 }}>Edit Profile</Button></Box> : <Box><TextField fullWidth label='Username' value={profileData.username} onChange={(e) => setProfileData({ ...profileData, username: e.target.value })} sx={{ mb: 2 }} /><TextField fullWidth label='Email' type='email' value={profileData.email} onChange={(e) => setProfileData({ ...profileData, email: e.target.value })} sx={{ mb: 2 }} /><Box sx={{ display: 'flex', gap: 1 }}><Button variant='contained' startIcon={<Save />} onClick={handleUpdateProfile} disabled={loading}>Save</Button><Button variant='outlined' startIcon={<Cancel />} onClick={() => setEditingProfile(false)}>Cancel</Button></Box></Box>}</CardContent></Card></Grid>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Change Password</Typography><TextField fullWidth type='password' label='Current Password' value={passwordData.currentPassword} onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })} sx={{ mb: 2 }} /><TextField fullWidth type='password' label='New Password' value={passwordData.newPassword} onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })} sx={{ mb: 2 }} /><TextField fullWidth type='password' label='Confirm New Password' value={passwordData.confirmPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} sx={{ mb: 2 }} /><Button variant='contained' onClick={handleChangePassword} disabled={loading}>Change Password</Button></CardContent></Card></Grid>
+            
+            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Notifications /> Notification Preferences</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>Customize your notification settings</Typography><Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Box><Typography variant='body2' fontWeight={600}>Email Notifications</Typography><Typography variant='caption' color='text.secondary'>Receive updates via email</Typography></Box>
+                <Switch checked={notificationPrefs.email} onChange={(e) => handleNotificationPrefChange('email', e.target.checked)} color='primary' />
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Box><Typography variant='body2' fontWeight={600}>Push Notifications</Typography><Typography variant='caption' color='text.secondary'>Browser push notifications</Typography></Box>
+                <Switch checked={notificationPrefs.push} onChange={(e) => handleNotificationPrefChange('push', e.target.checked)} color='primary' />
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Box><Typography variant='body2' fontWeight={600}>Auto Refresh</Typography><Typography variant='caption' color='text.secondary'>Automatically refresh data</Typography></Box>
+                <Switch checked={notificationPrefs.autoRefresh} onChange={(e) => handleNotificationPrefChange('autoRefresh', e.target.checked)} color='primary' />
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Box><Typography variant='body2' fontWeight={600}>Sound Notifications</Typography><Typography variant='caption' color='text.secondary'>Play sound on new events</Typography></Box>
+                <Switch checked={notificationPrefs.soundEnabled} onChange={(e) => handleNotificationPrefChange('soundEnabled', e.target.checked)} color='primary' />
+              </Box>
+            </Box></CardContent></Card></Grid>
+            
+            {isMainAdmin() && <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>💾 Data Management</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>Backup and restore your application data</Typography><Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}><Button variant='contained' startIcon={<GetApp />} onClick={handleBackupData} disabled={loading} sx={{ minWidth: 150 }}>Create Backup</Button><Button variant='outlined' component='label' startIcon={<Refresh />} disabled={loading} sx={{ minWidth: 150 }}>Restore Backup<input type='file' accept='.json' hidden onChange={handleRestoreData} /></Button></Box><Typography variant='caption' color='text.secondary' sx={{ mt: 2, display: 'block' }}>Backup includes all scans, products, rewards, and user data (excluding passwords)</Typography></CardContent></Card></Grid>}
           </Grid>}
+
+          <Dialog open={backupPasswordDialog.open} onClose={() => setBackupPasswordDialog({ open: false, password: '' })} maxWidth='xs' fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Security color='primary' />
+              Confirm Backup Creation
+            </DialogTitle>
+            <DialogContent>
+              <Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>
+                Please enter your password to create a backup of all system data.
+              </Typography>
+              <TextField 
+                fullWidth 
+                type='password'
+                label='Password' 
+                value={backupPasswordDialog.password} 
+                onChange={(e) => setBackupPasswordDialog({ ...backupPasswordDialog, password: e.target.value })} 
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && backupPasswordDialog.password) {
+                    handleConfirmBackup();
+                  }
+                }}
+                autoFocus
+                required
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setBackupPasswordDialog({ open: false, password: '' })} disabled={loading}>
+                Cancel
+              </Button>
+              <Button 
+                variant='contained' 
+                onClick={handleConfirmBackup} 
+                disabled={loading || !backupPasswordDialog.password}
+                startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <GetApp />}
+              >
+                {loading ? 'Creating...' : 'Create Backup'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Dialog open={restorePasswordDialog.open} onClose={() => setRestorePasswordDialog({ open: false, password: '', file: null, backupData: null })} maxWidth='xs' fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Security color='warning' />
+              Confirm Backup Restore
+            </DialogTitle>
+            <DialogContent>
+              <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
+                Please enter your password to restore system data from backup.
+              </Typography>
+              {restorePasswordDialog.backupData && (
+                <Box sx={{ p: 1.5, bgcolor: 'warning.lighter', borderRadius: 1, mb: 3 }}>
+                  <Typography variant='caption' color='warning.dark' fontWeight={600}>
+                    ⚠️ Backup Date: {new Date(restorePasswordDialog.backupData.timestamp).toLocaleString()}
+                  </Typography>
+                  <Typography variant='caption' color='text.secondary' display='block'>
+                    This will overwrite current data.
+                  </Typography>
+                </Box>
+              )}
+              <TextField 
+                fullWidth 
+                type='password'
+                label='Password' 
+                value={restorePasswordDialog.password} 
+                onChange={(e) => setRestorePasswordDialog({ ...restorePasswordDialog, password: e.target.value })} 
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && restorePasswordDialog.password) {
+                    handleConfirmRestore();
+                  }
+                }}
+                autoFocus
+                required
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setRestorePasswordDialog({ open: false, password: '', file: null, backupData: null })} disabled={loading}>
+                Cancel
+              </Button>
+              <Button 
+                variant='contained' 
+                color='warning'
+                onClick={handleConfirmRestore} 
+                disabled={loading || !restorePasswordDialog.password}
+                startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Refresh />}
+              >
+                {loading ? 'Restoring...' : 'Restore Backup'}
+              </Button>
+            </DialogActions>
+          </Dialog>
 
           <Dialog open={productDialog.open} onClose={() => setProductDialog({ open: false, product: null })} maxWidth='sm' fullWidth>
             <DialogTitle>{productDialog.product?._id ? 'Edit Product' : 'Add Product'}</DialogTitle>
@@ -1848,20 +2857,93 @@ function App() {
           </Dialog>
 
           <Dialog open={userDialog.open} onClose={() => setUserDialog({ open: false, user: null })} maxWidth='sm' fullWidth>
-            <DialogTitle>Create New User</DialogTitle>
+            <DialogTitle>{userDialog.user?._id ? 'Edit Co-Admin' : 'Create New Co-Admin'}</DialogTitle>
             <DialogContent>
               <TextField fullWidth label='Username' value={userDialog.user?.username || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, username: e.target.value } })} sx={{ mt: 2, mb: 2 }} required />
               <TextField fullWidth label='Email' type='email' value={userDialog.user?.email || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, email: e.target.value } })} sx={{ mb: 2 }} required />
-              <TextField fullWidth label='Password' type='password' value={userDialog.user?.password || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, password: e.target.value } })} sx={{ mb: 2 }} helperText='Minimum 6 characters' required />
+              {!userDialog.user?._id && <TextField fullWidth label='Password' type='password' value={userDialog.user?.password || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, password: e.target.value } })} sx={{ mb: 2 }} helperText='Minimum 6 characters' required />}
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel>Role</InputLabel>
-                <Select value={userDialog.user?.role || 'user'} label='Role' onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, role: e.target.value } })}>
-                  <MenuItem value='user'>User</MenuItem>
+                <Select value={userDialog.user?.role || 'admin'} label='Role' onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, role: e.target.value } })}>
                   <MenuItem value='admin'>Admin</MenuItem>
                 </Select>
               </FormControl>
+              
+              <Typography variant='subtitle2' sx={{ mt: 2, mb: 1, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Security /> Permissions
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, pl: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Delete Records</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to delete scans</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canDelete === true} 
+                    onChange={(e) => setUserDialog({ 
+                      ...userDialog, 
+                      user: { 
+                        ...userDialog.user, 
+                        permissions: { ...userDialog.user?.permissions, canDelete: e.target.checked } 
+                      } 
+                    })} 
+                    color='error' 
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Export Data</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to export reports</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canExport === true} 
+                    onChange={(e) => setUserDialog({ 
+                      ...userDialog, 
+                      user: { 
+                        ...userDialog.user, 
+                        permissions: { ...userDialog.user?.permissions, canExport: e.target.checked } 
+                      } 
+                    })} 
+                    color='primary' 
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Manage Users</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to add/edit users</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canManageUsers === true} 
+                    onChange={(e) => setUserDialog({ 
+                      ...userDialog, 
+                      user: { 
+                        ...userDialog.user, 
+                        permissions: { ...userDialog.user?.permissions, canManageUsers: e.target.checked } 
+                      } 
+                    })} 
+                    color='warning' 
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Manage Products</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to modify products</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canManageProducts === true} 
+                    onChange={(e) => setUserDialog({ 
+                      ...userDialog, 
+                      user: { 
+                        ...userDialog.user, 
+                        permissions: { ...userDialog.user?.permissions, canManageProducts: e.target.checked } 
+                      } 
+                    })} 
+                    color='success' 
+                  />
+                </Box>
+              </Box>
             </DialogContent>
-            <DialogActions><Button onClick={() => setUserDialog({ open: false, user: null })}>Cancel</Button><Button variant='contained' onClick={handleCreateUser} disabled={loading} startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Add />}>{loading ? 'Creating...' : 'Create User'}</Button></DialogActions>
+            <DialogActions><Button onClick={() => setUserDialog({ open: false, user: null })}>Cancel</Button><Button variant='contained' onClick={handleCreateUser} disabled={loading} startIcon={loading ? <CircularProgress size={20} color='inherit' /> : (userDialog.user?._id ? <Save /> : <Add />)}>{loading ? (userDialog.user?._id ? 'Saving...' : 'Creating...') : (userDialog.user?._id ? 'Save Changes' : 'Create User')}</Button></DialogActions>
           </Dialog>
 
           <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, scanId: null, scanDetails: null })} maxWidth='sm' fullWidth>
@@ -1974,7 +3056,53 @@ function App() {
           </Dialog>
         </Box>}
       </Container>
-      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+      
+      {/* Offline Indicator */}
+      {!isOnline && (
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            position: 'fixed', 
+            top: 70, 
+            left: '50%', 
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            px: 3,
+            py: 1,
+            bgcolor: 'warning.main',
+            color: 'warning.contrastText',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            borderRadius: 2
+          }}
+        >
+          <Typography variant="body2" fontWeight="bold">📡 Offline Mode</Typography>
+        </Paper>
+      )}
+
+      {/* Pull to Refresh Indicator */}
+      {isPulling && (
+        <Box 
+          sx={{ 
+            position: 'fixed',
+            top: 60,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9998,
+            opacity: Math.min(pullToRefreshY / 80, 1)
+          }}
+        >
+          <CircularProgress size={40} />
+        </Box>
+      )}
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={snackbar.duration || 4000} 
+        onClose={handleCloseSnackbar} 
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
         <Alert onClose={handleCloseSnackbar} severity={snackbar.type} variant='filled' sx={{ width: '100%' }}>{snackbar.msg}</Alert>
       </Snackbar>
     </Box></ThemeProvider>

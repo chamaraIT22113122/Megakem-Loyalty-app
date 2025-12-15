@@ -22,6 +22,15 @@ exports.protect = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    // Check token expiration explicitly
+    if (decoded.exp && Date.now() >= decoded.exp * 1000) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token has expired. Please login again.',
+        expired: true
+      });
+    }
+
     // Check if it's an anonymous token
     if (decoded.anonymous) {
       req.user = { id: decoded.id, anonymous: true };
@@ -38,8 +47,29 @@ exports.protect = async (req, res, next) => {
       });
     }
 
+    // Check if user is active
+    if (req.user.isActive === false) {
+      return res.status(401).json({
+        success: false,
+        message: 'Account has been deactivated'
+      });
+    }
+
     next();
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token has expired. Please login again.',
+        expired: true
+      });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
     return res.status(401).json({
       success: false,
       message: 'Not authorized to access this route'
