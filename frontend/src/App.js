@@ -1264,7 +1264,7 @@ function App() {
       action,
       details,
       severity, // 'info', 'warning', 'error', 'success'
-      user: adminEmail || 'user@megakem.com'
+      user: adminEmail || 'admin@megakem.com'
     };
     setActivityLog(prev => [logEntry, ...prev].slice(0, 100)); // Keep last 100 entries
   };
@@ -1279,7 +1279,7 @@ function App() {
 
   // Check if current user is the main admin
   const isMainAdmin = () => {
-    return adminEmail === 'user@megakem.com';
+    return adminEmail === 'admin@megakem.com';
   };
 
   // User Permissions Check
@@ -2102,7 +2102,7 @@ function App() {
                   sx={{ mb: 3 }} 
                   required 
                   autoFocus
-                  placeholder='user@megakem.com'
+                  placeholder='admin@megakem.com'
                 />
                 <TextField 
                   fullWidth 
@@ -2577,10 +2577,10 @@ function App() {
                 <TableBody>{users.filter(u => u.role === 'admin').map(u => <TableRow key={u._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
                   <TableCell>
                     <Typography variant='body2' fontWeight={600}>{u.username}</Typography>
-                    {u.email === 'user@megakem.com' && <Chip label='Main Admin' size='small' color='success' sx={{ mt: 0.5, fontSize: '0.65rem' }} />}
+                    {u.email === 'admin@megakem.com' && <Chip label='Main Admin' size='small' color='success' sx={{ mt: 0.5, fontSize: '0.65rem' }} />}
                   </TableCell>
                   <TableCell><Typography variant='body2'>{u.email}</Typography></TableCell>
-                  <TableCell><Chip label={u.email === 'user@megakem.com' ? 'Main Admin' : 'Co-Admin'} size='small' color={u.email === 'user@megakem.com' ? 'success' : 'error'} /></TableCell>
+                  <TableCell><Chip label={u.email === 'admin@megakem.com' ? 'Main Admin' : 'Co-Admin'} size='small' color={u.email === 'admin@megakem.com' ? 'success' : 'error'} /></TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                       {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
