@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload } from '@mui/icons-material';
+import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, rewardsAPI, analyticsAPI } from './services/api';
 import megakemLogo from './assets/Megakem Logo.png';
@@ -508,6 +509,92 @@ function App() {
   };
   
   const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
+
+  // Excel Export Functions
+  const exportToExcel = (data, filename, sheetName = 'Sheet1') => {
+    try {
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      showNotification(`Exported ${data.length} records to Excel successfully!`, 'success');
+    } catch (error) {
+      console.error('Export error:', error);
+      showNotification('Failed to export data to Excel', 'error');
+    }
+  };
+
+  const handleExportPurchaseHistory = () => {
+    if (memberHistory.length === 0) {
+      return showNotification('No data to export', 'warning');
+    }
+    const exportData = memberHistory.map(scan => ({
+      'Date': new Date(scan.timestamp).toLocaleString(),
+      'Product': scan.productName || scan.productNo,
+      'Product Code': scan.productNo,
+      'Pack Size': scan.qty || scan.packSize || 'N/A',
+      'Batch Number': scan.batchNo,
+      'Member ID': scan.memberId || 'N/A',
+      'Phone': scan.phone || 'N/A',
+      'Location': scan.location || 'N/A',
+      'Points': scan.points || 0
+    }));
+    exportToExcel(exportData, 'Purchase_History', 'History');
+  };
+
+  const handleExportAllScans = () => {
+    if (scanHistory.length === 0) {
+      return showNotification('No data to export', 'warning');
+    }
+    const exportData = scanHistory.map(scan => {
+      const product = products.find(p => 
+        p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+        p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+      );
+      const price = product ? product.price : (scan.price || 0);
+      return {
+        'Date': new Date(scan.timestamp).toLocaleString(),
+        'Product': scan.productName || scan.productNo,
+        'Product Code': scan.productNo,
+        'Pack Size': scan.qty || scan.packSize || 'N/A',
+        'Price (Rs.)': price,
+        'Batch Number': scan.batchNo,
+        'Member ID': scan.memberId || 'N/A',
+        'Phone': scan.phone || 'N/A',
+        'Location': scan.location || 'N/A',
+        'Points': scan.points || 0
+      };
+    });
+    exportToExcel(exportData, 'All_Scans_Report', 'Scans');
+  };
+
+  const handleExportProducts = () => {
+    if (products.length === 0) {
+      return showNotification('No products to export', 'warning');
+    }
+    const exportData = products.map(product => ({
+      'Product Code': product.productNo,
+      'Product Name': product.name,
+      'Pack Size': product.category,
+      'Price (Rs.)': product.price || 0,
+      'Points': product.points || 0,
+      'Description': product.description || 'N/A'
+    }));
+    exportToExcel(exportData, 'Products_List', 'Products');
+  };
+
+  const handleExportUsers = () => {
+    if (users.length === 0) {
+      return showNotification('No users to export', 'warning');
+    }
+    const exportData = users.map(user => ({
+      'Email': user.email,
+      'Username': user.username || user.email,
+      'Role': user.role || 'Co-Admin',
+      'Created At': user.createdAt ? new Date(user.createdAt).toLocaleString() : 'N/A'
+    }));
+    exportToExcel(exportData, 'Admin_Users_List', 'Users');
+  };
 
   const handleScan = async (qrString) => {
     try {
@@ -1417,21 +1504,34 @@ function App() {
         </Box>}
 
         {view === 'history' && <Box sx={{ py: { xs: 2, sm: 3 }, animation: 'fadeIn 0.5s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-            <IconButton 
-              onClick={() => setView('welcome')} 
-              sx={{ 
-                bgcolor: 'primary.lighter',
-                '&:hover': { bgcolor: 'primary.light', transform: 'translateX(-4px)' },
-                transition: 'all 0.3s'
-              }}
-            >
-              <ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main' }} />
-            </IconButton>
-            <Box>
-              <Typography variant='h4' fontWeight={800} sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>Purchase History</Typography>
-              <Typography variant='body2' color='text.secondary'>Search and track your loyalty rewards</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, gap: 2, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <IconButton 
+                onClick={() => setView('welcome')} 
+                sx={{ 
+                  bgcolor: 'primary.lighter',
+                  '&:hover': { bgcolor: 'primary.light', transform: 'translateX(-4px)' },
+                  transition: 'all 0.3s'
+                }}
+              >
+                <ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main' }} />
+              </IconButton>
+              <Box>
+                <Typography variant='h4' fontWeight={800} sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>Purchase History</Typography>
+                <Typography variant='body2' color='text.secondary'>Search and track your loyalty rewards</Typography>
+              </Box>
             </Box>
+            {memberHistory.length > 0 && (
+              <Button
+                variant='contained'
+                color='success'
+                startIcon={<FileDownload />}
+                onClick={handleExportPurchaseHistory}
+                sx={{ minWidth: 150 }}
+              >
+                Export to Excel
+              </Button>
+            )}
           </Box>
           <Card sx={{ mb: 3, overflow: 'hidden', boxShadow: '0 8px 32px -8px rgba(0,51,102,0.2)', bgcolor: 'background.paper' }}>
             <Box sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', p: 2, color: 'white' }}>
@@ -2239,7 +2339,47 @@ function App() {
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><Category /> Product Scan Details</Typography><List dense>{stats.topProducts?.map((p, i) => <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}><ListItemText primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} secondary={<Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}><Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} /><Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography></Box>} /></ListItem>)}</List></CardContent></Card></Grid>
             
             {/* Advanced Analytics Section */}
-            <Grid item xs={12}><Typography variant='h5' sx={{ fontWeight: 700, mt: 2, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}><Assessment /> Advanced Analytics</Typography></Grid>
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2, mb: 1, flexWrap: 'wrap', gap: 2 }}>
+                <Typography variant='h5' sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Assessment /> Advanced Analytics
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Button
+                    variant='contained'
+                    color='success'
+                    size='small'
+                    startIcon={<FileDownload />}
+                    onClick={handleExportAllScans}
+                    disabled={scanHistory.length === 0}
+                  >
+                    Export All Scans
+                  </Button>
+                  <Button
+                    variant='outlined'
+                    color='primary'
+                    size='small'
+                    startIcon={<FileDownload />}
+                    onClick={handleExportProducts}
+                    disabled={products.length === 0}
+                  >
+                    Export Products
+                  </Button>
+                  {isMainAdmin() && (
+                    <Button
+                      variant='outlined'
+                      color='secondary'
+                      size='small'
+                      startIcon={<FileDownload />}
+                      onClick={handleExportUsers}
+                      disabled={users.length === 0}
+                    >
+                      Export Users
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+            </Grid>
             
             <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>⏰ Peak Activity Hours</Typography><List dense>{(() => {
               const hourCounts = scanHistory.reduce((acc, scan) => {
