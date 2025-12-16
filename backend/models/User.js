@@ -54,6 +54,24 @@ const userSchema = new mongoose.Schema({
     name: String,
     earnedAt: { type: Date, default: Date.now }
   }],
+  permissions: {
+    canDelete: {
+      type: Boolean,
+      default: false
+    },
+    canExport: {
+      type: Boolean,
+      default: false
+    },
+    canManageUsers: {
+      type: Boolean,
+      default: false
+    },
+    canManageProducts: {
+      type: Boolean,
+      default: false
+    }
+  },
   resetPasswordToken: String,
   resetPasswordExpires: Date
 }, {

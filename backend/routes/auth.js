@@ -547,9 +547,9 @@ router.post('/users', protect, async (req, res) => {
       });
     }
 
-    const { username, email, password, role } = req.body;
+    const { username, email, password, role, permissions } = req.body;
 
-    console.log('👥 Creating new user:', { username, email, role: role || 'user' });
+    console.log('👥 Creating new user:', { username, email, role: role || 'user', permissions });
 
     // Validate input
     if (!username || !email || !password) {
@@ -575,14 +575,26 @@ router.post('/users', protect, async (req, res) => {
       });
     }
 
-    // Create user
-    const user = await User.create({
+    // Create user with permissions
+    const userData = {
       username,
       email,
       password,
       role: role || 'user',
       isActive: true
-    });
+    };
+
+    // Add permissions if provided
+    if (permissions) {
+      userData.permissions = {
+        canDelete: permissions.canDelete === true,
+        canExport: permissions.canExport === true,
+        canManageUsers: permissions.canManageUsers === true,
+        canManageProducts: permissions.canManageProducts === true
+      };
+    }
+
+    const user = await User.create(userData);
 
     console.log('✅ User created successfully:', user.username);
 
@@ -593,7 +605,8 @@ router.post('/users', protect, async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        isActive: user.isActive
+        isActive: user.isActive,
+        permissions: user.permissions
       },
       message: 'User created successfully'
     });
