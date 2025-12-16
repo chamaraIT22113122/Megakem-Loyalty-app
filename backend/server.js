@@ -45,6 +45,7 @@ initializeApp();
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:3002',
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_PROD
 ].filter(Boolean);

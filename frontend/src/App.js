@@ -2752,7 +2752,13 @@ function App() {
                       {u.permissions?.canManageProducts === true && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                     </Box>
                   </TableCell>
-                  <TableCell><Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} /></TableCell>
+                  <TableCell>
+                    {u.email === 'admin@megakem.com' ? (
+                      <Chip label="Always Active" size="small" color="success" sx={{ fontWeight: 600 }} />
+                    ) : (
+                      <Switch checked={u.isActive} onChange={() => handleToggleUserStatus(u._id, u.isActive)} />
+                    )}
+                  </TableCell>
                   <TableCell><Typography variant='caption' color='text.secondary'>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</Typography></TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
