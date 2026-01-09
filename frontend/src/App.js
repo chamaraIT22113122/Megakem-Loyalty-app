@@ -499,7 +499,11 @@ function App() {
     if (!window.Html5QrcodeScanner) return;
     
     const container = document.getElementById('reader');
-    if (container) container.innerHTML = '';
+    if (!container) {
+      console.warn('QR reader element not found');
+      return;
+    }
+    container.innerHTML = '';
     
     const scanner = new window.Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
     scanner.render(async (decodedText) => {
@@ -523,9 +527,12 @@ function App() {
   useEffect(() => {
     if (view === 'scanner') {
       loadScript('https://unpkg.com/html5-qrcode').then(() => {
-        if (window.Html5QrcodeScanner) {
-          initializeScanner();
-        }
+        // Add a small delay to ensure DOM is ready
+        setTimeout(() => {
+          if (window.Html5QrcodeScanner && view === 'scanner') {
+            initializeScanner();
+          }
+        }, 100);
       }).catch(err => console.error('Failed to load QR library', err));
     }
     return () => { if (scannerRef.current) { scannerRef.current.clear().catch(() => {}); scannerRef.current = null; } };
@@ -2851,26 +2858,14 @@ function App() {
                   Total: {members.length} | Applicators: {members.filter(m => m.role === 'applicator').length} | Customers: {members.filter(m => m.role === 'customer').length}
                 </Typography>
               </Box>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button 
-                  variant='outlined' 
-                  startIcon={<Refresh />} 
-                  onClick={handleSyncMembers}
-                  disabled={loading}
-                  size='small'
-                  title='Sync members from all existing scans'
-                >
-                  Sync from Scans
-                </Button>
-                <Button 
-                  variant='outlined' 
-                  startIcon={<Settings />} 
-                  onClick={() => setLoyaltyConfigDialog({ open: true })}
-                  size='small'
-                >
-                  Configure Cash Rewards
-                </Button>
-              </Box>
+              <Button 
+                variant='outlined' 
+                startIcon={<Settings />} 
+                onClick={() => setLoyaltyConfigDialog({ open: true })}
+                size='small'
+              >
+                Configure Cash Rewards
+              </Button>
             </Box>
             <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
               <TextField 
@@ -2911,6 +2906,7 @@ function App() {
                     <TableCell><strong>Name</strong></TableCell>
                     <TableCell><strong>Role</strong></TableCell>
                     <TableCell><strong>Total Scans</strong></TableCell>
+                    <TableCell><strong>Total Amount (Rs.)</strong></TableCell>
                     <TableCell><strong>Cash Rewards (Rs.)</strong></TableCell>
                     <TableCell><strong>Actions</strong></TableCell>
                   </TableRow>
@@ -2929,7 +2925,7 @@ function App() {
                     if (filteredMembers.length === 0) {
                       return (
                         <TableRow>
-                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                          <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                             <Typography variant='body1' color='text.secondary'>
                               {members.length === 0 
                                 ? 'No members found. Members are created automatically when they scan products.'
@@ -2940,49 +2936,66 @@ function App() {
                       );
                     }
 
-                    return filteredMembers.map(m => (
-                      <TableRow key={m._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                        <TableCell>
-                          <Typography variant='body2' fontWeight={600}>{m.memberId}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant='body2'>{m.memberName}</Typography>
-                          {m.phone && <Typography variant='caption' color='text.secondary'>{m.phone}</Typography>}
-                        </TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={m.role === 'applicator' ? 'Applicator' : 'Customer'} 
-                            size='small' 
-                            color={m.role === 'applicator' ? 'warning' : 'info'}
-                            sx={{ fontWeight: 600 }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant='body2' fontWeight={600}>{m.totalScans || 0}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={`Rs. ${(m.totalCashRewards || 0).toLocaleString()}`}
-                            size='small' 
-                            color='success' 
-                            sx={{ fontWeight: 700, fontSize: '0.875rem' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <IconButton 
-                            size='small' 
-                            color='info' 
-                            onClick={() => {
-                              setMemberId(m.memberId);
-                              setView('profile');
-                            }} 
-                            title='View Member Profile'
-                          >
-                            <Visibility />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ));
+                    return filteredMembers.map(m => {
+                      // Calculate real-time stats from scanHistory
+                      const memberScans = scanHistory.filter(s => s.memberId === m.memberId);
+                      const actualTotalScans = memberScans.length;
+                      const actualTotalAmount = memberScans.reduce((sum, s) => sum + (s.price || 0), 0);
+                      // Use the member's totalCashRewards from database (calculated via monthly purchase rewards)
+                      const actualTotalCashRewards = m.totalCashRewards || 0;
+                      
+                      return (
+                        <TableRow key={m._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                          <TableCell>
+                            <Typography variant='body2' fontWeight={600}>{m.memberId}</Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant='body2'>{m.memberName}</Typography>
+                            {m.phone && <Typography variant='caption' color='text.secondary'>{m.phone}</Typography>}
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={m.role === 'applicator' ? 'Applicator' : 'Customer'} 
+                              size='small' 
+                              color={m.role === 'applicator' ? 'warning' : 'info'}
+                              sx={{ fontWeight: 600 }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant='body2' fontWeight={600}>{actualTotalScans}</Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={`Rs. ${actualTotalAmount.toLocaleString()}`}
+                              size='small' 
+                              color='primary' 
+                              sx={{ fontWeight: 700, fontSize: '0.875rem' }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={`Rs. ${actualTotalCashRewards.toLocaleString()}`}
+                              size='small' 
+                              color='success' 
+                              sx={{ fontWeight: 700, fontSize: '0.875rem' }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <IconButton 
+                              size='small' 
+                              color='info' 
+                              onClick={() => {
+                                setMemberId(m.memberId);
+                                setView('profile');
+                              }} 
+                              title='View Member Profile'
+                            >
+                              <Visibility />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
                   })()}
                 </TableBody>
               </Table>
