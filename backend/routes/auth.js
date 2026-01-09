@@ -7,14 +7,16 @@ const { protect } = require('../middleware/auth');
 
 // Generate JWT Token
 const generateToken = (id, expiresIn = null) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+  const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-in-production';
+  return jwt.sign({ id }, jwtSecret, {
     expiresIn: expiresIn || process.env.JWT_EXPIRE || '7d'
   });
 };
 
 // Generate Refresh Token
 const generateRefreshToken = (id) => {
-  return jwt.sign({ id, type: 'refresh' }, process.env.JWT_SECRET, {
+  const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-in-production';
+  return jwt.sign({ id, type: 'refresh' }, jwtSecret, {
     expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d'
   });
 };
@@ -212,12 +214,15 @@ router.post('/admin/login', [
 
     console.log('🔑 Admin login attempt:', { email, hasPassword: !!password });
 
-    // Check for user with admin role
-    const user = await User.findOne({ email, role: 'admin' }).select('+password');
-    console.log('👤 User found:', user ? `Yes (${user.username})` : 'No');
+    // Check for user with admin or co-admin role
+    const user = await User.findOne({ 
+      email, 
+      role: { $in: ['admin', 'co-admin'] } 
+    }).select('+password');
+    console.log('👤 User found:', user ? `Yes (${user.username}, ${user.role})` : 'No');
     
     if (!user) {
-      console.log('❌ No admin user found with email:', email);
+      console.log('❌ No admin/co-admin user found with email:', email);
       return res.status(401).json({
         success: false,
         message: 'Invalid admin credentials'
@@ -287,7 +292,8 @@ router.post('/refresh', async (req, res) => {
     }
 
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-in-production';
+    const decoded = jwt.verify(refreshToken, jwtSecret);
 
     if (decoded.type !== 'refresh') {
       return res.status(401).json({
@@ -332,7 +338,8 @@ router.post('/anonymous', async (req, res) => {
   try {
     // Generate a temporary token without user
     const anonymousId = 'anonymous_' + Date.now();
-    const token = jwt.sign({ id: anonymousId, anonymous: true }, process.env.JWT_SECRET, {
+    const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-in-production';
+    const token = jwt.sign({ id: anonymousId, anonymous: true }, jwtSecret, {
       expiresIn: '1d'
     });
 
@@ -345,6 +352,7 @@ router.post('/anonymous', async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Anonymous session error:', error);
     res.status(400).json({
       success: false,
       message: error.message
@@ -631,7 +639,7 @@ router.put('/users/:id', protect, async (req, res) => {
       });
     }
 
-    const { role, isActive } = req.body;
+    const { role, isActive, points, permissions, username, email } = req.body;
     const user = await User.findById(req.params.id);
 
     if (!user) {
@@ -641,9 +649,146 @@ router.put('/users/:id', protect, async (req, res) => {
       });
     }
 
+    // Update basic fields
+    if (username !== undefined) user.username = username;
+    if (email !== undefined) user.email = email;
     if (role !== undefined) user.role = role;
     if (isActive !== undefined) user.isActive = isActive;
+    if (points !== undefined) {
+      user.points = Math.max(0, points); // Ensure points are not negative
+      user.updateTier(); // Update tier based on new points
+    }
 
+    // Update permissions
+    if (permissions !== undefined) {
+      user.permissions = {
+        canDelete: permissions.canDelete === true,
+        canExport: permissions.canExport === true,
+        canManageUsers: permissions.canManageUsers === true,
+        canManageProducts: permissions.canManageProducts === true
+      };
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      data: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        points: user.points,
+        tier: user.tier,
+        permissions: user.permissions
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   PUT /api/auth/users/:id/reset-password
+// @desc    Reset user password (main admin only)
+// @access  Private/Main Admin
+router.put('/users/:id/reset-password', protect, async (req, res) => {
+  try {
+    // Only main admin can reset other users' passwords
+    if (req.user.role !== 'admin' || req.user.email !== 'admin@megakem.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the main admin can reset user passwords'
+      });
+    }
+
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters'
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   PUT /api/auth/users/:id/points
+// @desc    Update user loyalty points (admin only)
+// @access  Private/Admin
+router.put('/users/:id/points', protect, [
+  body('points')
+    .isInt({ min: 0 })
+    .withMessage('Points must be a non-negative integer'),
+  body('operation')
+    .optional()
+    .isIn(['set', 'add', 'subtract'])
+    .withMessage('Operation must be set, add, or subtract')
+], async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const { points, operation = 'set' } = req.body;
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update points based on operation
+    if (operation === 'set') {
+      user.points = Math.max(0, points);
+    } else if (operation === 'add') {
+      user.points = Math.max(0, user.points + points);
+    } else if (operation === 'subtract') {
+      user.points = Math.max(0, user.points - points);
+    }
+
+    // Update tier based on new points
+    user.updateTier();
     await user.save();
 
     res.json({
@@ -652,9 +797,10 @@ router.put('/users/:id', protect, async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        role: user.role,
-        isActive: user.isActive
-      }
+        points: user.points,
+        tier: user.tier
+      },
+      message: `Points ${operation === 'set' ? 'set' : operation === 'add' ? 'added' : 'subtracted'} successfully`
     });
   } catch (error) {
     res.status(400).json({

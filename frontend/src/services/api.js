@@ -86,6 +86,8 @@ export const authAPI = {
   getUsers: () => api.get('/auth/users'),
   createUser: (userData) => api.post('/auth/users', userData),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
+  updateUserPoints: (id, points, operation = 'set') => api.put(`/auth/users/${id}/points`, { points, operation }),
+  resetUserPassword: (id, newPassword) => api.put(`/auth/users/${id}/reset-password`, { newPassword }),
   deleteUser: (id) => api.delete(`/auth/users/${id}`),
   getAuthStats: () => api.get('/auth/stats'),
 };
@@ -110,23 +112,36 @@ export const productsAPI = {
   delete: (id) => api.delete(`/products/${id}`),
 };
 
-// Rewards API
-export const rewardsAPI = {
-  getAll: () => api.get('/rewards'),
-  create: (rewardData) => api.post('/rewards', rewardData),
-  update: (id, rewardData) => api.put(`/rewards/${id}`, rewardData),
-  delete: (id) => api.delete(`/rewards/${id}`),
-  redeem: (id) => api.post(`/rewards/redeem/${id}`),
-  getRedemptions: () => api.get('/rewards/redemptions'),
-  getAllRedemptions: () => api.get('/rewards/redemptions/all'),
-};
-
 // Analytics API
 export const analyticsAPI = {
   getDashboard: (params) => api.get('/analytics/dashboard', { params }),
   getLeaderboard: (params) => api.get('/analytics/leaderboard', { params }),
   getUserStats: () => api.get('/analytics/user-stats'),
   export: (params) => api.get('/analytics/export', { params, responseType: 'blob' }),
+};
+
+// Members API (Customers & Applicators)
+export const membersAPI = {
+  getAll: (params) => api.get('/members', { params }),
+  getOne: (id) => api.get(`/members/${id}`),
+  updatePoints: (id, points, operation = 'set') => api.put(`/members/${id}/points`, { points, operation }),
+  getStats: () => api.get('/members/stats/summary'),
+  syncFromScans: () => api.post('/members/sync-from-scans'),
+};
+
+// Loyalty Configuration API
+export const loyaltyAPI = {
+  getConfig: () => api.get('/loyalty/config'),
+  updateConfig: (config) => api.put('/loyalty/config', config),
+  updateProductPoints: (productId, pointsConfig) => api.put(`/loyalty/products/${productId}/points`, pointsConfig),
+};
+
+// Cash Rewards API
+export const cashRewardsAPI = {
+  getMemberRewards: (memberId, params) => api.get(`/cash-rewards/${memberId}`, { params }),
+  getAllRewards: (params) => api.get('/cash-rewards', { params }),
+  calculateReward: (memberId, data) => api.post(`/cash-rewards/calculate/${memberId}`, data),
+  markAsPaid: (memberId, data) => api.put(`/cash-rewards/mark-paid/${memberId}`, data),
 };
 
 export default api;

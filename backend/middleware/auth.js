@@ -20,7 +20,8 @@ exports.protect = async (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-in-production';
+    const decoded = jwt.verify(token, jwtSecret);
 
     // Check token expiration explicitly
     if (decoded.exp && Date.now() >= decoded.exp * 1000) {
@@ -117,7 +118,8 @@ exports.optionalAuth = async (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-in-production';
+    const decoded = jwt.verify(token, jwtSecret);
 
     // Check if it's an anonymous token
     if (decoded.anonymous) {

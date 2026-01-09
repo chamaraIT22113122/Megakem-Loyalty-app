@@ -28,6 +28,15 @@ const productSchema = new mongoose.Schema({
     packSize: String,    // e.g., "1kg", "10kg", "25kg"
     price: Number        // Price for this pack size
   }],
+  pointsPerProduct: {
+    type: Number,
+    default: null,       // null means use price-based calculation
+    min: 0
+  },
+  pointsPerPackSize: [{
+    packSize: String,    // e.g., "1kg", "10kg", "25kg"
+    points: Number       // Points earned for this pack size
+  }],
   isActive: {
     type: Boolean,
     default: true

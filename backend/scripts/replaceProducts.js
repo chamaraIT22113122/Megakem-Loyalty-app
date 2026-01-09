@@ -2,24 +2,17 @@ const mongoose = require('mongoose');
 const Product = require('../models/Product');
 require('dotenv').config();
 
-const seedProducts = async () => {
+const replaceProducts = async () => {
   try {
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('📡 Connected to MongoDB');
 
-    // Check if products already exist
-    const existingProducts = await Product.find({});
-    if (existingProducts.length > 0) {
-      console.log('\n⚠️  Products already exist:');
-      existingProducts.forEach(p => {
-        console.log(`   • ${p.name} [${p.productNo}]`);
-      });
-      console.log('\nSkipping seed. Delete existing products first if you want to re-seed.');
-      process.exit(0);
-    }
+    // Delete all existing products
+    const deleteResult = await Product.deleteMany({});
+    console.log(`\n🗑️  Deleted ${deleteResult.deletedCount} existing products`);
 
-    // Create default Megakem products
+    // Create new default Megakem products
     const products = [
       {
         name: 'Ecolastic 32 Kg Set',
@@ -151,11 +144,11 @@ const seedProducts = async () => {
 
     await Product.insertMany(products);
 
-    console.log('\n✅ Default Megakem products created successfully!\n');
+    console.log('\n✅ New Megakem products created successfully!\n');
     console.log(`Total Products: ${products.length}\n`);
     console.log('Products:');
-    products.forEach(p => {
-      console.log(`  • ${p.name} [${p.productNo}] - Rs. ${p.price.toLocaleString()} (${p.category})`);
+    products.forEach((p, index) => {
+      console.log(`  ${index + 1}. ${p.name} [${p.productNo}] - Rs. ${p.price.toLocaleString()} (${p.category})`);
     });
 
   } catch (error) {
@@ -167,4 +160,9 @@ const seedProducts = async () => {
   }
 };
 
-seedProducts();
+replaceProducts();
+
+
+
+
+

@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const Scan = require('../models/Scan');
 const User = require('../models/User');
+const Member = require('../models/Member');
+const Product = require('../models/Product');
+const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { optionalAuth, protect, authorize } = require('../middleware/auth');
 
 // @route   GET /api/scans
@@ -126,6 +129,40 @@ router.post('/', optionalAuth, async (req, res) => {
       });
     }
 
+    // Try to get product price if not provided
+    let productPrice = req.body.price;
+    if ((!productPrice || productPrice === 0) && productNo) {
+      // First try to find exact match with product code and pack size (category)
+      let product = await Product.findOne({ 
+        productNo: productNo.toUpperCase(),
+        category: qty ? qty.toUpperCase() : undefined
+      });
+      
+      // If no exact match, try to find by product code and check pack size pricing
+      if (!product) {
+        product = await Product.findOne({ 
+          productNo: productNo.toUpperCase() 
+        });
+        
+        if (product && qty) {
+          // Check if product has pack size specific pricing
+          if (product.packSizePricing && product.packSizePricing.length > 0) {
+            const packSizePricing = product.packSizePricing.find(ps => 
+              ps.packSize.toUpperCase() === qty.toUpperCase()
+            );
+            if (packSizePricing) {
+              productPrice = packSizePricing.price;
+            }
+          }
+        }
+      }
+      
+      // Use default price if no specific pricing found
+      if (product && !productPrice) {
+        productPrice = product.price || 0;
+      }
+    }
+
     const scanData = {
       memberName,
       memberId: memberId.toUpperCase(),
@@ -134,7 +171,8 @@ router.post('/', optionalAuth, async (req, res) => {
       productNo,
       batchNo,
       bagNo,
-      qty
+      qty,
+      price: productPrice || 0
     };
 
     // Add user ID if authenticated
@@ -143,6 +181,9 @@ router.post('/', optionalAuth, async (req, res) => {
     }
 
     const scan = await Scan.create(scanData);
+
+    // Create or update member from scan
+    await updateMemberFromScan(scan);
 
     // Award points if user is authenticated
     if (req.user) {
@@ -212,9 +253,21 @@ router.post('/batch', optionalAuth, async (req, res) => {
           bagNo: scan.bagNo
         });
       } else {
+        // Try to get product price if not provided
+        let productPrice = scan.price;
+        if (!productPrice && scan.productNo) {
+          const product = await Product.findOne({ 
+            productNo: scan.productNo.toUpperCase() 
+          });
+          if (product) {
+            productPrice = product.price || 0;
+          }
+        }
+
         validScans.push({
           ...scan,
           memberId: scan.memberId.toUpperCase(),
+          price: productPrice || 0,
           userId: req.user ? req.user._id : undefined
         });
       }
@@ -229,6 +282,11 @@ router.post('/batch', optionalAuth, async (req, res) => {
     }
 
     const createdScans = await Scan.insertMany(validScans);
+
+    // Create or update members from scans
+    for (const scan of createdScans) {
+      await updateMemberFromScan(scan);
+    }
 
     // Award points if user is authenticated
     if (req.user) {
@@ -350,6 +408,176 @@ router.get('/stats/summary', async (req, res) => {
         lastWeek: weeklyScans,
         dailyStats,
         topProducts
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Helper function to calculate points for a scan
+async function calculatePointsForScan(scan) {
+  try {
+    // Get loyalty config
+    const config = await LoyaltyConfig.getConfig();
+    const pointsConfig = config.pointsCalculation || { method: 'price_based', priceDivisor: 1000, applicatorBonus: 0.1 };
+
+    // Find product
+    const product = await Product.findOne({ 
+      productNo: scan.productNo.toUpperCase() 
+    });
+
+    let basePoints = 0;
+
+    // Calculate base points based on method
+    if (pointsConfig.method === 'product_based' && product) {
+      // Use product-specific points
+      if (product.pointsPerProduct) {
+        basePoints = product.pointsPerProduct;
+      } else if (product.pointsPerPackSize && scan.qty) {
+        const packSizePoints = product.pointsPerPackSize.find(p => 
+          p.packSize.toLowerCase() === scan.qty.toLowerCase()
+        );
+        if (packSizePoints) {
+          basePoints = packSizePoints.points;
+        }
+      }
+    } else if (pointsConfig.method === 'price_based' && scan.price) {
+      // Price-based calculation
+      basePoints = Math.floor(scan.price / (pointsConfig.priceDivisor || 1000));
+    }
+
+    // Add bonus for applicators
+    let totalPoints = basePoints;
+    if (scan.role === 'applicator' && pointsConfig.applicatorBonus) {
+      const bonus = Math.floor(basePoints * pointsConfig.applicatorBonus);
+      totalPoints = basePoints + bonus;
+    }
+
+    return totalPoints;
+  } catch (error) {
+    console.error('Error calculating points:', error);
+    return 0;
+  }
+}
+
+// Helper function to create or update member from scan
+async function updateMemberFromScan(scan) {
+  try {
+    const memberId = scan.memberId.toUpperCase();
+    
+    // Find or create member
+    let member = await Member.findOne({ memberId });
+    
+    if (!member) {
+      // Create new member
+      member = await Member.create({
+        memberId,
+        memberName: scan.memberName,
+        phone: scan.phone || '',
+        role: scan.role,
+        points: 0,
+        totalScans: 0,
+        location: scan.location || ''
+      });
+    } else {
+      // Update member info if needed
+      if (scan.memberName && !member.memberName) {
+        member.memberName = scan.memberName;
+      }
+      if (scan.phone && !member.phone) {
+        member.phone = scan.phone;
+      }
+      if (scan.location && !member.location) {
+        member.location = scan.location;
+      }
+    }
+
+    // Calculate and add points for this scan
+    const pointsEarned = await calculatePointsForScan(scan);
+    member.points += pointsEarned;
+    member.totalScans += 1;
+    member.lastScanDate = scan.timestamp || new Date();
+
+    // Track monthly purchase value for cash rewards (only for applicators)
+    if (scan.role === 'applicator' && scan.price && scan.price > 0) {
+      const scanDate = scan.timestamp || new Date();
+      const year = scanDate.getFullYear();
+      const month = scanDate.getMonth() + 1; // getMonth() returns 0-11
+      member.addMonthlyPurchase(scan.price, year, month);
+    }
+
+    // Update tier
+    const config = await LoyaltyConfig.getConfig();
+    member.updateTier(config.tierThresholds);
+
+    await member.save();
+    return member;
+  } catch (error) {
+    console.error('Error updating member from scan:', error);
+    throw error;
+  }
+}
+
+// @route   POST /api/scans/sync-members
+// @desc    Sync members from all existing scans (one-time operation)
+// @access  Private/Admin
+router.post('/sync-members', protect, authorize('admin'), async (req, res) => {
+  try {
+    const allScans = await Scan.find().sort({ timestamp: 1 });
+    let created = 0;
+    let updated = 0;
+
+    for (const scan of allScans) {
+      try {
+        const memberId = scan.memberId.toUpperCase();
+        let member = await Member.findOne({ memberId });
+
+        if (!member) {
+          // Create new member
+          member = await Member.create({
+            memberId,
+            memberName: scan.memberName,
+            phone: scan.phone || '',
+            role: scan.role,
+            points: 0,
+            totalScans: 0,
+            location: scan.location || ''
+          });
+          created++;
+        } else {
+          updated++;
+        }
+
+        // Recalculate points for this scan and add to member
+        const pointsEarned = await calculatePointsForScan(scan);
+        member.points += pointsEarned;
+        member.totalScans += 1;
+        
+        if (scan.timestamp && (!member.lastScanDate || scan.timestamp > member.lastScanDate)) {
+          member.lastScanDate = scan.timestamp;
+        }
+
+        // Update tier
+        const config = await LoyaltyConfig.getConfig();
+        member.updateTier(config.tierThresholds);
+
+        await member.save();
+      } catch (error) {
+        console.error(`Error processing scan ${scan._id}:`, error);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Synced members from scans. Created: ${created}, Updated: ${updated}`,
+      data: {
+        created,
+        updated,
+        totalScans: allScans.length
       }
     });
   } catch (error) {

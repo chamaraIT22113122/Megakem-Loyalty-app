@@ -1,9 +1,9 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
-import { authAPI, scansAPI, productsAPI, rewardsAPI, analyticsAPI } from './services/api';
+import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI } from './services/api';
 import megakemLogo from './assets/Megakem Logo.png';
 import megakemBrandLogo from './assets/Megakem Brand Logo-01.png';
 
@@ -213,14 +213,20 @@ function App() {
   const [historySortBy, setHistorySortBy] = useState('date-desc');
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [loyaltyConfig, setLoyaltyConfig] = useState(null);
   const [products, setProducts] = useState([]);
+  const [loyaltyConfigDialog, setLoyaltyConfigDialog] = useState({ open: false });
+  const [productPointsDialog, setProductPointsDialog] = useState({ open: false, product: null });
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({ username: '', email: '' });
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [productDialog, setProductDialog] = useState({ open: false, product: null });
   const [userDialog, setUserDialog] = useState({ open: false, user: null });
+  const [rewardBreakdownDialog, setRewardBreakdownDialog] = useState({ open: false, member: null, breakdown: [] });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, scanId: null, scanDetails: null });
   const [userDeleteDialog, setUserDeleteDialog] = useState({ open: false, userId: null, userDetails: null });
+  const [pointsDialog, setPointsDialog] = useState({ open: false, user: null, points: '', operation: 'set' });
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [scanSearchQuery, setScanSearchQuery] = useState('');
   const [scanDateFilter, setScanDateFilter] = useState({ start: '', end: '' });
@@ -228,10 +234,13 @@ function App() {
   const [scansPerPage] = useState(10);
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [lastUpdateTime, setLastUpdateTime] = useState(null);
-  const [rewards, setRewards] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [userStats, setUserStats] = useState(null);
-  const [rewardDialog, setRewardDialog] = useState({ open: false, reward: null });
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [memberRoleFilter, setMemberRoleFilter] = useState('all');
+  const [cashRewards, setCashRewards] = useState([]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [notificationPrefs, setNotificationPrefs] = useState({ email: true, push: true, autoRefresh: true, soundEnabled: false });
   const [activityLog, setActivityLog] = useState([]);
   const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true });
@@ -245,7 +254,8 @@ function App() {
     confirmPassword: false,
     backupPassword: false,
     restorePassword: false,
-    coAdminPassword: false
+    coAdminPassword: false,
+    resetPassword: false
   });
   const scannerRef = useRef(null);
   const pollIntervalRef = useRef(null);
@@ -260,10 +270,8 @@ function App() {
           try { 
             const response = await authAPI.getMe(); 
             setUser(response.data.data);
-            // If adminAuth is stored, restore admin view
-            if (storedAdminAuth === 'true') {
-              setView('admin');
-            }
+            // Keep default welcome view - don't auto-switch to admin
+            // Users can manually click "Admin" button to access admin panel
           }
           catch { 
             localStorage.removeItem('token'); 
@@ -280,13 +288,29 @@ function App() {
     initAuth();
   }, []);
 
-  const createAnonymousSession = async () => {
-    try {
-      const response = await authAPI.anonymous();
-      const { token, id } = response.data.data;
-      localStorage.setItem('token', token);
-      setUser({ id, anonymous: true });
-    } catch (error) { console.error('Anonymous auth error:', error); }
+  const createAnonymousSession = async (retries = 3) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await authAPI.anonymous();
+        const { token, id } = response.data.data;
+        localStorage.setItem('token', token);
+        setUser({ id, anonymous: true });
+        return; // Success, exit function
+      } catch (error) {
+        console.error(`Anonymous auth error (attempt ${i + 1}/${retries}):`, error);
+        if (i === retries - 1) {
+          // Last attempt failed, show error to user
+          showNotification(
+            'Unable to connect to server. Please check your connection and refresh the page.',
+            'error',
+            8000
+          );
+        } else {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        }
+      }
+    }
   };
 
   // Extract pack size from batch code (e.g., "001" -> "1kg", "010" -> "10kg")
@@ -320,8 +344,33 @@ function App() {
   const parseBatchInfo = (batchNo) => {
     if (!batchNo) return null;
     
-    // Try to parse format: "MLSP 001 050525 001 001"
-    const parts = batchNo.trim().split(/\s+/);
+    // Try to parse format with underscores: "MKL46_001_050525_001"
+    let parts = batchNo.trim().split('_');
+    
+    if (parts.length === 4) {
+      const [productCode, materialBatch, dateCode, packNo] = parts;
+      
+      // Parse date: 050525 -> 05/05/25 -> May 5, 2025
+      let formattedDate = dateCode;
+      if (dateCode.length === 6) {
+        const day = dateCode.substring(0, 2);
+        const month = dateCode.substring(2, 4);
+        const year = '20' + dateCode.substring(4, 6);
+        formattedDate = `${day}/${month}/${year}`;
+      }
+      
+      return {
+        productCode,
+        materialBatch,
+        date: formattedDate,
+        packSize: '1', // Will be fetched from product
+        packNo,
+        parsed: true
+      };
+    }
+    
+    // Try to parse old format with spaces: "MLSP 001 050525 001 001"
+    parts = batchNo.trim().split(/\s+/);
     
     if (parts.length === 5) {
       const [productCode, materialBatch, dateCode, packSize, packNo] = parts;
@@ -436,11 +485,7 @@ function App() {
         
         // Load additional data for logged-in users
         if (!user.anonymous) {
-          const [rewardsRes, leaderboardRes] = await Promise.all([
-            rewardsAPI.getAll(),
-            analyticsAPI.getLeaderboard()
-          ]);
-          setRewards(rewardsRes.data.data);
+          const leaderboardRes = await analyticsAPI.getLeaderboard();
           setLeaderboard(leaderboardRes.data.data);
         }
       } catch (error) {
@@ -604,88 +649,107 @@ function App() {
       try {
         data = JSON.parse(qrString);
       } catch {
-        // If not JSON, parse as batch number format: "MLSP 001 050525 001 002"
-        const parts = qrString.trim().split(/\s+/);
+        // Parse batch number - supports two formats:
+        // New format: "MKL46_001_050525_001" (underscore-separated)
+        // Old format: "MKL46 001 050525 001 001" (space-separated)
         
-        if (parts.length === 5) {
-          const [productCode, materialBatch, dateCode, packSize, packNo] = parts;
-          
-          // If products not loaded yet, load them
-          let currentProducts = products;
-          if (currentProducts.length === 0) {
-            console.log('Products not loaded, fetching...');
-            try {
-              const productsRes = await productsAPI.getAll();
-              currentProducts = productsRes.data.data;
-              setProducts(currentProducts);
-            } catch (error) {
-              console.error('Error loading products:', error);
-            }
-          }
-          
-          // Find product by exact product code AND pack size match from admin products
-          console.log('=== PRODUCT MATCHING DEBUG ===');
-          console.log('Searching for:');
-          console.log('  - Product Code:', productCode);
-          console.log('  - Pack Size from batch:', packSize, '→', extractPackSize(packSize));
-          console.log('');
-          console.log('Available products in database:');
-          currentProducts.forEach((p, idx) => {
-            console.log(`  ${idx + 1}. "${p.name}"`);
-            console.log(`     Code: ${p.productNo} | Pack Size: ${p.category} | Price: Rs. ${p.price?.toLocaleString() || '0'}`);
-          });
-          console.log('');
-          
-          const packSizeFormatted = extractPackSize(packSize);
-          console.log('Formatted pack size for matching:', packSizeFormatted);
-          
-          // First try to find exact match: same product code AND pack size
-          let product = currentProducts.find(p => 
-            p.productNo.toUpperCase() === productCode.toUpperCase() &&
-            p.category && p.category.toUpperCase() === packSizeFormatted.toUpperCase()
-          );
-          
-          if (product) {
-            console.log('✅ EXACT MATCH FOUND:');
-            console.log('   Product:', product.name);
-            console.log('   Code:', product.productNo);
-            console.log('   Pack Size:', product.category);
-            console.log('   Price: Rs.', product.price?.toLocaleString());
-          } else {
-            console.log('⚠️ NO EXACT MATCH - Pack size not found in products');
-            console.log('❌ Product with code', productCode, 'and pack size', packSizeFormatted, 'does not exist');
-            console.log('   Please add this product variant to the Products tab');
-          }
-          console.log('================================');
-          console.log('');
-          
-          const itemPrice = product ? product.price : 0;
-          
-          if (product) {
-            data = {
-              id: product.productNo,
-              name: product.name,
-              batch: qrString, // Full batch string
-              bag: packNo,     // Pack number as bag
-              qty: packSizeFormatted,  // Pack size converted to kg format
-              price: itemPrice // Price based on product and pack size
-            };
-            showNotification(`Added ${product.name} (${packSizeFormatted})!`, 'success');
-          } else {
-            data = {
-              name: `${productCode} - Pack Size Not Found`,
-              batch: qrString,
-              bag: packNo || 'N/A',
-              id: productCode,
-              qty: packSizeFormatted || '1kg',
-              price: 0
-            };
-            showNotification(`Product "${productCode}" with pack size "${packSizeFormatted}" not found in Products tab. Please add it first.`, 'warning');
-          }
+        let parts = qrString.trim().split('_');
+        let productCode, materialBatch, dateCode, packSize, packNo;
+        
+        if (parts.length === 4) {
+          // New underscore format: MKL46_001_050525_001
+          [productCode, materialBatch, dateCode, packNo] = parts;
+          packSize = null; // Will get from product category
         } else {
-          // Unknown format
-          data = { name: 'Unknown Item', batch: qrString, bag: 'N/A', id: qrString, qty: '1' };
+          // Try space-separated format
+          parts = qrString.trim().split(/\s+/);
+          if (parts.length === 5) {
+            // Old 5-part format: MLSP 001 050525 001 001
+            [productCode, materialBatch, dateCode, packSize, packNo] = parts;
+          } else if (parts.length === 4) {
+            // New space format: MKL46 001 050525 001
+            [productCode, materialBatch, dateCode, packNo] = parts;
+            packSize = null;
+          } else {
+            throw new Error('Invalid batch format');
+          }
         }
+        
+        // If products not loaded yet, load them
+        let currentProducts = products;
+        if (currentProducts.length === 0) {
+          console.log('Products not loaded, fetching...');
+          try {
+            const productsRes = await productsAPI.getAll();
+            currentProducts = productsRes.data.data;
+            setProducts(currentProducts);
+          } catch (error) {
+            console.error('Error loading products:', error);
+          }
+        }
+        
+        console.log('=== PRODUCT MATCHING DEBUG ===');
+        console.log('Batch format:', qrString);
+        console.log('Parsed - Product Code:', productCode);
+        console.log('Parsed - Material Batch:', materialBatch);
+        console.log('Parsed - Date Code:', dateCode);
+        console.log('Parsed - Pack Size:', packSize || 'N/A (will use from product)');
+        console.log('Parsed - Pack No:', packNo);
+        console.log('');
+        console.log('Available products:');
+        currentProducts.forEach((p, idx) => {
+          console.log(`  ${idx + 1}. ${p.name} [${p.productNo}]`);
+          console.log(`     Pack Size: ${p.category || 'N/A'} | Price: Rs. ${p.price?.toLocaleString() || '0'}`);
+        });
+        console.log('');
+        
+        // Find product by code (case-insensitive)
+        const product = currentProducts.find(p => 
+          p.productNo && p.productNo.toUpperCase() === productCode.toUpperCase()
+        );
+        
+        if (product) {
+          console.log('✅ PRODUCT MATCHED:');
+          console.log('   Name:', product.name);
+          console.log('   Code:', product.productNo);
+          console.log('   Pack Size:', product.category || 'N/A');
+          console.log('   Price: Rs.', product.price?.toLocaleString() || '0');
+          
+          // Use pack size from batch if available, otherwise from product
+          const finalPackSize = packSize ? extractPackSize(packSize) : (product.category || '1kg');
+          
+          data = {
+            id: product.productNo,
+            name: product.name,
+            batch: qrString,
+            bag: packNo || '001',
+            qty: finalPackSize,
+            price: product.price || 0
+          };
+          
+          showNotification(`Added ${product.name} (${finalPackSize}) - Rs. ${product.price?.toLocaleString() || '0'}`, 'success');
+        } else {
+          console.log('❌ NO PRODUCT FOUND');
+          console.log('   Code:', productCode);
+          console.log('   → Add this product in Admin > Products tab');
+          
+          // Show unknown item but don't stop - let user see what was scanned
+          data = {
+            name: `Unknown Item (${productCode})`,
+            batch: qrString,
+            bag: packNo || 'N/A',
+            id: productCode,
+            qty: packSize ? extractPackSize(packSize) : '1kg',
+            price: 0
+          };
+          
+          showNotification(
+            `Product "${productCode}" not found. Please add it in the Products tab first.`,
+            'error',
+            5000
+          );
+        }
+        console.log('================================');
       }
       
       const newItem = { ...data, tempId: Date.now() + Math.random() };
@@ -700,7 +764,13 @@ function App() {
   const handleRemoveItem = (tempId) => setCart(prev => prev.filter(item => item.tempId !== tempId));
 
   const handleSubmitAll = async () => {
-    if (!user) return showNotification('Waiting for connection...', 'error');
+    if (!user) {
+      // Try to create anonymous session if user is missing
+      await createAnonymousSession(1);
+      if (!user) {
+        return showNotification('Unable to connect. Please refresh the page and try again.', 'error', 6000);
+      }
+    }
     if (cart.length === 0) return showNotification('List is empty', 'error');
     if (!memberId.trim()) return showNotification(role === 'customer' ? 'Please enter Phone Number' : 'Please enter Member ID', 'error');
     if (role === 'customer') {
@@ -808,17 +878,21 @@ function App() {
     if (!adminAuth) return;
     try {
       console.log('🔄 Loading admin data...');
-      const [statsRes, scansRes, usersRes, productsRes] = await Promise.all([
+      const [statsRes, scansRes, usersRes, productsRes, membersRes, loyaltyConfigRes] = await Promise.all([
         scansAPI.getStats(),
         scansAPI.getLive(),
         authAPI.getUsers(),
-        productsAPI.getAll()
+        productsAPI.getAll(),
+        membersAPI.getAll().catch(() => ({ data: { data: [] } })),
+        loyaltyAPI.getConfig().catch(() => ({ data: { data: null } }))
       ]);
       console.log('📦 Products response:', productsRes.data);
       setStats(statsRes.data.data);
       setScanHistory(scansRes.data.data);
       setUsers(usersRes.data.data);
       setProducts(productsRes.data.data);
+      setMembers(membersRes.data.data || []);
+      setLoyaltyConfig(loyaltyConfigRes.data.data);
       console.log('✅ Products loaded:', productsRes.data.data.length, 'products');
     } catch (error) {
       console.error('❌ Error loading admin data:', error);
@@ -838,6 +912,43 @@ function App() {
       }
     }
   }, [adminAuth, view]);
+
+  // Load leaderboard when leaderboard view is accessed
+  useEffect(() => {
+    if (view === 'leaderboard') {
+      const loadLeaderboard = async () => {
+        try {
+          const response = await analyticsAPI.getLeaderboard();
+          setLeaderboard(response.data.data || []);
+        } catch (error) {
+          console.error('Error loading leaderboard:', error);
+          setLeaderboard([]);
+        }
+      };
+      loadLeaderboard();
+    }
+  }, [view]);
+
+  // Load member data for profile view
+  useEffect(() => {
+    if (view === 'profile' && memberId) {
+      const loadMemberProfile = async () => {
+        try {
+          // Try to find member by memberId
+          const membersRes = await membersAPI.getAll();
+          const member = membersRes.data.data?.find(m => m.memberId === memberId.toUpperCase());
+          if (member) {
+            // Load member's scan history
+            const scansRes = await scansAPI.getAll({ memberId: memberId.toUpperCase() });
+            setScanHistory(scansRes.data.data || []);
+          }
+        } catch (error) {
+          console.error('Error loading member profile:', error);
+        }
+      };
+      loadMemberProfile();
+    }
+  }, [view, memberId]);
 
   // Process pending scan after role selection
   useEffect(() => {
@@ -1001,13 +1112,17 @@ function App() {
     }
     setLoading(true);
     try {
+      console.log('Deleting scan ID:', deleteDialog.scanId);
       await scansAPI.delete(deleteDialog.scanId);
       setScanHistory(scanHistory.filter(s => s._id !== deleteDialog.scanId));
       showNotification('Scan deleted successfully!', 'success');
       addToActivityLog('Scan Deleted', `Deleted scan ID: ${deleteDialog.scanId}`, 'warning');
       setDeleteDialog({ open: false, scanId: null, scanDetails: null });
     } catch (error) {
-      showNotification('Failed to delete scan', 'error');
+      console.error('Delete scan error:', error);
+      console.error('Error response:', error.response?.data);
+      const errorMsg = error.response?.data?.message || 'Failed to delete scan';
+      showNotification(errorMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -1074,9 +1189,22 @@ function App() {
 
       if (_id) {
         // Update existing user
-        // In real app: await authAPI.updateUser(_id, userData);
-        setUsers(users.map(u => u._id === _id ? { ...u, ...userData } : u));
-        showNotification('User updated successfully!', 'success');
+        const res = await authAPI.updateUser(_id, userData);
+        setUsers(users.map(u => u._id === _id ? { ...u, ...res.data.data } : u));
+        
+        // If password reset is provided, reset it
+        if (userDialog.user.newPassword && userDialog.user.newPassword.trim().length >= 6) {
+          try {
+            await authAPI.resetUserPassword(_id, userDialog.user.newPassword);
+            showNotification('User and password updated successfully!', 'success');
+            addToActivityLog('Password Reset', `Reset password for ${username}`, 'warning');
+          } catch (error) {
+            showNotification('User updated but password reset failed: ' + (error.response?.data?.message || 'Unknown error'), 'warning');
+          }
+        } else {
+          showNotification('User updated successfully!', 'success');
+        }
+        
         addToActivityLog('User Updated', `Updated permissions for ${username}`, 'info');
       } else {
         // Create new user
@@ -1089,6 +1217,132 @@ function App() {
       setUserDialog({ open: false, user: null });
     } catch (error) {
       showNotification(error.response?.data?.message || 'Failed to save user', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePoints = async () => {
+    if (!pointsDialog.user || !pointsDialog.points) {
+      showNotification('Please enter points', 'error');
+      return;
+    }
+
+    const pointsValue = parseInt(pointsDialog.points);
+    if (isNaN(pointsValue) || pointsValue < 0) {
+      showNotification('Points must be a non-negative number', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await membersAPI.updatePoints(
+        pointsDialog.user._id, 
+        pointsValue, 
+        pointsDialog.operation
+      );
+      
+      // Update the member in the members list
+      setMembers(members.map(m => 
+        m._id === pointsDialog.user._id 
+          ? { ...m, points: response.data.data.points, tier: response.data.data.tier }
+          : m
+      ));
+      
+      showNotification(
+        `Points ${pointsDialog.operation === 'set' ? 'set' : pointsDialog.operation === 'add' ? 'added' : 'subtracted'} successfully!`,
+        'success'
+      );
+      addToActivityLog(
+        'Points Updated',
+        `${pointsDialog.operation === 'set' ? 'Set' : pointsDialog.operation === 'add' ? 'Added' : 'Subtracted'} ${pointsValue} points for ${pointsDialog.user.memberName || pointsDialog.user.memberId}`,
+        'info'
+      );
+      
+      setPointsDialog({ open: false, user: null, points: '', operation: 'set' });
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to update points', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateLoyaltyConfig = async () => {
+    if (!loyaltyConfig) return;
+    
+    setLoading(true);
+    try {
+      const response = await loyaltyAPI.updateConfig({
+        tierThresholds: loyaltyConfig.tierThresholds
+      });
+      
+      setLoyaltyConfig(response.data.data);
+      showNotification('Tier thresholds updated successfully!', 'success');
+      addToActivityLog('Loyalty Config Updated', 'Updated tier thresholds', 'info');
+      setLoyaltyConfigDialog({ open: false });
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to update configuration', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateProductPoints = async () => {
+    if (!productPointsDialog.product) return;
+    
+    setLoading(true);
+    try {
+      // Convert empty string to null for pointsPerProduct
+      const pointsPerProduct = productPointsDialog.product.pointsPerProduct === '' || productPointsDialog.product.pointsPerProduct === null
+        ? null
+        : parseInt(productPointsDialog.product.pointsPerProduct) || null;
+      
+      const response = await loyaltyAPI.updateProductPoints(productPointsDialog.product._id, {
+        pointsPerProduct: pointsPerProduct,
+        pointsPerPackSize: productPointsDialog.product.pointsPerPackSize || []
+      });
+      
+      setProducts(products.map(p => 
+        p._id === productPointsDialog.product._id 
+          ? { ...p, pointsPerProduct: response.data.data.pointsPerProduct, pointsPerPackSize: response.data.data.pointsPerPackSize }
+          : p
+      ));
+      
+      showNotification('Product points configuration updated successfully!', 'success');
+      addToActivityLog('Product Points Updated', `Updated points for ${productPointsDialog.product.name}`, 'info');
+      setProductPointsDialog({ open: false, product: null });
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to update product points', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncMembers = async () => {
+    if (!window.confirm('This will sync all members from existing scans. This may take a few moments. Continue?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await membersAPI.syncFromScans();
+      
+      // Reload members after sync
+      const membersRes = await membersAPI.getAll();
+      setMembers(membersRes.data.data || []);
+      
+      showNotification(
+        `Successfully synced ${response.data.data.totalMembers} members from ${response.data.data.totalScans} scans!`,
+        'success',
+        6000
+      );
+      addToActivityLog(
+        'Members Synced',
+        `Synced ${response.data.data.created} new members and updated ${response.data.data.updated} existing members`,
+        'success'
+      );
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to sync members', 'error');
     } finally {
       setLoading(false);
     }
@@ -1199,7 +1453,6 @@ function App() {
         data: {
           scans: scanHistory,
           products: products,
-          rewards: rewards,
           users: users.map(u => ({ ...u, password: undefined })) // Exclude passwords
         }
       };
@@ -1335,12 +1588,9 @@ function App() {
         }
       }
       
-      // Update frontend state for products and rewards (if backend endpoints exist)
+      // Update frontend state for products (if backend endpoints exist)
       if (backupData.data.products && Array.isArray(backupData.data.products)) {
         setProducts(backupData.data.products);
-      }
-      if (backupData.data.rewards && Array.isArray(backupData.data.rewards)) {
-        setRewards(backupData.data.rewards);
       }
         
       showNotification(`Backup restored successfully! (${restoredItems} scans from ${new Date(backupData.timestamp).toLocaleString()})`, 'success', 3000);
@@ -1386,8 +1636,13 @@ function App() {
       return true;
     }
     
+    // Check user role - admins have all permissions
+    if (user && user.role === 'admin' && user.email === 'admin@megakem.com') {
+      return true;
+    }
+    
     // Find current logged-in user from users array
-    const currentUser = users.find(u => u.email === adminEmail);
+    const currentUser = users.find(u => u.email === adminEmail || u.email === user?.email);
     
     // If user found, check their specific permission (must be explicitly true)
     if (currentUser && currentUser.permissions) {
@@ -1418,7 +1673,22 @@ function App() {
         {adminAuth && view === 'admin' && (
           <Button color='inherit' onClick={handleAdminLogout} sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>Logout</Button>
         )}
-        <Button color='inherit' onClick={() => setView(view === 'admin' ? 'welcome' : 'admin')} sx={{ bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>{view === 'admin' ? 'App' : 'Admin'}</Button>
+        <Button 
+          color='inherit' 
+          onClick={() => {
+            // If trying to access admin without authentication, require login first
+            if (view !== 'admin' && !adminAuth) {
+              setView('admin'); // This will show the login form
+            } else if (view === 'admin') {
+              setView('welcome'); // Return to app
+            } else {
+              setView('admin'); // Already authenticated, go to admin panel
+            }
+          }} 
+          sx={{ bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}
+        >
+          {view === 'admin' ? 'App' : 'Admin'}
+        </Button>
       </Toolbar></AppBar>
       <Container maxWidth={view === 'admin' && adminAuth ? 'lg' : 'sm'} sx={{ flexGrow: 1, py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column' }}>
         {view === 'welcome' && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', animation: 'fadeIn 0.6s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
@@ -1467,29 +1737,11 @@ function App() {
               Search Purchase History
             </Button>
           </Box>
-          {false && !user?.anonymous && (
+          {memberId && (
             <Box sx={{ mt: 4 }}>
-              <Divider sx={{ mb: 3 }}><Chip label="My Account" color="primary" /></Divider>
+              <Divider sx={{ mb: 3 }}><Chip label="Member Account" color="primary" /></Divider>
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={4}>
-                  <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('profile')}>
-                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                      <Person sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                      <Typography variant="h6" fontWeight={600}>Profile</Typography>
-                      <Typography variant="caption" color="text.secondary">View stats & history</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('rewards')}>
-                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                      <CardGiftcard sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
-                      <Typography variant="h6" fontWeight={600}>Rewards</Typography>
-                      <Typography variant="caption" color="text.secondary">Redeem your points</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={4}>
+                <Grid item xs={12}>
                   <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('leaderboard')}>
                     <CardContent sx={{ textAlign: 'center', py: 3 }}>
                       <EmojiEvents sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
@@ -1518,7 +1770,7 @@ function App() {
               </IconButton>
               <Box>
                 <Typography variant='h4' fontWeight={800} sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>Purchase History</Typography>
-                <Typography variant='body2' color='text.secondary'>Search and track your loyalty rewards</Typography>
+                <Typography variant='body2' color='text.secondary'>Search and track your purchase history</Typography>
               </Box>
             </Box>
             {memberHistory.length > 0 && (
@@ -1652,13 +1904,13 @@ function App() {
                 <Box sx={{ p: 3, background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant='h5' fontWeight={700}>
-                      🎉 Loyalty Points Summary
+                      🎉 Monthly Purchase Summary
                     </Typography>
                     <Chip 
-                      label={currentTier.name} 
+                      label={memberHistory.filter(s => s.role === 'applicator').length > 0 ? 'Applicator' : 'Customer'} 
                       sx={{ 
-                        bgcolor: currentTier.color, 
-                        color: currentTier.name === 'Gold' ? '#000' : '#fff',
+                        bgcolor: 'secondary.main', 
+                        color: '#fff',
                         fontWeight: 700,
                         fontSize: '1rem',
                         px: 2
@@ -1667,67 +1919,24 @@ function App() {
                   </Box>
                   
                   <Grid container spacing={3}>
-                    <Grid item xs={6} sm={4}>
-                      <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                        <Star sx={{ fontSize: 40, mb: 1 }} />
-                        <Typography variant='h3' fontWeight={700}>{totalPoints}</Typography>
-                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Total Points</Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
+                    <Grid item xs={6} sm={6}>
                       <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
                         <EmojiEvents sx={{ fontSize: 40, mb: 1 }} />
                         <Typography variant='h3' fontWeight={700}>{memberHistory.length}</Typography>
-                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Transactions</Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Total Scans</Typography>
                       </Box>
                     </Grid>
-                    <Grid item xs={12} sm={4}>
+                    <Grid item xs={6} sm={6}>
                       <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
                         <TrendingUp sx={{ fontSize: 40, mb: 1 }} />
                         <Typography variant='h3' fontWeight={700}>
-                          {memberHistory.filter(s => s.role === 'applicator').length}
+                          Rs. {memberHistory.reduce((sum, s) => sum + (s.price || 0), 0).toLocaleString()}
                         </Typography>
-                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Bonus Eligible</Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Total Purchase Value</Typography>
                       </Box>
                     </Grid>
                   </Grid>
                   
-                  {/* Progress to Next Tier */}
-                  {nextTier && (
-                    <Box sx={{ mt: 3 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant='body2' fontWeight={600}>
-                          Progress to {nextTier.name} Tier
-                        </Typography>
-                        <Typography variant='body2' fontWeight={600}>
-                          {totalPoints} / {nextTier.min} pts
-                        </Typography>
-                      </Box>
-                      <LinearProgress 
-                        variant='determinate' 
-                        value={tierProgress} 
-                        sx={{ 
-                          height: 10, 
-                          borderRadius: 5,
-                          bgcolor: 'rgba(255,255,255,0.2)',
-                          '& .MuiLinearProgress-bar': {
-                            bgcolor: nextTier.color,
-                            borderRadius: 5
-                          }
-                        }} 
-                      />
-                      <Typography variant='caption' sx={{ opacity: 0.8, mt: 0.5, display: 'block' }}>
-                        {nextTier.min - totalPoints} points to unlock {nextTier.name} tier rewards!
-                      </Typography>
-                    </Box>
-                  )}
-                  {!nextTier && (
-                    <Box sx={{ mt: 3, textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                      <EmojiEvents sx={{ fontSize: 48, mb: 1 }} />
-                      <Typography variant='h6' fontWeight={700}>Maximum Tier Achieved!</Typography>
-                      <Typography variant='caption'>You've reached Platinum status 🎉</Typography>
-                    </Box>
-                  )}
                 </Box>
                 
                 {/* Purchase Pattern Chart */}
@@ -1740,7 +1949,7 @@ function App() {
                       const height = (monthlyData[month] / maxPoints) * 100;
                       return (
                         <Box key={idx} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <Tooltip title={`${monthlyData[month]} points`}>
+                          <Tooltip title={`${monthlyData[month]} purchases`}>
                             <Box 
                               sx={{ 
                                 width: '100%', 
@@ -1772,20 +1981,16 @@ function App() {
                 const totalPoints = basePoints + bonusPoints;
                 return (
                 <Card key={scan._id || idx} sx={{ mb: 2, position: 'relative', overflow: 'visible' }}>
-                  {/* Prominent Points Badge */}
+                  {/* Price Badge */}
                   <Box sx={{ position: 'absolute', top: -12, right: 16, zIndex: 1 }}>
                     <Chip 
-                      icon={<Star sx={{ color: '#fff !important' }} />}
-                      label={`${totalPoints} pts`} 
+                      label={`Rs. ${(scan.price || 0).toLocaleString()}`} 
                       color='primary' 
                       sx={{ 
                         fontWeight: 700,
                         fontSize: '0.9rem',
                         height: 32,
-                        boxShadow: 2,
-                        '& .MuiChip-icon': {
-                          color: '#fff'
-                        }
+                        boxShadow: 2
                       }}
                     />
                   </Box>
@@ -1817,39 +2022,22 @@ function App() {
                       return null;
                     })()}
                     
-                    {/* Points Information */}
-                    <Box sx={{ mt: 2, p: 1.5, bgcolor: 'success.lighter', borderRadius: 1, border: '1px solid', borderColor: 'success.light' }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                        <Typography variant='caption' color='text.secondary'>
-                          🎯 Base Points:
-                        </Typography>
-                        <Typography variant='body2' fontWeight={600} color='primary.main'>
-                          {basePoints} pts
-                        </Typography>
-                      </Box>
-                      {bonusPoints > 0 && (
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                          <Typography variant='caption' color='text.secondary'>
-                            ⭐ Applicator Bonus (10%):
+                    {/* Purchase Price Information */}
+                    {scan.price > 0 && (
+                      <Box sx={{ mt: 2, p: 1.5, bgcolor: 'info.lighter', borderRadius: 1, border: '1px solid', borderColor: 'info.light' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant='body2' fontWeight={700} color='primary.main'>
+                            Purchase Value:
                           </Typography>
-                          <Typography variant='body2' fontWeight={600} color='warning.main'>
-                            +{bonusPoints} pts
-                          </Typography>
+                          <Chip 
+                            label={`Rs. ${scan.price.toLocaleString()}`} 
+                            color='primary' 
+                            size='small'
+                            sx={{ fontWeight: 700 }}
+                          />
                         </Box>
-                      )}
-                      <Divider sx={{ my: 1 }} />
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant='body2' fontWeight={700} color='primary.main'>
-                          Total Points Earned:
-                        </Typography>
-                        <Chip 
-                          label={`${totalPoints} points`} 
-                          color='primary' 
-                          size='small'
-                          sx={{ fontWeight: 700 }}
-                        />
                       </Box>
-                    </Box>
+                    )}
                     
                     {scan.location && <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mt: 1 }}>📍 {scan.location}</Typography>}
                     <Typography variant='caption' color='text.disabled' sx={{ display: 'block', mt: 1 }}>
@@ -1864,181 +2052,122 @@ function App() {
           })()}
         </Box>}
 
-        {view === 'profile' && (
-          <Box sx={{ py: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-              <IconButton onClick={() => setView('welcome')} sx={{ mr: 2 }}>
-                <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
-              </IconButton>
-              <Typography variant="h4" fontWeight={700}>My Profile</Typography>
-            </Box>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <Card sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
-                  <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                    <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'secondary.main', fontSize: '2rem' }}>
-                      {user?.username?.[0]?.toUpperCase() || 'U'}
-                    </Avatar>
-                    <Typography variant="h5" fontWeight={700} gutterBottom>{user?.username || 'User'}</Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>{user?.email}</Typography>
-                    <Chip label={user?.tier || 'Bronze'} color="secondary" sx={{ fontWeight: 700, fontSize: '1rem' }} />
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={8}>
-                <Grid container spacing={2}>
-                  <Grid item xs={6} sm={3}>
-                    <Card>
-                      <CardContent sx={{ textAlign: 'center' }}>
-                        <Typography variant="h4" fontWeight={700} color="primary">{user?.points || 0}</Typography>
-                        <Typography variant="caption" color="text.secondary">Points</Typography>
+        {view === 'profile' && (() => {
+          const currentMember = members.find(m => m.memberId === memberId?.toUpperCase());
+          return (
+            <Box sx={{ py: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <IconButton onClick={() => setView(adminAuth ? 'admin' : 'welcome')} sx={{ mr: 2 }}>
+                  <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
+                </IconButton>
+                <Typography variant="h4" fontWeight={700}>Member Profile</Typography>
+              </Box>
+              {currentMember ? (
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={4}>
+                    <Card sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
+                      <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                        <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'secondary.main', fontSize: '2rem' }}>
+                          {currentMember.memberName?.[0]?.toUpperCase() || currentMember.memberId?.[0] || 'M'}
+                        </Avatar>
+                        <Typography variant="h5" fontWeight={700} gutterBottom>{currentMember.memberName || currentMember.memberId}</Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>{currentMember.memberId}</Typography>
+                        {currentMember.phone && <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>{currentMember.phone}</Typography>}
+                        <Chip 
+                          label={currentMember.role === 'applicator' ? 'Applicator' : 'Customer'} 
+                          color="secondary" 
+                          sx={{ fontWeight: 700, fontSize: '1rem' }} 
+                        />
                       </CardContent>
                     </Card>
                   </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Card>
-                      <CardContent sx={{ textAlign: 'center' }}>
-                        <Typography variant="h4" fontWeight={700} color="secondary">{user?.totalScans || 0}</Typography>
-                        <Typography variant="caption" color="text.secondary">Total Scans</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Card>
-                      <CardContent sx={{ textAlign: 'center' }}>
-                        <Typography variant="h4" fontWeight={700} color="info.main">{user?.achievements?.length || 0}</Typography>
-                        <Typography variant="caption" color="text.secondary">Achievements</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Card>
-                      <CardContent sx={{ textAlign: 'center' }}>
-                        <EmojiEvents sx={{ fontSize: 40, color: 'warning.main' }} />
-                        <Typography variant="caption" color="text.secondary">Tier Badge</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
-                <Card sx={{ mt: 2 }}>
-                  <CardContent>
-                    <Typography variant="h6" fontWeight={600} gutterBottom>Achievements</Typography>
-                    {user?.achievements && user.achievements.length > 0 ? (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {user.achievements.map((achievement, idx) => (
-                          <Chip key={idx} label={achievement} icon={<Star />} color="warning" variant="outlined" />
-                        ))}
-                      </Box>
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">No achievements yet. Start scanning to earn rewards!</Typography>
+                  <Grid item xs={12} md={8}>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <Card>
+                          <CardContent sx={{ textAlign: 'center' }}>
+                            <Typography variant="h4" fontWeight={700} color="primary">{currentMember.totalScans || 0}</Typography>
+                            <Typography variant="caption" color="text.secondary">Total Scans</Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Card>
+                          <CardContent sx={{ textAlign: 'center' }}>
+                            <Typography variant="h4" fontWeight={700} color="secondary">
+                              Rs. {(currentMember.totalCashRewards || 0).toLocaleString()}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">Total Cash Rewards</Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
+                    {currentMember.location && (
+                      <Card sx={{ mt: 2 }}>
+                        <CardContent>
+                          <Typography variant="body2" color="text.secondary">📍 Location: {currentMember.location}</Typography>
+                        </CardContent>
+                      </Card>
                     )}
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                      <HistoryIcon sx={{ mr: 1 }} /> Scan History
-                    </Typography>
-                    <Divider sx={{ my: 2 }} />
-                    {scanHistory.length > 0 ? (
-                      <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-                        {scanHistory.slice(0, 10).map((scan) => (
-                          <Box key={scan._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                            <Box>
-                              <Typography variant="body1" fontWeight={600}>{scan.productName}</Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Batch: {scan.batchNo} | Bag: {scan.bagNo}
-                              </Typography>
-                              {(() => {
-                                const batchInfo = parseBatchInfo(scan.batchNo);
-                                if (batchInfo?.parsed) {
-                                  return (
-                                    <Typography variant="caption" display="block" color="primary.main" sx={{ mt: 0.5 }}>
-                                      {batchInfo.productCode} • Mat: {batchInfo.materialBatch} • {batchInfo.date}
-                                    </Typography>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </Box>
-                            <Box sx={{ textAlign: 'right' }}>
-                              <Chip label={scan.role} size="small" color={scan.role === 'applicator' ? 'primary' : 'secondary'} />
-                              <Typography variant="caption" display="block" color="text.secondary">
-                                {new Date(scan.scannedAt).toLocaleDateString()}
-                              </Typography>
-                            </Box>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                          <HistoryIcon sx={{ mr: 1 }} /> Scan History
+                        </Typography>
+                        <Divider sx={{ my: 2 }} />
+                        {scanHistory.length > 0 ? (
+                          <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                            {scanHistory.slice(0, 10).map((scan) => (
+                              <Box key={scan._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                                <Box>
+                                  <Typography variant="body1" fontWeight={600}>{scan.productName || scan.product?.name}</Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Batch: {scan.batchNo} | Bag: {scan.bagNo}
+                                  </Typography>
+                                  {(() => {
+                                    const batchInfo = parseBatchInfo(scan.batchNo);
+                                    if (batchInfo?.parsed) {
+                                      return (
+                                        <Typography variant="caption" display="block" color="primary.main" sx={{ mt: 0.5 }}>
+                                          {batchInfo.productCode} • Mat: {batchInfo.materialBatch} • {batchInfo.date}
+                                        </Typography>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </Box>
+                                <Box sx={{ textAlign: 'right' }}>
+                                  <Chip label={scan.role} size="small" color={scan.role === 'applicator' ? 'primary' : 'secondary'} />
+                                  <Typography variant="caption" display="block" color="text.secondary">
+                                    {new Date(scan.timestamp || scan.scannedAt || scan.createdAt).toLocaleDateString()}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            ))}
                           </Box>
-                        ))}
-                      </Box>
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">No scan history available.</Typography>
-                    )}
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">No scan history available.</Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              ) : (
+                <Card>
+                  <CardContent sx={{ textAlign: 'center', py: 6 }}>
+                    <Person sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary">Member not found</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Please enter your member ID and scan products to create your profile.
+                    </Typography>
                   </CardContent>
                 </Card>
-              </Grid>
-            </Grid>
-          </Box>
-        )}
-        {view === 'rewards' && (
-          <Box sx={{ py: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-              <IconButton onClick={() => setView('welcome')} sx={{ mr: 2 }}>
-                <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
-              </IconButton>
-              <Typography variant="h4" fontWeight={700}>Rewards Catalog</Typography>
-            </Box>
-            <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="h6" fontWeight={600}>Available Points</Typography>
-                    <Typography variant="h3" fontWeight={700}>{user?.points || 0}</Typography>
-                  </Box>
-                  <CardGiftcard sx={{ fontSize: 80, opacity: 0.3 }} />
-                </Box>
-              </CardContent>
-            </Card>
-            <Grid container spacing={3}>
-              {rewards.length > 0 ? rewards.map((reward) => (
-                <Grid item xs={12} sm={6} md={4} key={reward._id}>
-                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }}>
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography variant="h6" fontWeight={700} gutterBottom>{reward.title}</Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{reward.description}</Typography>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
-                        <Chip label={`${reward.pointsRequired} pts`} color="primary" sx={{ fontWeight: 700 }} />
-                        <Typography variant="caption" color="text.secondary">Stock: {reward.stock}</Typography>
-                      </Box>
-                    </CardContent>
-                    <Box sx={{ p: 2, pt: 0 }}>
-                      <Button 
-                        fullWidth 
-                        variant="contained" 
-                        disabled={!user || user.points < reward.pointsRequired || reward.stock === 0}
-                        onClick={() => setRewardDialog({ open: true, reward })}
-                        sx={{ fontWeight: 600 }}
-                      >
-                        {user?.points >= reward.pointsRequired ? 'Redeem' : 'Insufficient Points'}
-                      </Button>
-                    </Box>
-                  </Card>
-                </Grid>
-              )) : (
-                <Grid item xs={12}>
-                  <Card>
-                    <CardContent sx={{ textAlign: 'center', py: 6 }}>
-                      <CardGiftcard sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-                      <Typography variant="h6" color="text.secondary">No rewards available at the moment</Typography>
-                      <Typography variant="body2" color="text.secondary">Check back soon for exciting rewards!</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
               )}
-            </Grid>
-          </Box>
-        )}
+            </Box>
+          );
+        })()}
         {view === 'leaderboard' && (
           <Box sx={{ py: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
@@ -2051,65 +2180,76 @@ function App() {
               <CardContent sx={{ textAlign: 'center', py: 4 }}>
                 <EmojiEvents sx={{ fontSize: 60, color: 'white', mb: 2 }} />
                 <Typography variant="h5" fontWeight={700} color="white">Top Contributors</Typography>
-                <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>Compete and earn rewards!</Typography>
+                <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>Most active members!</Typography>
               </CardContent>
             </Card>
-            {leaderboard.length > 0 ? (
-              <Grid container spacing={2}>
-                {leaderboard.slice(0, 10).map((entry, index) => (
-                  <Grid item xs={12} key={entry._id}>
-                    <Card sx={{ 
-                      border: index < 3 ? '2px solid' : 'none',
-                      borderColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : 'transparent',
-                      background: index < 3 ? `linear-gradient(135deg, ${index === 0 ? '#FFF9E6' : index === 1 ? '#F5F5F5' : '#FFF0E6'} 0%, white 100%)` : 'white'
-                    }}>
-                      <CardContent>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box sx={{ 
-                              width: 50, 
-                              height: 50, 
-                              borderRadius: '50%', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              background: index === 0 ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)' : 
-                                         index === 1 ? 'linear-gradient(135deg, #C0C0C0 0%, #999999 100%)' : 
-                                         index === 2 ? 'linear-gradient(135deg, #CD7F32 0%, #B8860B 100%)' : 
-                                         'linear-gradient(135deg, #003366 0%, #4A90A4 100%)',
-                              color: 'white',
-                              fontWeight: 700,
-                              fontSize: '1.5rem'
-                            }}>
-                              {index < 3 ? <EmojiEvents /> : index + 1}
-                            </Box>
-                            <Box>
-                              <Typography variant="h6" fontWeight={700}>{entry.username}</Typography>
-                              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                                <Chip label={entry.tier} size="small" color="primary" />
-                                <Typography variant="caption" color="text.secondary">{entry.totalScans} scans</Typography>
+            {(() => {
+              // Use members data sorted by total scans for leaderboard
+              const sortedMembers = [...members].sort((a, b) => (b.totalScans || 0) - (a.totalScans || 0));
+              return sortedMembers.length > 0 ? (
+                <Grid container spacing={2}>
+                  {sortedMembers.slice(0, 10).map((member, index) => (
+                    <Grid item xs={12} key={member._id}>
+                      <Card sx={{ 
+                        border: index < 3 ? '2px solid' : member.memberId === memberId?.toUpperCase() ? '2px solid' : 'none',
+                        borderColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : member.memberId === memberId?.toUpperCase() ? 'primary.main' : 'transparent',
+                        background: index < 3 ? `linear-gradient(135deg, ${index === 0 ? '#FFF9E6' : index === 1 ? '#F5F5F5' : '#FFF0E6'} 0%, white 100%)` : 
+                                   member.memberId === memberId?.toUpperCase() ? 'primary.lighter' : 'white'
+                      }}>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Box sx={{ 
+                                width: 50, 
+                                height: 50, 
+                                borderRadius: '50%', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                background: index === 0 ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)' : 
+                                           index === 1 ? 'linear-gradient(135deg, #C0C0C0 0%, #999999 100%)' : 
+                                           index === 2 ? 'linear-gradient(135deg, #CD7F32 0%, #B8860B 100%)' : 
+                                           'linear-gradient(135deg, #003366 0%, #4A90A4 100%)',
+                                color: 'white',
+                                fontWeight: 700,
+                                fontSize: '1.5rem'
+                              }}>
+                                {index < 3 ? <EmojiEvents /> : index + 1}
+                              </Box>
+                              <Box>
+                                <Typography variant="h6" fontWeight={700}>{member.memberName || member.memberId}</Typography>
+                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                  <Chip 
+                                    label={member.role === 'applicator' ? 'Applicator' : 'Customer'} 
+                                    size="small" 
+                                    color={member.role === 'applicator' ? 'warning' : 'info'}
+                                  />
+                                  {member.memberId === memberId?.toUpperCase() && (
+                                    <Chip label="You" size="small" color="primary" />
+                                  )}
+                                </Box>
                               </Box>
                             </Box>
+                            <Box sx={{ textAlign: 'right' }}>
+                              <Typography variant="h5" fontWeight={700} color="primary">{member.totalScans || 0}</Typography>
+                              <Typography variant="caption" color="text.secondary">scans</Typography>
+                            </Box>
                           </Box>
-                          <Box sx={{ textAlign: 'right' }}>
-                            <Typography variant="h5" fontWeight={700} color="primary">{entry.points}</Typography>
-                            <Typography variant="caption" color="text.secondary">points</Typography>
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            ) : (
-              <Card>
-                <CardContent sx={{ textAlign: 'center', py: 6 }}>
-                  <EmojiEvents sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-                  <Typography variant="h6" color="text.secondary">No leaderboard data available</Typography>
-                  <Typography variant="body2" color="text.secondary">Be the first to climb the ranks!</Typography>
-                </CardContent>
-              </Card>
-            )}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              ) : (
+                <Card>
+                  <CardContent sx={{ textAlign: 'center', py: 6 }}>
+                    <EmojiEvents sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary">No leaderboard data available</Typography>
+                    <Typography variant="body2" color="text.secondary">Be the first to climb the ranks!</Typography>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </Box>
         )}
         {view === 'scanner' && <Paper sx={{ flexGrow: 1, bgcolor: '#000', color: 'white', overflow: 'hidden', position: 'relative', borderRadius: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
@@ -2274,6 +2414,8 @@ function App() {
               <Tab icon={<DashboardIcon />} label='Dashboard' />
               <Tab icon={<HistoryIcon />} label='Scans' />
               {isMainAdmin() && <Tab icon={<People />} label='Co-Admins' />}
+              <Tab icon={<EmojiEvents />} label='Members & Loyalty' />
+              <Tab icon={<CardGiftcard />} label='Cash Rewards' />
               <Tab icon={<Category />} label='Products' />
               <Tab icon={<Settings />} label='Profile' />
             </Tabs>
@@ -2701,6 +2843,152 @@ function App() {
     })()}
           </Box>}
 
+          {((adminTab === 3 && isMainAdmin()) || (adminTab === 2 && !isMainAdmin())) && <Box>
+            <Box sx={{ mb: 2, display: 'flex', gap: 2, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Box>
+                <Typography variant='h6' sx={{ fontWeight: 700 }}>Members & Monthly Purchases</Typography>
+                <Typography variant='body2' color='text.secondary'>
+                  Total: {members.length} | Applicators: {members.filter(m => m.role === 'applicator').length} | Customers: {members.filter(m => m.role === 'customer').length}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button 
+                  variant='outlined' 
+                  startIcon={<Refresh />} 
+                  onClick={handleSyncMembers}
+                  disabled={loading}
+                  size='small'
+                  title='Sync members from all existing scans'
+                >
+                  Sync from Scans
+                </Button>
+                <Button 
+                  variant='outlined' 
+                  startIcon={<Settings />} 
+                  onClick={() => setLoyaltyConfigDialog({ open: true })}
+                  size='small'
+                >
+                  Configure Cash Rewards
+                </Button>
+              </Box>
+            </Box>
+            <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              <TextField 
+                size='small' 
+                placeholder='Search by member ID, name, phone...' 
+                value={memberSearchQuery}
+                onChange={(e) => setMemberSearchQuery(e.target.value)}
+                sx={{ flexGrow: 1, minWidth: 200 }}
+                InputProps={{
+                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+                }}
+              />
+              <FormControl size='small' sx={{ minWidth: 120 }}>
+                <InputLabel>Role</InputLabel>
+                <Select value={memberRoleFilter} onChange={(e) => setMemberRoleFilter(e.target.value)} label='Role'>
+                  <MenuItem value='all'>All Roles</MenuItem>
+                  <MenuItem value='applicator'>Applicator</MenuItem>
+                  <MenuItem value='customer'>Customer</MenuItem>
+                </Select>
+              </FormControl>
+              {(memberSearchQuery || memberRoleFilter !== 'all') && (
+                <Button 
+                  size='small' 
+                  onClick={() => { 
+                    setMemberSearchQuery(''); 
+                    setMemberRoleFilter('all');
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </Box>
+            <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>Member ID</strong></TableCell>
+                    <TableCell><strong>Name</strong></TableCell>
+                    <TableCell><strong>Role</strong></TableCell>
+                    <TableCell><strong>Total Scans</strong></TableCell>
+                    <TableCell><strong>Cash Rewards (Rs.)</strong></TableCell>
+                    <TableCell><strong>Actions</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(() => {
+                    let filteredMembers = members.filter(m => {
+                      const matchesSearch = !memberSearchQuery || 
+                        m.memberId?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+                        m.memberName?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+                        m.phone?.toLowerCase().includes(memberSearchQuery.toLowerCase());
+                      const matchesRole = memberRoleFilter === 'all' || m.role === memberRoleFilter;
+                      return matchesSearch && matchesRole;
+                    });
+
+                    if (filteredMembers.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                            <Typography variant='body1' color='text.secondary'>
+                              {members.length === 0 
+                                ? 'No members found. Members are created automatically when they scan products.'
+                                : 'No members match your filters.'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    return filteredMembers.map(m => (
+                      <TableRow key={m._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                        <TableCell>
+                          <Typography variant='body2' fontWeight={600}>{m.memberId}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant='body2'>{m.memberName}</Typography>
+                          {m.phone && <Typography variant='caption' color='text.secondary'>{m.phone}</Typography>}
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={m.role === 'applicator' ? 'Applicator' : 'Customer'} 
+                            size='small' 
+                            color={m.role === 'applicator' ? 'warning' : 'info'}
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant='body2' fontWeight={600}>{m.totalScans || 0}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={`Rs. ${(m.totalCashRewards || 0).toLocaleString()}`}
+                            size='small' 
+                            color='success' 
+                            sx={{ fontWeight: 700, fontSize: '0.875rem' }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <IconButton 
+                            size='small' 
+                            color='info' 
+                            onClick={() => {
+                              setMemberId(m.memberId);
+                              setView('profile');
+                            }} 
+                            title='View Member Profile'
+                          >
+                            <Visibility />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ));
+                  })()}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>}
+
           {adminTab === 2 && isMainAdmin() && <Box>
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Button 
@@ -2725,7 +3013,7 @@ function App() {
               >
                 Add Co-Admin
               </Button>
-              <Typography variant='body2' color='text.secondary'>Total Co-Admins: {users.filter(u => u.role === 'admin').length}</Typography>
+              <Typography variant='body2' color='text.secondary'>Total Co-Admins: {users.filter(u => u.role === 'admin' || u.role === 'co-admin').length}</Typography>
             </Box>
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table><TableHead><TableRow>
@@ -2737,19 +3025,30 @@ function App() {
                 <TableCell><strong>Created</strong></TableCell>
                 <TableCell><strong>Actions</strong></TableCell>
               </TableRow></TableHead>
-                <TableBody>{users.filter(u => u.role === 'admin').map(u => <TableRow key={u._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                <TableBody>{users.filter(u => u.role === 'admin' || u.role === 'co-admin').map(u => <TableRow key={u._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
                   <TableCell>
                     <Typography variant='body2' fontWeight={600}>{u.username}</Typography>
                     {u.email === 'admin@megakem.com' && <Chip label='Main Admin' size='small' color='success' sx={{ mt: 0.5, fontSize: '0.65rem' }} />}
                   </TableCell>
                   <TableCell><Typography variant='body2'>{u.email}</Typography></TableCell>
-                  <TableCell><Chip label={u.email === 'admin@megakem.com' ? 'Main Admin' : 'Co-Admin'} size='small' color={u.email === 'admin@megakem.com' ? 'success' : 'error'} /></TableCell>
+                  <TableCell><Chip label={u.email === 'admin@megakem.com' ? 'Main Admin' : (u.role === 'co-admin' ? 'Co-Admin' : 'Admin')} size='small' color={u.email === 'admin@megakem.com' ? 'success' : (u.role === 'co-admin' ? 'error' : 'warning')} /></TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                      {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                      {u.permissions?.canExport === true && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                      {u.permissions?.canManageUsers === true && <Chip label='Users' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                      {u.permissions?.canManageProducts === true && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                      {u.email === 'admin@megakem.com' ? (
+                        <>
+                          <Chip label='Delete' size='small' color='error' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Export' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Users' size='small' color='warning' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Products' size='small' color='success' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                        </>
+                      ) : (
+                        <>
+                          {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canExport === true && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageUsers === true && <Chip label='Users' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageProducts === true && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                        </>
+                      )}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -2799,16 +3098,270 @@ function App() {
             </TableContainer>
           </Box>}
 
-          {((adminTab === 3 && isMainAdmin()) || (adminTab === 2 && !isMainAdmin())) && <Box>
-            <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+          {/* Cash Rewards Management Tab */}
+          {((adminTab === 4 && isMainAdmin()) || (adminTab === 3 && !isMainAdmin())) && <Box>
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant='h5' sx={{ flexGrow: 1 }}>
+                <CardGiftcard sx={{ mr: 1, verticalAlign: 'middle' }} />
+                Cash Rewards Management
+              </Typography>
+              <FormControl sx={{ minWidth: 120 }}>
+                <InputLabel>Month</InputLabel>
+                <Select 
+                  value={selectedMonth} 
+                  label="Month"
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                    <MenuItem key={month} value={month}>
+                      {new Date(2024, month - 1).toLocaleString('default', { month: 'long' })}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl sx={{ minWidth: 120 }}>
+                <InputLabel>Year</InputLabel>
+                <Select 
+                  value={selectedYear} 
+                  label="Year"
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                >
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                    <MenuItem key={year} value={year}>{year}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <Button 
                 variant='contained' 
-                startIcon={<Add />} 
-                onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0 } })}
-                disabled={!hasPermission('canManageProducts')}
+                startIcon={<Calculate />} 
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
+                    setCashRewards(response.data.rewards || []);
+                    showNotification('Cash rewards calculated successfully', 'success');
+                  } catch (error) {
+                    showNotification(error.response?.data?.error || 'Failed to calculate rewards', 'error');
+                  }
+                  setLoading(false);
+                }}
               >
-                Add Product
+                Calculate Rewards
               </Button>
+              <Button 
+                variant='outlined' 
+                startIcon={<Refresh />} 
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
+                    setCashRewards(response.data.rewards || []);
+                  } catch (error) {
+                    showNotification('Failed to load rewards', 'error');
+                  }
+                  setLoading(false);
+                }}
+              >
+                Refresh
+              </Button>
+            </Box>
+
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : cashRewards.length === 0 ? (
+              <Paper sx={{ p: 4, textAlign: 'center' }}>
+                <CardGiftcard sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                <Typography variant='h6' color='text.secondary'>
+                  No cash rewards data for {new Date(selectedYear, selectedMonth - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </Typography>
+                <Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
+                  Click "Calculate Rewards" to generate rewards for this month
+                </Typography>
+              </Paper>
+            ) : (
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Member ID</strong></TableCell>
+                      <TableCell><strong>Member Name</strong></TableCell>
+                      <TableCell><strong>Role</strong></TableCell>
+                      <TableCell align='right'><strong>Purchase Value</strong></TableCell>
+                      <TableCell align='right'><strong>Cash Reward</strong></TableCell>
+                      <TableCell align='center'><strong>Status</strong></TableCell>
+                      <TableCell align='center'><strong>Actions</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {cashRewards.map((reward) => (
+                      <TableRow key={reward.memberId}>
+                        <TableCell>{reward.memberId}</TableCell>
+                        <TableCell>{reward.memberName}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={reward.role} 
+                            size='small'
+                            color={reward.role === 'applicator' ? 'primary' : 'default'}
+                          />
+                        </TableCell>
+                        <TableCell align='right'>
+                          Rs. {reward.totalPurchaseValue?.toLocaleString()}
+                        </TableCell>
+                        <TableCell align='right'>
+                          <Typography variant='body1' color='success.main' sx={{ fontWeight: 'bold' }}>
+                            Rs. {reward.cashReward?.toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align='center'>
+                          <Chip 
+                            label={reward.rewardPaid ? 'PAID' : reward.rewardCalculated ? 'CALCULATED' : 'PENDING'} 
+                            size='small'
+                            color={reward.rewardPaid ? 'success' : reward.rewardCalculated ? 'warning' : 'default'}
+                          />
+                        </TableCell>
+                        <TableCell align='center'>
+                          <Tooltip title="View Breakdown">
+                            <IconButton 
+                              size='small'
+                              onClick={() => {
+                                // Calculate breakdown
+                                const breakdown = [];
+                                const tiers = [
+                                  { name: 'First Rs. 250,000', min: 0, max: 250000, rate: 4.5 },
+                                  { name: 'Next Rs. 250,000', min: 250001, max: 500000, rate: 5.0 },
+                                  { name: 'Next Rs. 250,000', min: 500001, max: 750000, rate: 5.5 },
+                                  { name: 'Next Rs. 250,000', min: 750001, max: 1000000, rate: 6.0 },
+                                  { name: 'Above Rs. 1,000,000', min: 1000001, max: Infinity, rate: 6.5 }
+                                ];
+                                
+                                let remainingAmount = reward.totalPurchaseValue;
+                                tiers.forEach(tier => {
+                                  if (remainingAmount > 0) {
+                                    const tierMax = tier.max === Infinity ? remainingAmount : Math.min(tier.max, remainingAmount + tier.min);
+                                    const amountInTier = Math.max(0, tierMax - tier.min);
+                                    const tierReward = amountInTier * (tier.rate / 100);
+                                    if (amountInTier > 0) {
+                                      breakdown.push({
+                                        tier: tier.name,
+                                        amount: amountInTier,
+                                        rate: tier.rate,
+                                        reward: tierReward
+                                      });
+                                      remainingAmount -= amountInTier;
+                                    }
+                                  }
+                                });
+                                
+                                setRewardBreakdownDialog({
+                                  open: true,
+                                  member: reward,
+                                  breakdown: breakdown
+                                });
+                              }}
+                            >
+                              <Visibility />
+                            </IconButton>
+                          </Tooltip>
+                          {!reward.rewardPaid && (
+                            <Tooltip title="Mark as Paid">
+                              <IconButton 
+                                size='small'
+                                color='success'
+                                onClick={async () => {
+                                  if (window.confirm(`Mark Rs. ${reward.cashReward?.toLocaleString()} as paid for ${reward.memberName}?`)) {
+                                    setLoading(true);
+                                    try {
+                                      await cashRewardsAPI.markAsPaid(reward.memberId, {
+                                        year: selectedYear,
+                                        month: selectedMonth
+                                      });
+                                      // Refresh the list
+                                      const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
+                                      setCashRewards(response.data.rewards || []);
+                                      showNotification('Reward marked as paid', 'success');
+                                    } catch (error) {
+                                      showNotification('Failed to mark as paid', 'error');
+                                    }
+                                    setLoading(false);
+                                  }
+                                }}
+                              >
+                                <CheckCircle />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {/* Summary Card */}
+            {cashRewards.length > 0 && (
+              <Paper sx={{ mt: 3, p: 3 }}>
+                <Typography variant='h6' gutterBottom>
+                  Monthly Summary
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box>
+                      <Typography variant='body2' color='text.secondary'>
+                        Total Members
+                      </Typography>
+                      <Typography variant='h5'>
+                        {cashRewards.length}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box>
+                      <Typography variant='body2' color='text.secondary'>
+                        Total Purchases
+                      </Typography>
+                      <Typography variant='h5'>
+                        Rs. {cashRewards.reduce((sum, r) => sum + (r.totalPurchaseValue || 0), 0).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box>
+                      <Typography variant='body2' color='text.secondary'>
+                        Total Rewards
+                      </Typography>
+                      <Typography variant='h5' color='success.main'>
+                        Rs. {cashRewards.reduce((sum, r) => sum + (r.cashReward || 0), 0).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box>
+                      <Typography variant='body2' color='text.secondary'>
+                        Paid Rewards
+                      </Typography>
+                      <Typography variant='h5' color='primary.main'>
+                        {cashRewards.filter(r => r.rewardPaid).length} / {cashRewards.length}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+            )}
+          </Box>}
+
+          {((adminTab === 5 && isMainAdmin()) || (adminTab === 4 && !isMainAdmin())) && <Box>
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Button 
+                  variant='contained' 
+                  startIcon={<Add />} 
+                  onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0 } })}
+                  disabled={!hasPermission('canManageProducts')}
+                >
+                  Add Product
+                </Button>
               <TextField 
                 size='small' 
                 placeholder='Search products...' 
@@ -2852,14 +3405,14 @@ function App() {
                       );
                     }
                     
-                    return filteredProducts.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell><TableCell><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')}><Edit /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts')}><Delete /></IconButton></TableCell></TableRow>);
+                    return filteredProducts.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell><TableCell><Box sx={{ display: 'flex', gap: 0.5 }}><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Edit Product'><Edit /></IconButton><IconButton size='small' color='primary' onClick={() => setProductPointsDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Configure Points'><EmojiEvents /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts')} title='Delete Product'><Delete /></IconButton></Box></TableCell></TableRow>);
                   })()}
                 </TableBody>
               </Table>
             </TableContainer>
           </Box>}
 
-          {((adminTab === 4 && isMainAdmin()) || (adminTab === 3 && !isMainAdmin())) && <Grid container spacing={3}>
+          {((adminTab === 6 && isMainAdmin()) || (adminTab === 5 && !isMainAdmin())) && <Grid container spacing={3}>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Profile Settings</Typography>{!editingProfile ? <Box><Typography variant='body1'><strong>Username:</strong> {user?.username}</Typography><Typography variant='body1'><strong>Email:</strong> {user?.email}</Typography><Button variant='outlined' startIcon={<Edit />} onClick={() => { setEditingProfile(true); setProfileData({ username: user?.username, email: user?.email }); }} sx={{ mt: 2 }}>Edit Profile</Button></Box> : <Box><TextField fullWidth label='Username' value={profileData.username} onChange={(e) => setProfileData({ ...profileData, username: e.target.value })} sx={{ mb: 2 }} /><TextField fullWidth label='Email' type='email' value={profileData.email} onChange={(e) => setProfileData({ ...profileData, email: e.target.value })} sx={{ mb: 2 }} /><Box sx={{ display: 'flex', gap: 1 }}><Button variant='contained' startIcon={<Save />} onClick={handleUpdateProfile} disabled={loading}>Save</Button><Button variant='outlined' startIcon={<Cancel />} onClick={() => setEditingProfile(false)}>Cancel</Button></Box></Box>}</CardContent></Card></Grid>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Change Password</Typography><TextField fullWidth type={showPassword.currentPassword ? 'text' : 'password'} label='Current Password' value={passwordData.currentPassword} onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, currentPassword: !showPassword.currentPassword })} edge="end" size="small">{showPassword.currentPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><TextField fullWidth type={showPassword.newPassword ? 'text' : 'password'} label='New Password' value={passwordData.newPassword} onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, newPassword: !showPassword.newPassword })} edge="end" size="small">{showPassword.newPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><TextField fullWidth type={showPassword.confirmPassword ? 'text' : 'password'} label='Confirm New Password' value={passwordData.confirmPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, confirmPassword: !showPassword.confirmPassword })} edge="end" size="small">{showPassword.confirmPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><Button variant='contained' onClick={handleChangePassword} disabled={loading}>Change Password</Button></CardContent></Card></Grid>
             
@@ -2882,7 +3435,7 @@ function App() {
               </Box>
             </Box></CardContent></Card></Grid>
             
-            {isMainAdmin() && <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>💾 Data Management</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>Backup and restore your application data</Typography><Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}><Button variant='contained' startIcon={<GetApp />} onClick={handleBackupData} disabled={loading} sx={{ minWidth: 150 }}>Create Backup</Button><Button variant='outlined' component='label' startIcon={<Refresh />} disabled={loading} sx={{ minWidth: 150 }}>Restore Backup<input type='file' accept='.json' hidden onChange={handleRestoreData} /></Button></Box><Typography variant='caption' color='text.secondary' sx={{ mt: 2, display: 'block' }}>Backup includes all scans, products, rewards, and user data (excluding passwords)</Typography></CardContent></Card></Grid>}
+            {isMainAdmin() && <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>💾 Data Management</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>Backup and restore your application data</Typography><Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}><Button variant='contained' startIcon={<GetApp />} onClick={handleBackupData} disabled={loading} sx={{ minWidth: 150 }}>Create Backup</Button><Button variant='outlined' component='label' startIcon={<Refresh />} disabled={loading} sx={{ minWidth: 150 }}>Restore Backup<input type='file' accept='.json' hidden onChange={handleRestoreData} /></Button></Box><Typography variant='caption' color='text.secondary' sx={{ mt: 2, display: 'block' }}>Backup includes all scans, products, and user data (excluding passwords)</Typography></CardContent></Card></Grid>}
           </Grid>}
 
           <Dialog open={backupPasswordDialog.open} onClose={() => setBackupPasswordDialog({ open: false, password: '' })} maxWidth='xs' fullWidth>
@@ -3056,13 +3609,53 @@ function App() {
             <DialogContent>
               <TextField fullWidth label='Username' value={userDialog.user?.username || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, username: e.target.value } })} sx={{ mt: 2, mb: 2 }} required />
               <TextField fullWidth label='Email' type='email' value={userDialog.user?.email || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, email: e.target.value } })} sx={{ mb: 2 }} required />
+              
+              {/* Password field for new users */}
               {!userDialog.user?._id && <TextField fullWidth label='Password' type={showPassword.coAdminPassword ? 'text' : 'password'} value={userDialog.user?.password || ''} onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, password: e.target.value } })} sx={{ mb: 2 }} helperText='Minimum 6 characters' required InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, coAdminPassword: !showPassword.coAdminPassword })} edge="end" size="small">{showPassword.coAdminPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} />}
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Role</InputLabel>
-                <Select value={userDialog.user?.role || 'admin'} label='Role' onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, role: e.target.value } })}>
-                  <MenuItem value='admin'>Admin</MenuItem>
-                </Select>
-              </FormControl>
+              
+              {/* Password reset for existing users - only main admin */}
+              {userDialog.user?._id && isMainAdmin() && (
+                <>
+                  <Box sx={{ mb: 2, p: 1.5, bgcolor: 'info.light', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant='body2' color='info.dark' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <strong>Current Password:</strong> ••••••••••• (encrypted for security)
+                    </Typography>
+                  </Box>
+                  <TextField 
+                    fullWidth 
+                    label='New Password (Optional)' 
+                    type={showPassword.resetPassword ? 'text' : 'password'} 
+                    value={userDialog.user?.newPassword || ''} 
+                    onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, newPassword: e.target.value } })} 
+                    sx={{ mb: 2 }} 
+                    helperText='Leave blank to keep current password. Minimum 6 characters to change.' 
+                    InputProps={{ 
+                      endAdornment: ( 
+                        <InputAdornment position="end">
+                          <IconButton 
+                            onClick={() => setShowPassword({ ...showPassword, resetPassword: !showPassword.resetPassword })} 
+                            edge="end" 
+                            size="small"
+                          >
+                            {showPassword.resetPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment> 
+                      ) 
+                    }} 
+                  />
+                </>
+              )}
+              
+              {/* Only show role selector if not main admin */}
+              {userDialog.user?.email !== 'admin@megakem.com' && (
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>Role</InputLabel>
+                  <Select value={userDialog.user?.role || 'admin'} label='Role' onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, role: e.target.value } })}>
+                    <MenuItem value='admin'>Admin</MenuItem>
+                    <MenuItem value='co-admin'>Co-Admin</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
               
               <Typography variant='subtitle2' sx={{ mt: 2, mb: 1, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Security /> Permissions
@@ -3141,6 +3734,295 @@ function App() {
             <DialogActions><Button onClick={() => setUserDialog({ open: false, user: null })}>Cancel</Button><Button variant='contained' onClick={handleCreateUser} disabled={loading} startIcon={loading ? <CircularProgress size={20} color='inherit' /> : (userDialog.user?._id ? <Save /> : <Add />)}>{loading ? (userDialog.user?._id ? 'Saving...' : 'Creating...') : (userDialog.user?._id ? 'Save Changes' : 'Create User')}</Button></DialogActions>
           </Dialog>
 
+          <Dialog open={pointsDialog.open} onClose={() => setPointsDialog({ open: false, user: null, points: '', operation: 'set' })} maxWidth='sm' fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <EmojiEvents color='primary' />
+              Update Loyalty Points
+            </DialogTitle>
+            <DialogContent>
+              {pointsDialog.user && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant='body2' color='text.secondary' gutterBottom>
+                    Member: <strong>{pointsDialog.user.memberName || pointsDialog.user.memberId}</strong> ({pointsDialog.user.memberId})
+                    {pointsDialog.user.role && (
+                      <Chip label={pointsDialog.user.role === 'applicator' ? 'Applicator' : 'Customer'} size='small' color={pointsDialog.user.role === 'applicator' ? 'warning' : 'info'} sx={{ ml: 1 }} />
+                    )}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                    <Chip 
+                      label={`Current Points: ${pointsDialog.user.points || 0}`} 
+                      color='primary' 
+                      sx={{ fontWeight: 700 }}
+                    />
+                    <Chip 
+                      label={`Tier: ${pointsDialog.user.tier ? pointsDialog.user.tier.charAt(0).toUpperCase() + pointsDialog.user.tier.slice(1) : 'Bronze'}`} 
+                      color={
+                        pointsDialog.user.tier === 'platinum' ? 'success' :
+                        pointsDialog.user.tier === 'gold' ? 'warning' :
+                        pointsDialog.user.tier === 'silver' ? 'info' : 'default'
+                      }
+                      sx={{ fontWeight: 600 }}
+                    />
+                  </Box>
+                </Box>
+              )}
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Operation</InputLabel>
+                <Select
+                  value={pointsDialog.operation}
+                  label='Operation'
+                  onChange={(e) => setPointsDialog({ ...pointsDialog, operation: e.target.value })}
+                >
+                  <MenuItem value='set'>Set Points (Replace)</MenuItem>
+                  <MenuItem value='add'>Add Points</MenuItem>
+                  <MenuItem value='subtract'>Subtract Points</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label='Points'
+                type='number'
+                value={pointsDialog.points}
+                onChange={(e) => setPointsDialog({ ...pointsDialog, points: e.target.value })}
+                inputProps={{ min: 0 }}
+                helperText={
+                  pointsDialog.operation === 'set' 
+                    ? 'This will replace the current points value'
+                    : pointsDialog.operation === 'add'
+                    ? 'This will add to the current points'
+                    : 'This will subtract from the current points'
+                }
+                sx={{ mb: 2 }}
+              />
+              {pointsDialog.user && pointsDialog.points && !isNaN(parseInt(pointsDialog.points)) && (
+                <Box sx={{ p: 2, bgcolor: 'primary.50', borderRadius: 1, mb: 2 }}>
+                  <Typography variant='body2' fontWeight={600} gutterBottom>
+                    Result Preview:
+                  </Typography>
+                  <Typography variant='body1'>
+                    {pointsDialog.operation === 'set' 
+                      ? `New Points: ${parseInt(pointsDialog.points)}`
+                      : pointsDialog.operation === 'add'
+                      ? `New Points: ${(pointsDialog.user.points || 0) + parseInt(pointsDialog.points)}`
+                      : `New Points: ${Math.max(0, (pointsDialog.user.points || 0) - parseInt(pointsDialog.points))}`
+                    }
+                  </Typography>
+                </Box>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setPointsDialog({ open: false, user: null, points: '', operation: 'set' })}>
+                Cancel
+              </Button>
+              <Button 
+                variant='contained' 
+                onClick={handleUpdatePoints} 
+                disabled={loading || !pointsDialog.points || isNaN(parseInt(pointsDialog.points))}
+                startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Save />}
+              >
+                {loading ? 'Updating...' : 'Update Points'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Dialog open={loyaltyConfigDialog.open} onClose={() => setLoyaltyConfigDialog({ open: false })} maxWidth='md' fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Settings color='primary' />
+              Configure Cash Reward Tiers
+            </DialogTitle>
+            <DialogContent>
+              <Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>
+                Set the cash reward percentage for each monthly purchase tier. Rewards are calculated cumulatively based on total monthly purchases.
+              </Typography>
+              {loyaltyConfig && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <TextField
+                    fullWidth
+                    label='Tier 1: Rs. 0 - 250,000'
+                    type='number'
+                    value={loyaltyConfig.cashRewardTiers?.tier1 || 4.5}
+                    onChange={(e) => setLoyaltyConfig({
+                      ...loyaltyConfig,
+                      cashRewardTiers: {
+                        ...loyaltyConfig.cashRewardTiers,
+                        tier1: parseFloat(e.target.value) || 0
+                      }
+                    })}
+                    inputProps={{ min: 0, max: 100, step: 0.1 }}
+                    InputProps={{
+                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                    }}
+                    helperText='Percentage rate for first Rs. 250,000 (default: 4.5%)'
+                  />
+                  <TextField
+                    fullWidth
+                    label='Tier 2: Rs. 250,001 - 500,000'
+                    type='number'
+                    value={loyaltyConfig.cashRewardTiers?.tier2 || 5.0}
+                    onChange={(e) => setLoyaltyConfig({
+                      ...loyaltyConfig,
+                      cashRewardTiers: {
+                        ...loyaltyConfig.cashRewardTiers,
+                        tier2: parseFloat(e.target.value) || 0
+                      }
+                    })}
+                    inputProps={{ min: 0, max: 100, step: 0.1 }}
+                    InputProps={{
+                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                    }}
+                    helperText='Percentage rate for next Rs. 250,000 (default: 5.0%)'
+                  />
+                  <TextField
+                    fullWidth
+                    label='Tier 3: Rs. 500,001 - 750,000'
+                    type='number'
+                    value={loyaltyConfig.cashRewardTiers?.tier3 || 5.5}
+                    onChange={(e) => setLoyaltyConfig({
+                      ...loyaltyConfig,
+                      cashRewardTiers: {
+                        ...loyaltyConfig.cashRewardTiers,
+                        tier3: parseFloat(e.target.value) || 0
+                      }
+                    })}
+                    inputProps={{ min: 0, max: 100, step: 0.1 }}
+                    InputProps={{
+                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                    }}
+                    helperText='Percentage rate for next Rs. 250,000 (default: 5.5%)'
+                  />
+                  <TextField
+                    fullWidth
+                    label='Tier 4: Rs. 750,001 - 1,000,000'
+                    type='number'
+                    value={loyaltyConfig.cashRewardTiers?.tier4 || 6.0}
+                    onChange={(e) => setLoyaltyConfig({
+                      ...loyaltyConfig,
+                      cashRewardTiers: {
+                        ...loyaltyConfig.cashRewardTiers,
+                        tier4: parseFloat(e.target.value) || 0
+                      }
+                    })}
+                    inputProps={{ min: 0, max: 100, step: 0.1 }}
+                    InputProps={{
+                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                    }}
+                    helperText='Percentage rate for next Rs. 250,000 (default: 6.0%)'
+                  />
+                  <TextField
+                    fullWidth
+                    label='Tier 5: Above Rs. 1,000,000'
+                    type='number'
+                    value={loyaltyConfig.cashRewardTiers?.tier5 || 6.5}
+                    onChange={(e) => setLoyaltyConfig({
+                      ...loyaltyConfig,
+                      cashRewardTiers: {
+                        ...loyaltyConfig.cashRewardTiers,
+                        tier5: parseFloat(e.target.value) || 0
+                      }
+                    })}
+                    inputProps={{ min: 0, max: 100, step: 0.1 }}
+                    InputProps={{
+                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                    }}
+                    helperText='Percentage rate for purchases above Rs. 1,000,000 (default: 6.5%)'
+                  />
+                  <Box sx={{ p: 2, bgcolor: 'success.lighter', borderRadius: 1, mt: 1 }}>
+                    <Typography variant='body2' fontWeight={600} gutterBottom>Example Calculation:</Typography>
+                    <Typography variant='caption' color='text.secondary' display='block'>
+                      For Rs. 600,000 monthly purchase:
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary' display='block'>
+                      • First Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier1 || 4.5}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100).toLocaleString()}
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary' display='block'>
+                      • Next Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier2 || 5.0}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100).toLocaleString()}
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary' display='block'>
+                      • Balance Rs. 100,000 at {loyaltyConfig.cashRewardTiers?.tier3 || 5.5}% = Rs. {(100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100).toLocaleString()}
+                    </Typography>
+                    <Typography variant='caption' fontWeight={700} color='success.main' display='block' sx={{ mt: 1 }}>
+                      Total Reward = Rs. {((250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100) + (250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100) + (100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100)).toLocaleString()}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
+                    <Typography variant='caption' color='text.secondary'>
+                      <strong>Note:</strong> Percentage rates should typically increase with higher tiers to incentivize larger purchases. Changes will apply to new calculations only.
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setLoyaltyConfigDialog({ open: false })}>
+                Cancel
+              </Button>
+              <Button 
+                variant='contained' 
+                onClick={handleUpdateLoyaltyConfig} 
+                disabled={loading || !loyaltyConfig}
+                startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Save />}
+              >
+                {loading ? 'Saving...' : 'Save Configuration'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Dialog open={productPointsDialog.open} onClose={() => setProductPointsDialog({ open: false, product: null })} maxWidth='sm' fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <EmojiEvents color='primary' />
+              Configure Product Points
+            </DialogTitle>
+            <DialogContent>
+              {productPointsDialog.product && (
+                <>
+                  <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
+                    Product: <strong>{productPointsDialog.product.name}</strong> ({productPointsDialog.product.productNo})
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    label='Points Per Product (Fixed)'
+                    type='number'
+                    value={productPointsDialog.product.pointsPerProduct || ''}
+                    onChange={(e) => setProductPointsDialog({
+                      ...productPointsDialog,
+                      product: {
+                        ...productPointsDialog.product,
+                        pointsPerProduct: e.target.value ? parseInt(e.target.value) : null
+                      }
+                    })}
+                    inputProps={{ min: 0 }}
+                    helperText='Set fixed points for this product (leave empty to use price-based calculation)'
+                    sx={{ mb: 2 }}
+                  />
+                  <Typography variant='body2' fontWeight={600} sx={{ mb: 1 }}>
+                    Points Per Pack Size (Optional)
+                  </Typography>
+                  <Typography variant='caption' color='text.secondary' sx={{ mb: 2, display: 'block' }}>
+                    Set different points for different pack sizes. If not set, will use fixed points or price-based calculation.
+                  </Typography>
+                  <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Typography variant='caption' color='text.secondary'>
+                      Pack size points configuration can be added here. For now, the system uses the fixed points or price-based calculation.
+                    </Typography>
+                  </Box>
+                </>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setProductPointsDialog({ open: false, product: null })}>
+                Cancel
+              </Button>
+              <Button 
+                variant='contained' 
+                onClick={handleUpdateProductPoints} 
+                disabled={loading || !productPointsDialog.product}
+                startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Save />}
+              >
+                {loading ? 'Saving...' : 'Save Points'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
           <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, scanId: null, scanDetails: null })} maxWidth='sm' fullWidth>
             <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main' }}>
               <Delete /> Confirm Delete
@@ -3209,46 +4091,6 @@ function App() {
               </Button>
             </DialogActions>
           </Dialog>
-
-          <Dialog open={rewardDialog.open} onClose={() => setRewardDialog({ open: false, reward: null })} maxWidth="sm" fullWidth>
-            <DialogTitle>Confirm Redemption</DialogTitle>
-            <DialogContent>
-              <Typography variant="body1" gutterBottom>
-                Are you sure you want to redeem <strong>{rewardDialog.reward?.title}</strong>?
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                This will deduct <strong>{rewardDialog.reward?.pointsRequired} points</strong> from your account.
-              </Typography>
-              <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.50', borderRadius: 2 }}>
-                <Typography variant="caption" color="text.secondary">Current Points: {user?.points}</Typography>
-                <Typography variant="h6" fontWeight={700} color="primary">
-                  After: {(user?.points || 0) - (rewardDialog.reward?.pointsRequired || 0)} points
-                </Typography>
-              </Box>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setRewardDialog({ open: false, reward: null })} disabled={loading}>Cancel</Button>
-              <Button onClick={async () => {
-                if (!rewardDialog.reward) return;
-                setLoading(true);
-                try {
-                  await rewardsAPI.redeem(rewardDialog.reward._id);
-                  const userRes = await authAPI.getMe();
-                  setUser(userRes.data.data);
-                  showNotification('Reward redeemed successfully!', 'success');
-                  setRewardDialog({ open: false, reward: null });
-                  const rewardsRes = await rewardsAPI.getAll();
-                  setRewards(rewardsRes.data.data);
-                } catch (error) {
-                  showNotification(error.response?.data?.message || 'Failed to redeem reward', 'error');
-                } finally {
-                  setLoading(false);
-                }
-              }} variant="contained" disabled={loading} sx={{ fontWeight: 600 }}>
-                {loading ? <CircularProgress size={24} /> : 'Confirm Redemption'}
-              </Button>
-            </DialogActions>
-          </Dialog>
         </Box>}
       </Container>
       
@@ -3305,6 +4147,110 @@ function App() {
           © Developed by Eflash24
         </Typography>
       </Box>
+
+      {/* Reward Breakdown Dialog */}
+      <Dialog 
+        open={rewardBreakdownDialog.open} 
+        onClose={() => setRewardBreakdownDialog({ open: false, member: null, breakdown: [] })}
+        maxWidth='md'
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CardGiftcard />
+          Cash Reward Breakdown
+        </DialogTitle>
+        <DialogContent>
+          {rewardBreakdownDialog.member && (
+            <>
+              <Paper sx={{ p: 2, mb: 3, bgcolor: 'primary.50' }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant='body2' color='text.secondary'>
+                      Member
+                    </Typography>
+                    <Typography variant='h6'>
+                      {rewardBreakdownDialog.member.memberName}
+                    </Typography>
+                    <Typography variant='body2' color='text.secondary'>
+                      ID: {rewardBreakdownDialog.member.memberId}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant='body2' color='text.secondary'>
+                      Total Purchase Value
+                    </Typography>
+                    <Typography variant='h5' color='primary.main'>
+                      Rs. {rewardBreakdownDialog.member.totalPurchaseValue?.toLocaleString()}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              <Typography variant='h6' gutterBottom sx={{ mb: 2 }}>
+                Tier-by-Tier Calculation
+              </Typography>
+
+              <TableContainer component={Paper} variant='outlined'>
+                <Table size='small'>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Tier</strong></TableCell>
+                      <TableCell align='right'><strong>Amount</strong></TableCell>
+                      <TableCell align='center'><strong>Rate</strong></TableCell>
+                      <TableCell align='right'><strong>Reward</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rewardBreakdownDialog.breakdown.map((tier, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{tier.tier}</TableCell>
+                        <TableCell align='right'>
+                          Rs. {tier.amount.toLocaleString()}
+                        </TableCell>
+                        <TableCell align='center'>
+                          <Chip label={`${tier.rate}%`} size='small' color='primary' />
+                        </TableCell>
+                        <TableCell align='right'>
+                          <Typography color='success.main' fontWeight='bold'>
+                            Rs. {tier.reward.toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow>
+                      <TableCell colSpan={3} align='right'>
+                        <Typography variant='h6'>
+                          <strong>Total Cash Reward:</strong>
+                        </Typography>
+                      </TableCell>
+                      <TableCell align='right'>
+                        <Typography variant='h6' color='success.main' fontWeight='bold'>
+                          Rs. {rewardBreakdownDialog.member.cashReward?.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1 }}>
+                <Typography variant='body2' color='text.secondary'>
+                  <strong>Note:</strong> Cash rewards are calculated based on tiered percentages. 
+                  The first Rs. 250,000 earns {rewardBreakdownDialog.breakdown[0]?.rate || 4.5}%, 
+                  the next Rs. 250,000 earns {rewardBreakdownDialog.breakdown[1]?.rate || 5.0}%, and so on.
+                </Typography>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button 
+            onClick={() => setRewardBreakdownDialog({ open: false, member: null, breakdown: [] })}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box></ThemeProvider>
   );
 }

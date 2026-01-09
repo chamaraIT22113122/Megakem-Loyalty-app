@@ -1,6 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
+const cron = require('node-cron');
+const fs = require('fs').promises;
+const path = require('path');
 const connectDB = require('./config/database');
 const User = require('./models/User');
 
@@ -41,6 +45,36 @@ const initializeApp = async () => {
 
 initializeApp();
 
+// Backup function
+const backupDatabase = async () => {
+  try {
+    const backupDir = path.join(__dirname, 'backups');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = path.join(backupDir, `backup-${timestamp}`);
+    await fs.mkdir(backupPath, { recursive: true });
+
+    const db = mongoose.connection.db;
+    const collections = await db.listCollections().toArray();
+
+    for (const coll of collections) {
+      const collection = db.collection(coll.name);
+      const data = await collection.find({}).toArray();
+      const filePath = path.join(backupPath, `${coll.name}.json`);
+      await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+    }
+
+    console.log(`✅ Database backup completed: ${backupPath}`);
+  } catch (error) {
+    console.error('❌ Error during backup:', error.message);
+  }
+};
+
+// Schedule daily backup at midnight (0 0 * * *)
+cron.schedule('0 0 * * *', () => {
+  console.log('🔄 Starting scheduled database backup...');
+  backupDatabase();
+});
+
 // Middleware
 const allowedOrigins = [
   'http://localhost:3000',
@@ -75,8 +109,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/scans', require('./routes/scans'));
 app.use('/api/products', require('./routes/products'));
-app.use('/api/rewards', require('./routes/rewards'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/members', require('./routes/members'));
+app.use('/api/loyalty', require('./routes/loyalty'));
+app.use('/api/cash-rewards', require('./routes/cashRewards'));
 
 // Health check
 app.get('/api/health', (req, res) => {
