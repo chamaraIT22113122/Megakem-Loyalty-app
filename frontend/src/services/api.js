@@ -118,6 +118,8 @@ export const analyticsAPI = {
   getLeaderboard: (params) => api.get('/analytics/leaderboard', { params }),
   getUserStats: () => api.get('/analytics/user-stats'),
   export: (params) => api.get('/analytics/export', { params, responseType: 'blob' }),
+  getDailyReport: (date) => api.get('/analytics/daily-report', { params: { date } }),
+  getCalendarData: (year, month) => api.get('/analytics/calendar-data', { params: { year, month } }),
 };
 
 // Members API (Customers & Applicators)

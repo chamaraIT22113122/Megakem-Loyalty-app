@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate } from '@mui/icons-material';
+import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI } from './services/api';
@@ -241,6 +241,16 @@ function App() {
   const [cashRewards, setCashRewards] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
+  const [calendarData, setCalendarData] = useState([]);
+  const [dailyReport, setDailyReport] = useState(null);
+  const [loadingCalendar, setLoadingCalendar] = useState(false);
+  const [showCalendarView, setShowCalendarView] = useState(false);
+  const [calendarViewMonth, setCalendarViewMonth] = useState(new Date().getMonth());
+  const [calendarViewYear, setCalendarViewYear] = useState(new Date().getFullYear());
+  const [dailyReportDialog, setDailyReportDialog] = useState({ open: false, date: null });
+  const [dailyReportTab, setDailyReportTab] = useState(0);
+  const [previousDayReport, setPreviousDayReport] = useState(null);
   const [notificationPrefs, setNotificationPrefs] = useState({ email: true, push: true, autoRefresh: true, soundEnabled: false });
   const [activityLog, setActivityLog] = useState([]);
   const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true });
@@ -920,6 +930,121 @@ function App() {
       console.log('✅ Members reloaded:', membersRes.data.data.length, 'members');
     } catch (error) {
       console.error('❌ Error reloading members:', error);
+    }
+  };
+
+  // Function to load calendar data for the month
+  const loadCalendarData = async (year, month) => {
+    setLoadingCalendar(true);
+    try {
+      const response = await analyticsAPI.getCalendarData(year, month + 1);
+      console.log('📊 Calendar data loaded:', response.data);
+      setCalendarData(response.data.data || []);
+    } catch (error) {
+      console.error('Error loading calendar data:', error);
+      console.error('Error response:', error.response);
+      setCalendarData([]);
+    } finally {
+      setLoadingCalendar(false);
+    }
+  };
+
+  // Function to load daily report
+  const loadDailyReport = async (date) => {
+    setLoadingCalendar(true);
+    setDailyReport(null); // Clear previous report
+    setPreviousDayReport(null);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    // Calculate previous day
+    const prevDate = new Date(date);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prevYear = prevDate.getFullYear();
+    const prevMonth = String(prevDate.getMonth() + 1).padStart(2, '0');
+    const prevDay = String(prevDate.getDate()).padStart(2, '0');
+    const prevDateStr = `${prevYear}-${prevMonth}-${prevDay}`;
+    
+    try {
+      console.log('📅 Loading daily report for:', dateStr);
+      const [currentResponse, previousResponse] = await Promise.all([
+        analyticsAPI.getDailyReport(dateStr),
+        analyticsAPI.getDailyReport(prevDateStr).catch(() => ({ data: { success: false } }))
+      ]);
+      
+      console.log('✅ Daily report loaded:', currentResponse.data);
+      if (currentResponse.data.success) {
+        setDailyReport(currentResponse.data.data);
+      } else {
+        // No data for this date
+        setDailyReport({ 
+          summary: { totalScans: 0, uniqueMembers: 0, uniqueProducts: 0, roleBreakdown: {} },
+          topProducts: [],
+          topMembers: [],
+          hourlyDistribution: {},
+          scans: []
+        });
+      }
+      
+      // Set previous day data for comparison
+      if (previousResponse.data.success) {
+        setPreviousDayReport(previousResponse.data.data);
+      } else {
+        setPreviousDayReport({ 
+          summary: { totalScans: 0, uniqueMembers: 0, uniqueProducts: 0, roleBreakdown: {} }
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error loading daily report:', error);
+      console.error('Error response:', error.response);
+      // Show empty data for no scans on that day
+      setDailyReport({ 
+        summary: { totalScans: 0, uniqueMembers: 0, uniqueProducts: 0, roleBreakdown: {} },
+        topProducts: [],
+        topMembers: [],
+        hourlyDistribution: {},
+        scans: []
+      });
+      setPreviousDayReport({ 
+        summary: { totalScans: 0, uniqueMembers: 0, uniqueProducts: 0, roleBreakdown: {} }
+      });
+    } finally {
+      setLoadingCalendar(false);
+    }
+  };
+
+  // Load calendar data when month changes
+  useEffect(() => {
+    if (showCalendarView && adminAuth) {
+      loadCalendarData(calendarViewYear, calendarViewMonth);
+    }
+  }, [calendarViewYear, calendarViewMonth, showCalendarView, adminAuth]);
+
+  // Load daily report when date is selected
+  const handleCalendarDateChange = (date) => {
+    setSelectedCalendarDate(date);
+    setDailyReportDialog({ open: true, date });
+    loadDailyReport(date);
+  };
+
+  // Navigate calendar months
+  const handlePreviousMonth = () => {
+    if (calendarViewMonth === 0) {
+      setCalendarViewMonth(11);
+      setCalendarViewYear(calendarViewYear - 1);
+    } else {
+      setCalendarViewMonth(calendarViewMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (calendarViewMonth === 11) {
+      setCalendarViewMonth(0);
+      setCalendarViewYear(calendarViewYear + 1);
+    } else {
+      setCalendarViewMonth(calendarViewMonth + 1);
     }
   };
 
@@ -2739,6 +2864,162 @@ function App() {
           </Paper>
 
           {adminTab === 0 && stats && <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+            {/* Calendar Toggle Button */}
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant='h5' sx={{ fontWeight: 700 }}>
+                  Dashboard Overview
+                </Typography>
+                <Button
+                  variant={showCalendarView ? 'contained' : 'outlined'}
+                  startIcon={<CalendarMonth />}
+                  onClick={() => {
+                    setShowCalendarView(!showCalendarView);
+                    if (!showCalendarView) {
+                      const today = new Date();
+                      setCalendarViewMonth(today.getMonth());
+                      setCalendarViewYear(today.getFullYear());
+                      setSelectedCalendarDate(today);
+                      setDailyReport(null); // Clear any previous report
+                      loadCalendarData(today.getFullYear(), today.getMonth());
+                    }
+                  }}
+                  sx={{ fontWeight: 600 }}
+                >
+                  {showCalendarView ? 'Hide Calendar' : 'Show Calendar View'}
+                </Button>
+              </Box>
+            </Grid>
+
+            {/* Calendar View Section */}
+            {showCalendarView && (
+              <>
+                <Grid item xs={12}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography variant='h6' gutterBottom sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CalendarMonth /> Sales & Scans Calendar
+                      </Typography>
+                      
+                      {/* Custom Calendar Header */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, px: 1 }}>
+                        <IconButton onClick={handlePreviousMonth} size='small'>
+                          <NavigateBefore />
+                        </IconButton>
+                        <Typography variant='subtitle1' sx={{ fontWeight: 600 }}>
+                          {new Date(calendarViewYear, calendarViewMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </Typography>
+                        <IconButton onClick={handleNextMonth} size='small'>
+                          <NavigateNext />
+                        </IconButton>
+                      </Box>
+
+                      {/* Calendar Grid */}
+                      <Box sx={{ width: '100%' }}>
+                        {/* Day Labels */}
+                        <Grid container spacing={0} sx={{ mb: 1 }}>
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                            <Grid item xs key={day} sx={{ textAlign: 'center' }}>
+                              <Typography variant='caption' sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                                {day}
+                              </Typography>
+                            </Grid>
+                          ))}
+                        </Grid>
+
+                        {/* Calendar Days */}
+                        <Grid container spacing={0.5}>
+                          {(() => {
+                            const firstDay = new Date(calendarViewYear, calendarViewMonth, 1).getDay();
+                            const daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
+                            const today = new Date();
+                            const isCurrentMonth = today.getMonth() === calendarViewMonth && today.getFullYear() === calendarViewYear;
+                            
+                            const days = [];
+                            
+                            // Empty cells before first day
+                            for (let i = 0; i < firstDay; i++) {
+                              days.push(
+                                <Grid item xs key={`empty-${i}`} sx={{ aspectRatio: '1/1' }}>
+                                  <Box sx={{ height: '100%' }} />
+                                </Grid>
+                              );
+                            }
+                            
+                            // Calendar days
+                            for (let day = 1; day <= daysInMonth; day++) {
+                              const dayData = calendarData.find(d => d.date === day);
+                              const hasScanData = dayData && dayData.scans > 0;
+                              const isToday = isCurrentMonth && today.getDate() === day;
+                              const isSelected = selectedCalendarDate && 
+                                                selectedCalendarDate.getDate() === day && 
+                                                selectedCalendarDate.getMonth() === calendarViewMonth &&
+                                                selectedCalendarDate.getFullYear() === calendarViewYear;
+                              
+                              days.push(
+                                <Grid item xs key={day} sx={{ aspectRatio: '1/1' }}>
+                                  <Badge
+                                    badgeContent={hasScanData ? dayData.scans : undefined}
+                                    color='primary'
+                                    sx={{
+                                      width: '100%',
+                                      height: '100%',
+                                      '& .MuiBadge-badge': {
+                                        fontSize: '0.6rem',
+                                        height: '16px',
+                                        minWidth: '16px',
+                                        padding: '0 4px'
+                                      }
+                                    }}
+                                  >
+                                    <ButtonBase
+                                      onClick={() => handleCalendarDateChange(new Date(calendarViewYear, calendarViewMonth, day))}
+                                      sx={{
+                                        width: '100%',
+                                        height: '100%',
+                                        minHeight: 40,
+                                        borderRadius: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        bgcolor: hasScanData ? 'success.lighter' : 'transparent',
+                                        border: isToday ? '2px solid' : isSelected ? '2px solid' : '1px solid transparent',
+                                        borderColor: isToday ? 'primary.main' : isSelected ? 'primary.dark' : 'transparent',
+                                        fontWeight: isSelected || isToday ? 700 : 400,
+                                        color: isSelected ? 'primary.main' : isToday ? 'primary.main' : 'text.primary',
+                                        '&:hover': {
+                                          bgcolor: hasScanData ? 'success.light' : 'action.hover'
+                                        }
+                                      }}
+                                    >
+                                      <Typography variant='body2' sx={{ fontWeight: 'inherit' }}>
+                                        {day}
+                                      </Typography>
+                                    </ButtonBase>
+                                  </Badge>
+                                </Grid>
+                              );
+                            }
+                            
+                            return days;
+                          })()}
+                        </Grid>
+                      </Box>
+
+                      <Box sx={{ mt: 2, p: 2, bgcolor: 'info.lighter', borderRadius: 2 }}>
+                        <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5 }}>
+                          💡 Tip: Click on any date to view detailed daily report
+                        </Typography>
+                        <Typography variant='caption' color='text.secondary'>
+                          📊 Badges show number of scans per day
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </>
+            )}
+
             <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.total}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Total Scans</Typography></CardContent></Card></Grid>
             <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.applicator}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Applicators</Typography></CardContent></Card></Grid>
             <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.customer}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Customers</Typography></CardContent></Card></Grid>
@@ -4688,6 +4969,1237 @@ function App() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button 
             onClick={() => setRewardBreakdownDialog({ open: false, member: null, breakdown: [] })}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Advanced Daily Report Dialog */}
+      <Dialog 
+        open={dailyReportDialog.open} 
+        onClose={() => {
+          setDailyReportDialog({ open: false, date: null });
+          setDailyReportTab(0);
+        }}
+        maxWidth='lg'
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            maxHeight: '90vh'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', 
+          color: 'white',
+          pb: 0
+        }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box>
+              <Typography variant='h6' sx={{ fontWeight: 700 }}>
+                📊 Advanced Daily Report
+              </Typography>
+              {dailyReportDialog.date && (
+                <Typography variant='caption' sx={{ opacity: 0.9 }}>
+                  {new Date(dailyReportDialog.date).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    month: 'long', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })}
+                </Typography>
+              )}
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {dailyReportDialog.date && (
+                <Chip 
+                  label={new Date(dailyReportDialog.date).toLocaleDateString('en-US', { weekday: 'short' })} 
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    fontWeight: 600
+                  }}
+                  size='small'
+                />
+              )}
+              <Tooltip title='Export Advanced Report to Excel'>
+                <IconButton 
+                  size='small' 
+                  sx={{ color: 'white' }}
+                  onClick={() => {
+                    if (dailyReport && dailyReport.summary) {
+                      try {
+                        const wb = XLSX.utils.book_new();
+                        const reportDate = new Date(dailyReportDialog.date);
+                        const dateStr = reportDate.toLocaleDateString('en-US', { 
+                          weekday: 'long', 
+                          month: 'long', 
+                          day: 'numeric', 
+                          year: 'numeric' 
+                        });
+
+                        // SHEET 1: Executive Summary
+                        const summaryData = [
+                          ['MEGAKEM LOYALTY PROGRAM'],
+                          ['DAILY REPORT - EXECUTIVE SUMMARY'],
+                          [dateStr],
+                          ['Generated:', new Date().toLocaleString()],
+                          [],
+                          ['KEY METRICS', ''],
+                          ['Metric', 'Value'],
+                          ['Total Scans', dailyReport.summary.totalScans],
+                          ['Unique Active Members', dailyReport.summary.uniqueMembers],
+                          ['Unique Products Scanned', dailyReport.summary.uniqueProducts],
+                          ['Applicators', dailyReport.summary.roleBreakdown?.applicator || 0],
+                          ['Customers', dailyReport.summary.roleBreakdown?.customer || 0],
+                          [],
+                          ['PERFORMANCE INDICATORS', ''],
+                          ...(dailyReport.summary.totalScans > 0 ? [
+                            ['Average Scans per Member', (dailyReport.summary.totalScans / dailyReport.summary.uniqueMembers).toFixed(2)],
+                            ['Average Scans per Product', (dailyReport.summary.totalScans / dailyReport.summary.uniqueProducts).toFixed(2)],
+                          ] : []),
+                          ...(previousDayReport ? [
+                            [],
+                            ['DAY-OVER-DAY COMPARISON', ''],
+                            ['Previous Day Total Scans', previousDayReport.summary.totalScans],
+                            ['Change in Scans', dailyReport.summary.totalScans - previousDayReport.summary.totalScans],
+                            ['% Change', previousDayReport.summary.totalScans > 0 
+                              ? `${((dailyReport.summary.totalScans - previousDayReport.summary.totalScans) / previousDayReport.summary.totalScans * 100).toFixed(2)}%`
+                              : 'N/A'
+                            ],
+                            ['Previous Day Active Members', previousDayReport.summary.uniqueMembers],
+                            ['Change in Members', dailyReport.summary.uniqueMembers - previousDayReport.summary.uniqueMembers],
+                          ] : [])
+                        ];
+                        
+                        const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+                        
+                        // Style the summary sheet
+                        wsSummary['!cols'] = [
+                          { wch: 30 },
+                          { wch: 20 }
+                        ];
+                        
+                        // Merge cells for title
+                        wsSummary['!merges'] = [
+                          { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
+                          { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
+                          { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } }
+                        ];
+
+                        XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+                        // SHEET 2: Top Products (All)
+                        if (dailyReport.topProducts && dailyReport.topProducts.length > 0) {
+                          const productsData = [
+                            ['TOP PRODUCTS ANALYSIS'],
+                            [dateStr],
+                            [],
+                            ['Rank', 'Product Name', 'Product Code', 'Total Scans', '% of Total', 'Category'],
+                            ...dailyReport.topProducts.map((product, i) => [
+                              i + 1,
+                              product.productName,
+                              product.productNo,
+                              product.count,
+                              `${((product.count / dailyReport.summary.totalScans) * 100).toFixed(2)}%`,
+                              product.category || 'N/A'
+                            ]),
+                            [],
+                            ['SUMMARY STATISTICS', ''],
+                            ['Total Products Scanned', dailyReport.summary.uniqueProducts],
+                            ['Total Scans', dailyReport.summary.totalScans],
+                            ['Most Popular Product', dailyReport.topProducts[0]?.productName],
+                            ['Top Product Scans', dailyReport.topProducts[0]?.count],
+                            ['Top Product Share', `${((dailyReport.topProducts[0]?.count / dailyReport.summary.totalScans) * 100).toFixed(2)}%`]
+                          ];
+
+                          const wsProducts = XLSX.utils.aoa_to_sheet(productsData);
+                          wsProducts['!cols'] = [
+                            { wch: 8 },
+                            { wch: 40 },
+                            { wch: 15 },
+                            { wch: 12 },
+                            { wch: 12 },
+                            { wch: 15 }
+                          ];
+                          wsProducts['!merges'] = [
+                            { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+                            { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }
+                          ];
+                          
+                          XLSX.utils.book_append_sheet(wb, wsProducts, 'Top Products');
+                        }
+
+                        // SHEET 3: Top Members (All)
+                        if (dailyReport.topMembers && dailyReport.topMembers.length > 0) {
+                          const membersData = [
+                            ['TOP ACTIVE MEMBERS ANALYSIS'],
+                            [dateStr],
+                            [],
+                            ['Rank', 'Member Name', 'Member ID', 'Role', 'Location', 'Total Scans', '% of Total', 'Avg per Hour'],
+                            ...dailyReport.topMembers.map((member, i) => [
+                              i + 1,
+                              member.memberName,
+                              member.memberId || 'N/A',
+                              member.role,
+                              member.location || 'N/A',
+                              member.count,
+                              `${((member.count / dailyReport.summary.totalScans) * 100).toFixed(2)}%`,
+                              (member.count / 8).toFixed(2) // Assuming 8-hour workday
+                            ]),
+                            [],
+                            ['MEMBER STATISTICS', ''],
+                            ['Total Active Members', dailyReport.summary.uniqueMembers],
+                            ['Total Applicators', dailyReport.summary.roleBreakdown?.applicator || 0],
+                            ['Total Customers', dailyReport.summary.roleBreakdown?.customer || 0],
+                            ['Most Active Member', dailyReport.topMembers[0]?.memberName],
+                            ['Top Member Scans', dailyReport.topMembers[0]?.count],
+                            ['Average Scans per Member', (dailyReport.summary.totalScans / dailyReport.summary.uniqueMembers).toFixed(2)]
+                          ];
+
+                          const wsMembers = XLSX.utils.aoa_to_sheet(membersData);
+                          wsMembers['!cols'] = [
+                            { wch: 8 },
+                            { wch: 30 },
+                            { wch: 15 },
+                            { wch: 12 },
+                            { wch: 20 },
+                            { wch: 12 },
+                            { wch: 12 },
+                            { wch: 12 }
+                          ];
+                          wsMembers['!merges'] = [
+                            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+                            { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
+                          ];
+                          
+                          XLSX.utils.book_append_sheet(wb, wsMembers, 'Top Members');
+                        }
+
+                        // SHEET 4: Hourly Distribution
+                        if (dailyReport.hourlyDistribution && Object.keys(dailyReport.hourlyDistribution).length > 0) {
+                          const hourlyEntries = Object.entries(dailyReport.hourlyDistribution).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+                          const hourlyData = [
+                            ['HOURLY ACTIVITY DISTRIBUTION'],
+                            [dateStr],
+                            [],
+                            ['Hour', 'Time', 'Scans', '% of Total', 'Cumulative Scans', 'Cumulative %'],
+                            ...hourlyEntries.map(([hour, count], i) => {
+                              const cumulative = hourlyEntries.slice(0, i + 1).reduce((sum, [, c]) => sum + c, 0);
+                              return [
+                                parseInt(hour),
+                                `${hour}:00 - ${hour}:59`,
+                                count,
+                                `${((count / dailyReport.summary.totalScans) * 100).toFixed(2)}%`,
+                                cumulative,
+                                `${((cumulative / dailyReport.summary.totalScans) * 100).toFixed(2)}%`
+                              ];
+                            }),
+                            [],
+                            ['HOURLY ANALYSIS', ''],
+                            ['Peak Hour', `${Object.entries(dailyReport.hourlyDistribution).reduce((max, [hour, count]) => count > max.count ? { hour, count } : max, { hour: 0, count: 0 }).hour}:00`],
+                            ['Peak Hour Scans', Object.entries(dailyReport.hourlyDistribution).reduce((max, [hour, count]) => count > max.count ? { hour, count } : max, { hour: 0, count: 0 }).count],
+                            ['Morning Activity (6-12)', Object.entries(dailyReport.hourlyDistribution).filter(([h]) => parseInt(h) >= 6 && parseInt(h) < 12).reduce((sum, [, c]) => sum + c, 0)],
+                            ['Afternoon Activity (12-18)', Object.entries(dailyReport.hourlyDistribution).filter(([h]) => parseInt(h) >= 12 && parseInt(h) < 18).reduce((sum, [, c]) => sum + c, 0)],
+                            ['Evening Activity (18-24)', Object.entries(dailyReport.hourlyDistribution).filter(([h]) => parseInt(h) >= 18).reduce((sum, [, c]) => sum + c, 0)]
+                          ];
+
+                          const wsHourly = XLSX.utils.aoa_to_sheet(hourlyData);
+                          wsHourly['!cols'] = [
+                            { wch: 8 },
+                            { wch: 15 },
+                            { wch: 12 },
+                            { wch: 12 },
+                            { wch: 15 },
+                            { wch: 15 }
+                          ];
+                          wsHourly['!merges'] = [
+                            { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+                            { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }
+                          ];
+                          
+                          XLSX.utils.book_append_sheet(wb, wsHourly, 'Hourly Activity');
+                        }
+
+                        // SHEET 5: Detailed Scans (if available)
+                        if (dailyReport.scans && dailyReport.scans.length > 0) {
+                          const scansData = [
+                            ['DETAILED SCAN LOG'],
+                            [dateStr],
+                            [],
+                            ['#', 'Time', 'Member Name', 'Member ID', 'Role', 'Product Name', 'Product Code', 'Location', 'Points Earned'],
+                            ...dailyReport.scans.map((scan, i) => {
+                              // Handle multiple date field options
+                              let timeStr = 'N/A';
+                              try {
+                                const dateValue = scan.scannedAt || scan.createdAt || scan.timestamp || scan.date;
+                                if (dateValue) {
+                                  const date = new Date(dateValue);
+                                  if (!isNaN(date.getTime())) {
+                                    timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                                  }
+                                }
+                              } catch (e) {
+                                timeStr = 'Invalid';
+                              }
+                              
+                              return [
+                                i + 1,
+                                timeStr,
+                                scan.memberName || 'N/A',
+                                scan.memberId || 'N/A',
+                                scan.role || 'N/A',
+                                scan.productName || 'N/A',
+                                scan.productNo || 'N/A',
+                                scan.location || 'N/A',
+                                scan.pointsEarned || 0
+                              ];
+                            }),
+                            [],
+                            ['TOTAL SCANS', dailyReport.scans.length]
+                          ];
+
+                          const wsScans = XLSX.utils.aoa_to_sheet(scansData);
+                          wsScans['!cols'] = [
+                            { wch: 6 },
+                            { wch: 12 },
+                            { wch: 25 },
+                            { wch: 15 },
+                            { wch: 12 },
+                            { wch: 35 },
+                            { wch: 15 },
+                            { wch: 20 },
+                            { wch: 12 }
+                          ];
+                          wsScans['!merges'] = [
+                            { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+                            { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }
+                          ];
+                          
+                          XLSX.utils.book_append_sheet(wb, wsScans, 'Detailed Scans');
+                        }
+
+                        // SHEET 6: Comparison (if previous day data exists)
+                        if (previousDayReport && previousDayReport.summary) {
+                          const prevDate = new Date(reportDate);
+                          prevDate.setDate(prevDate.getDate() - 1);
+                          
+                          const comparisonData = [
+                            ['DAY-OVER-DAY COMPARISON ANALYSIS'],
+                            ['Current Day:', dateStr],
+                            ['Previous Day:', prevDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })],
+                            [],
+                            ['Metric', 'Previous Day', 'Current Day', 'Change', '% Change', 'Status'],
+                            [
+                              'Total Scans',
+                              previousDayReport.summary.totalScans,
+                              dailyReport.summary.totalScans,
+                              dailyReport.summary.totalScans - previousDayReport.summary.totalScans,
+                              previousDayReport.summary.totalScans > 0 
+                                ? `${((dailyReport.summary.totalScans - previousDayReport.summary.totalScans) / previousDayReport.summary.totalScans * 100).toFixed(2)}%`
+                                : 'N/A',
+                              dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? 'Improved' : 'Declined'
+                            ],
+                            [
+                              'Active Members',
+                              previousDayReport.summary.uniqueMembers,
+                              dailyReport.summary.uniqueMembers,
+                              dailyReport.summary.uniqueMembers - previousDayReport.summary.uniqueMembers,
+                              previousDayReport.summary.uniqueMembers > 0 
+                                ? `${((dailyReport.summary.uniqueMembers - previousDayReport.summary.uniqueMembers) / previousDayReport.summary.uniqueMembers * 100).toFixed(2)}%`
+                                : 'N/A',
+                              dailyReport.summary.uniqueMembers >= previousDayReport.summary.uniqueMembers ? 'Improved' : 'Declined'
+                            ],
+                            [
+                              'Products Scanned',
+                              previousDayReport.summary.uniqueProducts,
+                              dailyReport.summary.uniqueProducts,
+                              dailyReport.summary.uniqueProducts - previousDayReport.summary.uniqueProducts,
+                              previousDayReport.summary.uniqueProducts > 0 
+                                ? `${((dailyReport.summary.uniqueProducts - previousDayReport.summary.uniqueProducts) / previousDayReport.summary.uniqueProducts * 100).toFixed(2)}%`
+                                : 'N/A',
+                              dailyReport.summary.uniqueProducts >= previousDayReport.summary.uniqueProducts ? 'Improved' : 'Declined'
+                            ],
+                            [
+                              'Applicators',
+                              previousDayReport.summary.roleBreakdown?.applicator || 0,
+                              dailyReport.summary.roleBreakdown?.applicator || 0,
+                              (dailyReport.summary.roleBreakdown?.applicator || 0) - (previousDayReport.summary.roleBreakdown?.applicator || 0),
+                              (previousDayReport.summary.roleBreakdown?.applicator || 0) > 0 
+                                ? `${(((dailyReport.summary.roleBreakdown?.applicator || 0) - (previousDayReport.summary.roleBreakdown?.applicator || 0)) / (previousDayReport.summary.roleBreakdown?.applicator || 0) * 100).toFixed(2)}%`
+                                : 'N/A',
+                              (dailyReport.summary.roleBreakdown?.applicator || 0) >= (previousDayReport.summary.roleBreakdown?.applicator || 0) ? 'Improved' : 'Declined'
+                            ],
+                            [
+                              'Customers',
+                              previousDayReport.summary.roleBreakdown?.customer || 0,
+                              dailyReport.summary.roleBreakdown?.customer || 0,
+                              (dailyReport.summary.roleBreakdown?.customer || 0) - (previousDayReport.summary.roleBreakdown?.customer || 0),
+                              (previousDayReport.summary.roleBreakdown?.customer || 0) > 0 
+                                ? `${(((dailyReport.summary.roleBreakdown?.customer || 0) - (previousDayReport.summary.roleBreakdown?.customer || 0)) / (previousDayReport.summary.roleBreakdown?.customer || 0) * 100).toFixed(2)}%`
+                                : 'N/A',
+                              (dailyReport.summary.roleBreakdown?.customer || 0) >= (previousDayReport.summary.roleBreakdown?.customer || 0) ? 'Improved' : 'Declined'
+                            ],
+                            [],
+                            ['PERFORMANCE SUMMARY', ''],
+                            ['Metrics Improved', [
+                              dailyReport.summary.totalScans >= previousDayReport.summary.totalScans,
+                              dailyReport.summary.uniqueMembers >= previousDayReport.summary.uniqueMembers,
+                              dailyReport.summary.uniqueProducts >= previousDayReport.summary.uniqueProducts
+                            ].filter(Boolean).length + ' out of 3 key metrics'],
+                            ['Overall Trend', dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? 'Positive Growth' : 'Needs Attention']
+                          ];
+
+                          const wsComparison = XLSX.utils.aoa_to_sheet(comparisonData);
+                          wsComparison['!cols'] = [
+                            { wch: 20 },
+                            { wch: 15 },
+                            { wch: 15 },
+                            { wch: 12 },
+                            { wch: 12 },
+                            { wch: 12 }
+                          ];
+                          wsComparison['!merges'] = [
+                            { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+                            { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+                            { s: { r: 2, c: 0 }, e: { r: 2, c: 5 } }
+                          ];
+                          
+                          XLSX.utils.book_append_sheet(wb, wsComparison, 'Comparison');
+                        }
+
+                        // Generate filename
+                        const filename = `Megakem_Daily_Report_${reportDate.toISOString().split('T')[0]}_Advanced.xlsx`;
+                        
+                        // Write file
+                        XLSX.writeFile(wb, filename);
+                        
+                        setSnackbar({ 
+                          open: true, 
+                          message: `📊 Advanced report exported successfully! (${Object.keys(wb.Sheets).length} sheets)`, 
+                          severity: 'success' 
+                        });
+                      } catch (error) {
+                        console.error('Export error:', error);
+                        setSnackbar({ 
+                          open: true, 
+                          message: 'Failed to export report. Please try again.', 
+                          severity: 'error' 
+                        });
+                      }
+                    }
+                  }}
+                >
+                  <FileDownload />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+          <Tabs 
+            value={dailyReportTab} 
+            onChange={(e, v) => setDailyReportTab(v)}
+            textColor='inherit'
+            TabIndicatorProps={{ style: { backgroundColor: 'white' } }}
+            variant='scrollable'
+            scrollButtons='auto'
+          >
+            <Tab label='Overview' sx={{ color: 'rgba(255,255,255,0.7)', '&.Mui-selected': { color: 'white' } }} />
+            <Tab label='Comparisons' sx={{ color: 'rgba(255,255,255,0.7)', '&.Mui-selected': { color: 'white' } }} />
+            <Tab label='Analytics' sx={{ color: 'rgba(255,255,255,0.7)', '&.Mui-selected': { color: 'white' } }} />
+            <Tab label='Details' sx={{ color: 'rgba(255,255,255,0.7)', '&.Mui-selected': { color: 'white' } }} />
+          </Tabs>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {loadingCalendar ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+              <CircularProgress size={60} />
+              <Typography variant='body2' color='text.secondary' sx={{ mt: 2 }}>
+                Loading advanced analytics...
+              </Typography>
+            </Box>
+          ) : dailyReport && dailyReport.summary ? (
+            <>
+              {/* Tab 0: Overview */}
+              {dailyReportTab === 0 && (
+                <>
+                  {dailyReport.summary.totalScans === 0 && (
+                    <Box sx={{ textAlign: 'center', py: 4, bgcolor: 'info.lighter', borderRadius: 2, mb: 3 }}>
+                      <Typography variant='h6' color='text.secondary' sx={{ mb: 1 }}>
+                        📭 No Scans Recorded
+                      </Typography>
+                      <Typography variant='body2' color='text.secondary'>
+                        There were no product scans on this date
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Enhanced Summary Cards with Trends */}
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={6} md={3}>
+                      <Paper sx={{ p: 2, bgcolor: 'primary.lighter', position: 'relative', overflow: 'hidden' }}>
+                        <Box sx={{ position: 'relative', zIndex: 1 }}>
+                          <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                            {dailyReport.summary.totalScans}
+                          </Typography>
+                          <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 1 }}>
+                            Total Scans
+                          </Typography>
+                          {previousDayReport && (
+                            <Chip 
+                              label={
+                                previousDayReport.summary.totalScans > 0
+                                  ? `${((dailyReport.summary.totalScans - previousDayReport.summary.totalScans) / previousDayReport.summary.totalScans * 100).toFixed(1)}%`
+                                  : dailyReport.summary.totalScans > 0 ? '+100%' : '0%'
+                              }
+                              size='small'
+                              color={dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? 'success' : 'error'}
+                              icon={dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? <TrendingUp /> : <TrendingUp style={{ transform: 'rotate(180deg)' }} />}
+                              sx={{ fontSize: '0.7rem', height: 20 }}
+                            />
+                          )}
+                        </Box>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                      <Paper sx={{ p: 2, bgcolor: 'success.lighter', position: 'relative', overflow: 'hidden' }}>
+                        <Box sx={{ position: 'relative', zIndex: 1 }}>
+                          <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                            {dailyReport.summary.uniqueMembers > 0 
+                              ? (dailyReport.summary.totalScans / dailyReport.summary.uniqueMembers).toFixed(1)
+                              : '0'}
+                          </Typography>
+                          <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 1 }}>
+                            Avg Scans/Member
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Chip 
+                              label={`${dailyReport.summary.roleBreakdown?.applicator || 0} Applicators`}
+                              size='small'
+                              color='warning'
+                              sx={{ fontSize: '0.7rem', height: 20 }}
+                            />
+                            <Chip 
+                              label={`${dailyReport.summary.roleBreakdown?.customer || 0} Customers`}
+                              size='small'
+                              color='info'
+                              sx={{ fontSize: '0.7rem', height: 20 }}
+                            />
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                      <Paper sx={{ p: 2, bgcolor: 'warning.lighter', position: 'relative', overflow: 'hidden' }}>
+                        <Box sx={{ position: 'relative', zIndex: 1 }}>
+                          <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                            {(() => {
+                              if (dailyReport.hourlyDistribution && Object.keys(dailyReport.hourlyDistribution).length > 0) {
+                                const peak = Object.entries(dailyReport.hourlyDistribution).reduce(
+                                  (max, [hour, count]) => count > max.count ? { hour, count } : max, 
+                                  { hour: '0', count: 0 }
+                                );
+                                return `${peak.hour}:00`;
+                              }
+                              return 'N/A';
+                            })()}
+                          </Typography>
+                          <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 1 }}>
+                            Peak Hour
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Chip 
+                              label={`${dailyReport.summary.uniqueProducts} Products`}
+                              size='small'
+                              color='primary'
+                              sx={{ fontSize: '0.7rem', height: 20 }}
+                            />
+                            <Chip 
+                              label={`${dailyReport.summary.uniqueMembers} Members`}
+                              size='small'
+                              color='success'
+                              sx={{ fontSize: '0.7rem', height: 20 }}
+                            />
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                      <Paper sx={{ p: 2, bgcolor: 'info.lighter', position: 'relative', overflow: 'hidden' }}>
+                        <Box sx={{ position: 'relative', zIndex: 1 }}>
+                          <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                            Rs. {(() => {
+                              if (dailyReport.scans && dailyReport.scans.length > 0) {
+                                const totalValue = dailyReport.scans.reduce((sum, scan) => {
+                                  // Try to get price from scan or find matching product
+                                  const scanPrice = scan.price || 0;
+                                  const productMatch = products.find(p => 
+                                    p.productNo.toUpperCase() === (scan.productNo || '').toUpperCase() && 
+                                    p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+                                  );
+                                  const price = productMatch ? productMatch.price : scanPrice;
+                                  return sum + price;
+                                }, 0);
+                                return totalValue.toLocaleString();
+                              }
+                              return '0';
+                            })()}
+                          </Typography>
+                          <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>
+                            Estimated Sales
+                          </Typography>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+
+                  {/* Quick Insights */}
+                  {dailyReport.summary.totalScans > 0 && (
+                    <Paper sx={{ p: 2, mb: 3, bgcolor: 'secondary.lighter', borderLeft: '4px solid', borderLeftColor: 'secondary.main' }}>
+                      <Typography variant='subtitle2' sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Assessment /> Key Insights
+                      </Typography>
+                      <Grid container spacing={1}>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant='body2'>
+                            • Avg scans per member: <strong>{(dailyReport.summary.totalScans / dailyReport.summary.uniqueMembers).toFixed(1)}</strong>
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant='body2'>
+                            • Avg scans per product: <strong>{(dailyReport.summary.totalScans / dailyReport.summary.uniqueProducts).toFixed(1)}</strong>
+                          </Typography>
+                        </Grid>
+                        {dailyReport.hourlyDistribution && Object.keys(dailyReport.hourlyDistribution).length > 0 && (
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant='body2'>
+                              • Peak hour: <strong>{Object.entries(dailyReport.hourlyDistribution).reduce((max, [hour, count]) => count > max.count ? { hour, count } : max, { hour: 0, count: 0 }).hour}:00</strong>
+                            </Typography>
+                          </Grid>
+                        )}
+                        {dailyReport.topProducts && dailyReport.topProducts.length > 0 && (
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant='body2'>
+                              • Most popular: <strong>{dailyReport.topProducts[0]?.productName?.substring(0, 25)}...</strong>
+                            </Typography>
+                          </Grid>
+                        )}
+                      </Grid>
+                    </Paper>
+                  )}
+
+                  {/* Top Products */}
+                  <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Inventory2 /> Top 5 Products
+                  </Typography>
+                  <TableContainer component={Paper} sx={{ mb: 3 }}>
+                    <Table size='small'>
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: 'grey.100' }}>
+                          <TableCell sx={{ fontWeight: 700 }}>Rank</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Code</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>Scans</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>% of Total</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {dailyReport.topProducts && dailyReport.topProducts.length > 0 ? (
+                          dailyReport.topProducts.slice(0, 5).map((product, i) => (
+                            <TableRow key={i} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                              <TableCell>
+                                <Chip 
+                                  label={i + 1} 
+                                  size='small' 
+                                  color={i === 0 ? 'primary' : 'default'}
+                                  sx={{ width: 32, height: 24 }}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant='body2' fontWeight={i === 0 ? 700 : 400}>
+                                  {product.productName}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={product.productNo} size='small' variant='outlined' />
+                              </TableCell>
+                              <TableCell align='right'>
+                                <strong>{product.count}</strong>
+                              </TableCell>
+                              <TableCell align='right'>
+                                <Typography variant='body2' color='text.secondary'>
+                                  {((product.count / dailyReport.summary.totalScans) * 100).toFixed(1)}%
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={5} align='center'>
+                              <Typography variant='body2' color='text.secondary' sx={{ py: 2 }}>
+                                No products scanned on this day
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+
+                  {/* Top Members */}
+                  <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <People /> Top Active Members
+                  </Typography>
+                  <TableContainer component={Paper}>
+                    <Table size='small'>
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: 'grey.100' }}>
+                          <TableCell sx={{ fontWeight: 700 }}>Rank</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Member</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>Scans</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>% of Total</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {dailyReport.topMembers && dailyReport.topMembers.length > 0 ? (
+                          dailyReport.topMembers.map((member, i) => (
+                            <TableRow key={i} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                              <TableCell>
+                                <Chip 
+                                  label={i + 1} 
+                                  size='small' 
+                                  color={i === 0 ? 'success' : 'default'}
+                                  sx={{ width: 32, height: 24 }}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant='body2' fontWeight={i === 0 ? 700 : 400}>
+                                  {member.memberName}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Chip 
+                                  label={member.role} 
+                                  size='small' 
+                                  color={member.role === 'applicator' ? 'warning' : 'info'}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant='body2' color='text.secondary'>
+                                  {member.location || 'N/A'}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align='right'>
+                                <strong>{member.count}</strong>
+                              </TableCell>
+                              <TableCell align='right'>
+                                <Typography variant='body2' color='text.secondary'>
+                                  {((member.count / dailyReport.summary.totalScans) * 100).toFixed(1)}%
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={6} align='center'>
+                              <Typography variant='body2' color='text.secondary' sx={{ py: 2 }}>
+                                No member activity on this day
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              )}
+
+              {/* Tab 1: Comparisons */}
+              {dailyReportTab === 1 && (
+                <>
+                  <Typography variant='h6' sx={{ fontWeight: 700, mb: 3 }}>
+                    📈 Day-over-Day Comparison
+                  </Typography>
+                  
+                  {previousDayReport && (
+                    <>
+                      {/* Comparison Summary */}
+                      <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid item xs={12} md={4}>
+                          <Paper sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography variant='body2' color='text.secondary' gutterBottom>
+                              Total Scans Change
+                            </Typography>
+                            <Typography variant='h4' sx={{ 
+                              fontWeight: 'bold',
+                              color: dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? 'success.main' : 'error.main'
+                            }}>
+                              {dailyReport.summary.totalScans - previousDayReport.summary.totalScans >= 0 ? '+' : ''}
+                              {dailyReport.summary.totalScans - previousDayReport.summary.totalScans}
+                            </Typography>
+                            <Typography variant='caption' color='text.secondary'>
+                              {previousDayReport.summary.totalScans > 0
+                                ? `${((dailyReport.summary.totalScans - previousDayReport.summary.totalScans) / previousDayReport.summary.totalScans * 100).toFixed(1)}%`
+                                : dailyReport.summary.totalScans > 0 ? '+100%' : '0%'
+                              } vs previous day
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Paper sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography variant='body2' color='text.secondary' gutterBottom>
+                              Active Members Change
+                            </Typography>
+                            <Typography variant='h4' sx={{ 
+                              fontWeight: 'bold',
+                              color: dailyReport.summary.uniqueMembers >= previousDayReport.summary.uniqueMembers ? 'success.main' : 'error.main'
+                            }}>
+                              {dailyReport.summary.uniqueMembers - previousDayReport.summary.uniqueMembers >= 0 ? '+' : ''}
+                              {dailyReport.summary.uniqueMembers - previousDayReport.summary.uniqueMembers}
+                            </Typography>
+                            <Typography variant='caption' color='text.secondary'>
+                              {previousDayReport.summary.uniqueMembers > 0
+                                ? `${((dailyReport.summary.uniqueMembers - previousDayReport.summary.uniqueMembers) / previousDayReport.summary.uniqueMembers * 100).toFixed(1)}%`
+                                : dailyReport.summary.uniqueMembers > 0 ? '+100%' : '0%'
+                              } vs previous day
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Paper sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography variant='body2' color='text.secondary' gutterBottom>
+                              Products Change
+                            </Typography>
+                            <Typography variant='h4' sx={{ 
+                              fontWeight: 'bold',
+                              color: dailyReport.summary.uniqueProducts >= previousDayReport.summary.uniqueProducts ? 'success.main' : 'error.main'
+                            }}>
+                              {dailyReport.summary.uniqueProducts - previousDayReport.summary.uniqueProducts >= 0 ? '+' : ''}
+                              {dailyReport.summary.uniqueProducts - previousDayReport.summary.uniqueProducts}
+                            </Typography>
+                            <Typography variant='caption' color='text.secondary'>
+                              {previousDayReport.summary.uniqueProducts > 0
+                                ? `${((dailyReport.summary.uniqueProducts - previousDayReport.summary.uniqueProducts) / previousDayReport.summary.uniqueProducts * 100).toFixed(1)}%`
+                                : dailyReport.summary.uniqueProducts > 0 ? '+100%' : '0%'
+                              } vs previous day
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      </Grid>
+
+                      {/* Detailed Comparison Chart */}
+                      <Paper sx={{ p: 2, mb: 3 }}>
+                        <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2 }}>
+                          Metrics Comparison
+                        </Typography>
+                        <ResponsiveContainer width='100%' height={300}>
+                          <BarChart
+                            data={[
+                              {
+                                metric: 'Total Scans',
+                                'Previous Day': previousDayReport.summary.totalScans,
+                                'Selected Day': dailyReport.summary.totalScans
+                              },
+                              {
+                                metric: 'Active Members',
+                                'Previous Day': previousDayReport.summary.uniqueMembers,
+                                'Selected Day': dailyReport.summary.uniqueMembers
+                              },
+                              {
+                                metric: 'Products',
+                                'Previous Day': previousDayReport.summary.uniqueProducts,
+                                'Selected Day': dailyReport.summary.uniqueProducts
+                              },
+                              {
+                                metric: 'Applicators',
+                                'Previous Day': previousDayReport.summary.roleBreakdown?.applicator || 0,
+                                'Selected Day': dailyReport.summary.roleBreakdown?.applicator || 0
+                              },
+                              {
+                                metric: 'Customers',
+                                'Previous Day': previousDayReport.summary.roleBreakdown?.customer || 0,
+                                'Selected Day': dailyReport.summary.roleBreakdown?.customer || 0
+                              }
+                            ]}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray='3 3' />
+                            <XAxis dataKey='metric' />
+                            <YAxis />
+                            <RechartsTooltip />
+                            <Bar dataKey='Previous Day' fill='#94a3b8' radius={[8, 8, 0, 0]} />
+                            <Bar dataKey='Selected Day' fill='#003366' radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </Paper>
+
+                      {/* Performance Indicators */}
+                      <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                        <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2 }}>
+                          Performance Indicators
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={6}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              {dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? (
+                                <CheckCircle sx={{ color: 'success.main' }} />
+                              ) : (
+                                <Cancel sx={{ color: 'error.main' }} />
+                              )}
+                              <Box>
+                                <Typography variant='body2' fontWeight={600}>
+                                  Scan Volume
+                                </Typography>
+                                <Typography variant='caption' color='text.secondary'>
+                                  {dailyReport.summary.totalScans >= previousDayReport.summary.totalScans 
+                                    ? 'Increased or maintained' 
+                                    : 'Decreased from previous day'
+                                  }
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              {dailyReport.summary.uniqueMembers >= previousDayReport.summary.uniqueMembers ? (
+                                <CheckCircle sx={{ color: 'success.main' }} />
+                              ) : (
+                                <Cancel sx={{ color: 'error.main' }} />
+                              )}
+                              <Box>
+                                <Typography variant='body2' fontWeight={600}>
+                                  Member Engagement
+                                </Typography>
+                                <Typography variant='caption' color='text.secondary'>
+                                  {dailyReport.summary.uniqueMembers >= previousDayReport.summary.uniqueMembers 
+                                    ? 'Growing engagement' 
+                                    : 'Lower engagement'
+                                  }
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </Paper>
+                    </>
+                  )}
+
+                  {!previousDayReport && (
+                    <Box sx={{ textAlign: 'center', py: 8 }}>
+                      <Assessment sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+                      <Typography variant='h6' color='text.secondary'>
+                        No comparison data available
+                      </Typography>
+                      <Typography variant='body2' color='text.secondary'>
+                        Previous day data could not be loaded
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              )}
+
+              {/* Tab 2: Analytics */}
+              {dailyReportTab === 2 && (
+                <>
+                  <Typography variant='h6' sx={{ fontWeight: 700, mb: 3 }}>
+                    📊 Detailed Analytics
+                  </Typography>
+
+                  {/* Hourly Activity Chart */}
+                  {dailyReport.hourlyDistribution && Object.keys(dailyReport.hourlyDistribution).length > 0 ? (
+                    <>
+                      <Paper sx={{ p: 2, mb: 3 }}>
+                        <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2 }}>
+                          ⏰ Hourly Activity Distribution
+                        </Typography>
+                        <ResponsiveContainer width='100%' height={300}>
+                          <BarChart
+                            data={Object.entries(dailyReport.hourlyDistribution).map(([hour, count]) => ({
+                              hour: `${hour}:00`,
+                              scans: count,
+                              percentage: ((count / dailyReport.summary.totalScans) * 100).toFixed(1)
+                            }))}
+                            margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+                          >
+                            <CartesianGrid strokeDasharray='3 3' stroke='#f0f0f0' />
+                            <XAxis dataKey='hour' tick={{ fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} />
+                            <RechartsTooltip 
+                              contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }}
+                              formatter={(value, name, props) => [
+                                `${value} scans (${props.payload.percentage}%)`,
+                                'Activity'
+                              ]}
+                            />
+                            <Bar dataKey='scans' fill='#003366' radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <Box sx={{ mt: 2, p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
+                          <Typography variant='body2'>
+                            <strong>Peak Hour:</strong> {Object.entries(dailyReport.hourlyDistribution).reduce((max, [hour, count]) => count > max.count ? { hour, count } : max, { hour: 0, count: 0 }).hour}:00 with {Object.entries(dailyReport.hourlyDistribution).reduce((max, [hour, count]) => count > max.count ? { hour, count } : max, { hour: 0, count: 0 }).count} scans
+                          </Typography>
+                        </Box>
+                      </Paper>
+
+                      {/* Activity Breakdown */}
+                      <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid item xs={12} md={6}>
+                          <Paper sx={{ p: 2 }}>
+                            <Typography variant='subtitle2' sx={{ fontWeight: 700, mb: 2 }}>
+                              Morning Activity (6AM - 12PM)
+                            </Typography>
+                            <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'primary.main', mb: 1 }}>
+                              {Object.entries(dailyReport.hourlyDistribution)
+                                .filter(([hour]) => parseInt(hour) >= 6 && parseInt(hour) < 12)
+                                .reduce((sum, [, count]) => sum + count, 0)}
+                            </Typography>
+                            <Typography variant='caption' color='text.secondary'>
+                              {((Object.entries(dailyReport.hourlyDistribution)
+                                .filter(([hour]) => parseInt(hour) >= 6 && parseInt(hour) < 12)
+                                .reduce((sum, [, count]) => sum + count, 0) / dailyReport.summary.totalScans) * 100).toFixed(1)}% of total scans
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <Paper sx={{ p: 2 }}>
+                            <Typography variant='subtitle2' sx={{ fontWeight: 700, mb: 2 }}>
+                              Afternoon Activity (12PM - 6PM)
+                            </Typography>
+                            <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'warning.main', mb: 1 }}>
+                              {Object.entries(dailyReport.hourlyDistribution)
+                                .filter(([hour]) => parseInt(hour) >= 12 && parseInt(hour) < 18)
+                                .reduce((sum, [, count]) => sum + count, 0)}
+                            </Typography>
+                            <Typography variant='caption' color='text.secondary'>
+                              {((Object.entries(dailyReport.hourlyDistribution)
+                                .filter(([hour]) => parseInt(hour) >= 12 && parseInt(hour) < 18)
+                                .reduce((sum, [, count]) => sum + count, 0) / dailyReport.summary.totalScans) * 100).toFixed(1)}% of total scans
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      </Grid>
+                    </>
+                  ) : (
+                    <Box sx={{ textAlign: 'center', py: 4, bgcolor: 'grey.50', borderRadius: 2, mb: 3 }}>
+                      <Typography variant='body1' color='text.secondary'>
+                        No hourly data available
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Role Distribution */}
+                  {dailyReport.summary.totalScans > 0 && (
+                    <Paper sx={{ p: 2, mb: 3 }}>
+                      <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2 }}>
+                        👥 Member Role Distribution
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={6}>
+                          <ResponsiveContainer width='100%' height={250}>
+                            <PieChart>
+                              <Pie
+                                data={[
+                                  { name: 'Applicators', value: dailyReport.summary.roleBreakdown?.applicator || 0, color: '#f59e0b' },
+                                  { name: 'Customers', value: dailyReport.summary.roleBreakdown?.customer || 0, color: '#00B4D8' }
+                                ]}
+                                cx='50%'
+                                cy='50%'
+                                labelLine={false}
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                outerRadius={80}
+                                fill='#8884d8'
+                                dataKey='value'
+                              >
+                                {[
+                                  { name: 'Applicators', value: dailyReport.summary.roleBreakdown?.applicator || 0, color: '#f59e0b' },
+                                  { name: 'Customers', value: dailyReport.summary.roleBreakdown?.customer || 0, color: '#00B4D8' }
+                                ].map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <RechartsTooltip />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center', height: '100%' }}>
+                            <Paper sx={{ p: 2, bgcolor: 'warning.lighter' }}>
+                              <Typography variant='body2' color='text.secondary' gutterBottom>
+                                Applicators
+                              </Typography>
+                              <Typography variant='h4' sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                                {dailyReport.summary.roleBreakdown?.applicator || 0}
+                              </Typography>
+                              <Typography variant='caption' color='text.secondary'>
+                                {((dailyReport.summary.roleBreakdown?.applicator || 0) / dailyReport.summary.uniqueMembers * 100).toFixed(1)}% of active members
+                              </Typography>
+                            </Paper>
+                            <Paper sx={{ p: 2, bgcolor: 'info.lighter' }}>
+                              <Typography variant='body2' color='text.secondary' gutterBottom>
+                                Customers
+                              </Typography>
+                              <Typography variant='h4' sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                                {dailyReport.summary.roleBreakdown?.customer || 0}
+                              </Typography>
+                              <Typography variant='caption' color='text.secondary'>
+                                {((dailyReport.summary.roleBreakdown?.customer || 0) / dailyReport.summary.uniqueMembers * 100).toFixed(1)}% of active members
+                              </Typography>
+                            </Paper>
+                          </Box>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  )}
+
+                  {/* Product Performance */}
+                  {dailyReport.topProducts && dailyReport.topProducts.length > 0 && (
+                    <Paper sx={{ p: 2 }}>
+                      <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2 }}>
+                        📦 Product Performance Distribution
+                      </Typography>
+                      <ResponsiveContainer width='100%' height={300}>
+                        <BarChart
+                          data={dailyReport.topProducts.slice(0, 10).map(p => ({
+                            name: p.productName.length > 25 ? p.productName.substring(0, 25) + '...' : p.productName,
+                            scans: p.count,
+                            percentage: ((p.count / dailyReport.summary.totalScans) * 100).toFixed(1)
+                          }))}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                        >
+                          <CartesianGrid strokeDasharray='3 3' />
+                          <XAxis dataKey='name' angle={-45} textAnchor='end' height={100} tick={{ fontSize: 10 }} />
+                          <YAxis />
+                          <RechartsTooltip 
+                            formatter={(value, name, props) => [
+                              `${value} scans (${props.payload.percentage}%)`,
+                              'Scans'
+                            ]}
+                          />
+                          <Bar dataKey='scans' fill='#A4D233' radius={[8, 8, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Paper>
+                  )}
+                </>
+              )}
+
+              {/* Tab 3: Details */}
+              {dailyReportTab === 3 && (
+                <>
+                  <Typography variant='h6' sx={{ fontWeight: 700, mb: 3 }}>
+                    📋 Detailed Scan List
+                  </Typography>
+
+                  {dailyReport.scans && dailyReport.scans.length > 0 ? (
+                    <TableContainer component={Paper}>
+                      <Table size='small'>
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: 'grey.100' }}>
+                            <TableCell sx={{ fontWeight: 700 }}>#</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Time</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Member</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {dailyReport.scans.slice(0, 100).map((scan, i) => {
+                            // Try multiple date field options and formats
+                            let timeStr = 'N/A';
+                            try {
+                              const dateValue = scan.scannedAt || scan.createdAt || scan.timestamp || scan.date;
+                              if (dateValue) {
+                                const date = new Date(dateValue);
+                                if (!isNaN(date.getTime())) {
+                                  timeStr = date.toLocaleTimeString('en-US', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit',
+                                    hour12: true
+                                  });
+                                }
+                              }
+                            } catch (e) {
+                              console.error('Date parsing error:', e);
+                            }
+                            
+                            return (
+                              <TableRow key={i} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                                <TableCell>{i + 1}</TableCell>
+                                <TableCell>
+                                  <Typography variant='body2'>
+                                    {timeStr}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant='body2'>
+                                    {scan.memberName || scan.memberId}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Chip 
+                                    label={scan.role || 'N/A'} 
+                                    size='small' 
+                                    color={scan.role === 'applicator' ? 'warning' : 'info'}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant='body2' noWrap sx={{ maxWidth: 200 }}>
+                                    {scan.productName || scan.productNo}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant='body2' color='text.secondary'>
+                                    {scan.location || 'N/A'}
+                                  </Typography>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                      {dailyReport.scans.length > 100 && (
+                        <Box sx={{ p: 2, textAlign: 'center', bgcolor: 'grey.50' }}>
+                          <Typography variant='caption' color='text.secondary'>
+                            Showing first 100 of {dailyReport.scans.length} total scans
+                          </Typography>
+                        </Box>
+                      )}
+                    </TableContainer>
+                  ) : (
+                    <Box sx={{ textAlign: 'center', py: 8, bgcolor: 'grey.50', borderRadius: 2 }}>
+                      <Typography variant='body1' color='text.secondary'>
+                        No scan details available
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 8 }}>
+              <CalendarMonth sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+              <Typography variant='h6' color='text.secondary'>
+                No data available for this date
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, justifyContent: 'space-between' }}>
+          <Box>
+            <Typography variant='caption' color='text.secondary'>
+              {dailyReport && dailyReport.summary ? `${dailyReport.summary.totalScans} total scans` : 'No data'}
+            </Typography>
+          </Box>
+          <Button 
+            onClick={() => {
+              setDailyReportDialog({ open: false, date: null });
+              setDailyReportTab(0);
+            }}
+            variant='contained'
           >
             Close
           </Button>
