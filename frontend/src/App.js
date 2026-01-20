@@ -251,6 +251,7 @@ function App() {
   const [dailyReportDialog, setDailyReportDialog] = useState({ open: false, date: null });
   const [dailyReportTab, setDailyReportTab] = useState(0);
   const [previousDayReport, setPreviousDayReport] = useState(null);
+  const [expandedCardDialog, setExpandedCardDialog] = useState({ open: false, type: null, data: [] });
   const [notificationPrefs, setNotificationPrefs] = useState({ email: true, push: true, autoRefresh: true, soundEnabled: false });
   const [activityLog, setActivityLog] = useState([]);
   const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true });
@@ -3029,7 +3030,67 @@ function App() {
             
             <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>User Distribution</Typography><ResponsiveContainer width='100%' height={300}><PieChart><Pie data={[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }]} cx='50%' cy='50%' labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill='#8884d8' dataKey='value'>{[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>📍 Top Locations</Typography><List dense>{scanHistory.filter(s => s.location).reduce((acc, scan) => { const existing = acc.find(l => l.location === scan.location); if (existing) { existing.count++; } else { acc.push({ location: scan.location, count: 1 }); } return acc; }, []).sort((a, b) => b.count - a.count).slice(0, 5).map((loc, i) => <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: i === 0 ? 'success.main' : 'grey.400', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}><ListItemText primary={<Typography variant='body1' fontWeight={600}>{loc.location}</Typography>} secondary={<Chip label={`${loc.count} scans`} size='small' color={i === 0 ? 'success' : 'default'} />} /></ListItem>)}</List></CardContent></Card></Grid>
+            <Grid item xs={12} md={6}>
+              <Card 
+                sx={{ 
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
+                }}
+                onClick={() => {
+                  const allLocations = scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                    const existing = acc.find(l => l.location === scan.location); 
+                    if (existing) { existing.count++; } 
+                    else { acc.push({ location: scan.location, count: 1 }); } 
+                    return acc; 
+                  }, []).sort((a, b) => b.count - a.count);
+                  setExpandedCardDialog({ open: true, type: 'locations', data: allLocations });
+                }}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant='h6' sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
+                      📍 Top Locations
+                    </Typography>
+                    {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                      const existing = acc.find(l => l.location === scan.location); 
+                      if (existing) { existing.count++; } 
+                      else { acc.push({ location: scan.location, count: 1 }); } 
+                      return acc; 
+                    }, []).length > 6 && (
+                      <Chip 
+                        label={`+${scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                          const existing = acc.find(l => l.location === scan.location); 
+                          if (existing) { existing.count++; } 
+                          else { acc.push({ location: scan.location, count: 1 }); } 
+                          return acc; 
+                        }, []).length - 6} more`}
+                        size='small'
+                        color='primary'
+                      />
+                    )}
+                  </Box>
+                  <List dense>
+                    {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                      const existing = acc.find(l => l.location === scan.location); 
+                      if (existing) { existing.count++; } 
+                      else { acc.push({ location: scan.location, count: 1 }); } 
+                      return acc; 
+                    }, []).sort((a, b) => b.count - a.count).slice(0, 6).map((loc, i) => 
+                      <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: i === 0 ? 'success.main' : 'grey.400', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                        <ListItemText 
+                          primary={<Typography variant='body1' fontWeight={600}>{loc.location}</Typography>} 
+                          secondary={<Chip label={`${loc.count} scans`} size='small' color={i === 0 ? 'success' : 'default'} />} 
+                        />
+                      </ListItem>
+                    )}
+                  </List>
+                  <Typography variant='caption' color='text.secondary' sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
+                    Click to view all locations
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
             
             <Grid item xs={12} md={6}><Card sx={{ background: 'linear-gradient(135deg, #FAD961 0%, #F76B1C 100%)', color: 'white' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>💰 Total Product Value (Estimated)</Typography><Typography variant='h3' fontWeight='bold' sx={{ my: 2 }}>Rs. {scanHistory.reduce((total, scan) => { 
               const product = products.find(p => 
@@ -3040,43 +3101,194 @@ function App() {
               return total + price; 
             }, 0).toLocaleString()}</Typography><Typography variant='body2' sx={{ opacity: 0.9 }}>Based on {scanHistory.length} scans with product pricing</Typography></CardContent></Card></Grid>
             
-            <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>💵 Price Estimation by Product</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell><TableCell sx={{ fontWeight: 700 }}>Pack Size</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Unit Price</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Est. Value</TableCell></TableRow></TableHead><TableBody>{(() => { const productStats = scanHistory.reduce((acc, scan) => { 
-              // Find product by BOTH product code AND pack size
-              const product = products.find(p => 
-                p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
-                p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
-              ); 
-              
-              // Use unique key: productCode + packSize
-              const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
-              
-              if (!acc[key]) { 
-                acc[key] = { 
-                  productNo: scan.productNo,
-                  name: product ? product.name : scan.productName || 'Unknown Product',
-                  packSize: scan.qty || 'N/A', 
-                  price: product ? product.price : (scan.price || 0),
-                  scans: 0, 
-                  totalQty: 0 
-                }; 
-              } 
-              acc[key].scans += 1; 
-              
-              // Total Qty = number of packs (same as scans)
-              acc[key].totalQty += 1; 
-              return acc; 
-            }, {}); 
+            <Grid item xs={12}>
+              <Card 
+                sx={{ 
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
+                }}
+                onClick={() => {
+                  const productStats = scanHistory.reduce((acc, scan) => { 
+                    const product = products.find(p => 
+                      p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                      p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+                    ); 
+                    const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
+                    if (!acc[key]) { 
+                      acc[key] = { 
+                        productNo: scan.productNo,
+                        name: product ? product.name : scan.productName || 'Unknown Product',
+                        packSize: scan.qty || 'N/A', 
+                        price: product ? product.price : (scan.price || 0),
+                        scans: 0, 
+                        totalQty: 0 
+                      }; 
+                    } 
+                    acc[key].scans += 1; 
+                    acc[key].totalQty += 1; 
+                    return acc; 
+                  }, {}); 
+                  const sortedData = Object.entries(productStats)
+                    .sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty))
+                    .map(([key, data]) => ({
+                      productName: data.name,
+                      packSize: data.packSize,
+                      unitPrice: data.price || 0,
+                      totalScans: data.scans,
+                      estimatedValue: (data.price || 0) * data.totalQty
+                    }));
+                  setExpandedCardDialog({ open: true, type: 'priceEstimation', data: sortedData });
+                }}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant='h6' sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
+                      💵 Price Estimation by Product
+                    </Typography>
+                    {(() => {
+                      const productStats = scanHistory.reduce((acc, scan) => { 
+                        const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
+                        if (!acc[key]) acc[key] = true;
+                        return acc; 
+                      }, {});
+                      const totalProducts = Object.keys(productStats).length;
+                      return totalProducts > 6 && (
+                        <Chip 
+                          label={`+${totalProducts - 6} more`}
+                          size='small'
+                          color='primary'
+                        />
+                      );
+                    })()}
+                  </Box>
+                  <TableContainer>
+                    <Table size='small'>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Pack Size</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>Unit Price</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>Est. Value</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(() => { 
+                          const productStats = scanHistory.reduce((acc, scan) => { 
+                            const product = products.find(p => 
+                              p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                              p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+                            ); 
+                            const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
+                            if (!acc[key]) { 
+                              acc[key] = { 
+                                productNo: scan.productNo,
+                                name: product ? product.name : scan.productName || 'Unknown Product',
+                                packSize: scan.qty || 'N/A', 
+                                price: product ? product.price : (scan.price || 0),
+                                scans: 0, 
+                                totalQty: 0 
+                              }; 
+                            } 
+                            acc[key].scans += 1; 
+                            acc[key].totalQty += 1; 
+                            return acc; 
+                          }, {}); 
+                          return Object.entries(productStats).sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty)).slice(0, 6).map(([key, data]) => 
+                            <TableRow key={key} sx={{ '&:hover': { bgcolor: 'action.hover' }, bgcolor: data.price === 0 ? 'warning.50' : 'inherit' }}>
+                              <TableCell>
+                                <Typography variant='body2' fontWeight={600}>{data.name}</Typography>
+                                <Typography variant='caption' color='text.secondary'>{data.productNo}</Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={data.packSize} size='small' variant='outlined' color={data.price === 0 ? 'warning' : 'default'} />
+                              </TableCell>
+                              <TableCell align='right'>
+                                {data.price > 0 ? 
+                                  <Typography variant='body2' fontWeight={600}>Rs. {data.price.toLocaleString()}</Typography> : 
+                                  <Typography variant='body2' fontWeight={600} color='warning.main'>Not Set</Typography>
+                                }
+                              </TableCell>
+                              <TableCell align='right'>
+                                <Chip label={data.scans} size='small' color='primary' />
+                              </TableCell>
+                              <TableCell align='right'>
+                                <Typography variant='body1' fontWeight={700} color={data.price > 0 ? 'success.main' : 'warning.main'}>
+                                  Rs. {(data.price * data.totalQty).toLocaleString()}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ); 
+                        })()}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <Box sx={{ mt: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant='body1' fontWeight={700} color='success.dark'>Grand Total Estimated Value:</Typography>
+                    <Typography variant='h5' fontWeight={800} color='success.dark'>
+                      Rs. {scanHistory.reduce((total, scan) => { 
+                        const product = products.find(p => 
+                          p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                          p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+                        ); 
+                        const price = product ? product.price : (scan.price || 0);
+                        return total + price; 
+                      }, 0).toLocaleString()}
+                    </Typography>
+                  </Box>
+                  <Typography variant='caption' color='text.secondary' sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
+                    Click to view complete price estimation
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
             
-            return Object.entries(productStats).sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty)).map(([key, data]) => <TableRow key={key} sx={{ '&:hover': { bgcolor: 'action.hover' }, bgcolor: data.price === 0 ? 'warning.50' : 'inherit' }}><TableCell><Typography variant='body2' fontWeight={600}>{data.name}</Typography><Typography variant='caption' color='text.secondary'>{data.productNo}</Typography></TableCell><TableCell><Chip label={data.packSize} size='small' variant='outlined' color={data.price === 0 ? 'warning' : 'default'} /></TableCell><TableCell align='right'>{data.price > 0 ? <Typography variant='body2' fontWeight={600}>Rs. {data.price.toLocaleString()}</Typography> : <Typography variant='body2' fontWeight={600} color='warning.main'>Not Set</Typography>}</TableCell><TableCell align='right'><Chip label={data.scans} size='small' color='primary' /></TableCell><TableCell align='right'><Typography variant='body1' fontWeight={700} color={data.price > 0 ? 'success.main' : 'warning.main'}>Rs. {(data.price * data.totalQty).toLocaleString()}</Typography></TableCell></TableRow>); })()}</TableBody></Table></TableContainer><Box sx={{ mt: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Typography variant='body1' fontWeight={700} color='success.dark'>Grand Total Estimated Value:</Typography><Typography variant='h5' fontWeight={800} color='success.dark'>Rs. {scanHistory.reduce((total, scan) => { 
-              const product = products.find(p => 
-                p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
-                p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
-              ); 
-              const price = product ? product.price : (scan.price || 0);
-              return total + price; 
-            }, 0).toLocaleString()}</Typography></Box></CardContent></Card></Grid>
-            
-            <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><Category /> Product Scan Details</Typography><List dense>{stats.topProducts?.map((p, i) => <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}><ListItemText primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} secondary={<Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}><Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} /><Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography></Box>} /></ListItem>)}</List></CardContent></Card></Grid>
+            <Grid item xs={12}>
+              <Card 
+                sx={{ 
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
+                }}
+                onClick={() => {
+                  setExpandedCardDialog({ open: true, type: 'products', data: stats.topProducts || [] });
+                }}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant='h6' sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
+                      <Category /> Product Scan Details
+                    </Typography>
+                    {(stats.topProducts?.length || 0) > 6 && (
+                      <Chip 
+                        label={`+${(stats.topProducts?.length || 0) - 6} more`}
+                        size='small'
+                        color='primary'
+                      />
+                    )}
+                  </Box>
+                  <List dense>
+                    {stats.topProducts?.slice(0, 6).map((p, i) => 
+                      <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                        <ListItemText 
+                          primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} 
+                          secondary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
+                              <Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} />
+                              <Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography>
+                            </Box>
+                          } 
+                        />
+                      </ListItem>
+                    )}
+                  </List>
+                  <Typography variant='caption' color='text.secondary' sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
+                    Click to view all products
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
             
             {/* Advanced Analytics Section */}
             <Grid item xs={12}>
@@ -6199,6 +6411,285 @@ function App() {
               setDailyReportDialog({ open: false, date: null });
               setDailyReportTab(0);
             }}
+            variant='contained'
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Expanded Card Dialog */}
+      <Dialog 
+        open={expandedCardDialog.open} 
+        onClose={() => setExpandedCardDialog({ open: false, type: null, data: [] })}
+        maxWidth='md'
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            maxHeight: '85vh'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', 
+          color: 'white',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <Box>
+            <Typography variant='h6' sx={{ fontWeight: 700 }}>
+              {expandedCardDialog.type === 'locations' && '📍 All Locations'}
+              {expandedCardDialog.type === 'products' && '📦 All Products'}
+              {expandedCardDialog.type === 'priceEstimation' && '💵 Complete Price Estimation'}
+            </Typography>
+            <Typography variant='caption' sx={{ opacity: 0.9 }}>
+              {expandedCardDialog.data.length} total items
+            </Typography>
+          </Box>
+          <Tooltip title='Export to Excel'>
+            <IconButton 
+              size='small' 
+              sx={{ color: 'white' }}
+              onClick={() => {
+                try {
+                  const wb = XLSX.utils.book_new();
+                  let wsData = [];
+                  
+                  if (expandedCardDialog.type === 'locations') {
+                    wsData = [
+                      ['Top Locations Report'],
+                      ['Generated:', new Date().toLocaleString()],
+                      [],
+                      ['Rank', 'Location', 'Total Scans', '% of Total'],
+                      ...expandedCardDialog.data.map((loc, i) => [
+                        i + 1,
+                        loc.location,
+                        loc.count,
+                        `${((loc.count / expandedCardDialog.data.reduce((sum, l) => sum + l.count, 0)) * 100).toFixed(2)}%`
+                      ])
+                    ];
+                  } else if (expandedCardDialog.type === 'products') {
+                    wsData = [
+                      ['Product Scan Details Report'],
+                      ['Generated:', new Date().toLocaleString()],
+                      [],
+                      ['Rank', 'Product Name', 'Total Scans', '% of Total'],
+                      ...expandedCardDialog.data.map((p, i) => [
+                        i + 1,
+                        p._id,
+                        p.count,
+                        `${((p.count / expandedCardDialog.data.reduce((sum, prod) => sum + prod.count, 0)) * 100).toFixed(2)}%`
+                      ])
+                    ];
+                  } else if (expandedCardDialog.type === 'priceEstimation') {
+                    const grandTotal = expandedCardDialog.data.reduce((sum, item) => sum + (item.estimatedValue || 0), 0);
+                    wsData = [
+                      ['Price Estimation by Product Report'],
+                      ['Generated:', new Date().toLocaleString()],
+                      [],
+                      ['Rank', 'Product Name', 'Pack Size', 'Unit Price', 'Total Scans', 'Est. Value'],
+                      ...expandedCardDialog.data.map((item, i) => [
+                        i + 1,
+                        item.productName || 'Unknown',
+                        item.packSize || 'N/A',
+                        `Rs. ${(item.unitPrice || 0).toFixed(2)}`,
+                        item.totalScans || 0,
+                        `Rs. ${(item.estimatedValue || 0).toFixed(2)}`
+                      ]),
+                      [],
+                      ['Grand Total', '', '', '', '', `Rs. ${grandTotal.toFixed(2)}`]
+                    ];
+                  }
+                  
+                  const ws = XLSX.utils.aoa_to_sheet(wsData);
+                  
+                  // Set column widths based on type
+                  if (expandedCardDialog.type === 'priceEstimation') {
+                    ws['!cols'] = [{ wch: 8 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 18 }];
+                  } else {
+                    ws['!cols'] = [{ wch: 8 }, { wch: 40 }, { wch: 15 }, { wch: 15 }];
+                  }
+                  
+                  XLSX.utils.book_append_sheet(wb, ws, 'Report');
+                  XLSX.writeFile(wb, `${expandedCardDialog.type}_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+                  setSnackbar({ open: true, message: 'Report exported successfully!', severity: 'success' });
+                } catch (error) {
+                  console.error('Export error:', error);
+                  setSnackbar({ open: true, message: 'Failed to export report', severity: 'error' });
+                }
+              }}
+            >
+              <FileDownload />
+            </IconButton>
+          </Tooltip>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {/* Locations View */}
+          {expandedCardDialog.type === 'locations' && (
+            <TableContainer component={Paper}>
+              <Table size='small'>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'grey.100' }}>
+                    <TableCell sx={{ fontWeight: 700 }}>Rank</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                    <TableCell align='right' sx={{ fontWeight: 700 }}>Scans</TableCell>
+                    <TableCell align='right' sx={{ fontWeight: 700 }}>% of Total</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {expandedCardDialog.data.map((loc, i) => (
+                    <TableRow key={i} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                      <TableCell>
+                        <Chip 
+                          label={i + 1} 
+                          size='small' 
+                          color={i === 0 ? 'success' : i === 1 ? 'primary' : 'default'}
+                          sx={{ width: 32 }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant='body2' fontWeight={i < 3 ? 600 : 400}>
+                          {loc.location}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align='right'>
+                        <Chip label={loc.count} size='small' color='primary' />
+                      </TableCell>
+                      <TableCell align='right'>
+                        <Typography variant='body2' color='text.secondary'>
+                          {((loc.count / expandedCardDialog.data.reduce((sum, l) => sum + l.count, 0)) * 100).toFixed(2)}%
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          {/* Products View */}
+          {expandedCardDialog.type === 'products' && (
+            <TableContainer component={Paper}>
+              <Table size='small'>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'grey.100' }}>
+                    <TableCell sx={{ fontWeight: 700 }}>Rank</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell>
+                    <TableCell align='right' sx={{ fontWeight: 700 }}>Scans</TableCell>
+                    <TableCell align='right' sx={{ fontWeight: 700 }}>% of Total</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {expandedCardDialog.data.map((p, i) => (
+                    <TableRow key={i} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                      <TableCell>
+                        <Chip 
+                          label={i + 1} 
+                          size='small' 
+                          color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'}
+                          sx={{ width: 32 }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant='body2' fontWeight={i < 3 ? 600 : 400}>
+                          {p._id}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align='right'>
+                        <Chip label={p.count} size='small' color='primary' />
+                      </TableCell>
+                      <TableCell align='right'>
+                        <Typography variant='body2' color='text.secondary'>
+                          {((p.count / expandedCardDialog.data.reduce((sum, prod) => sum + prod.count, 0)) * 100).toFixed(2)}%
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          {/* Price Estimation View */}
+          {expandedCardDialog.type === 'priceEstimation' && (
+            <>
+              <TableContainer component={Paper}>
+                <Table size='small'>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: 'grey.100' }}>
+                      <TableCell sx={{ fontWeight: 700 }}>Rank</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Pack Size</TableCell>
+                      <TableCell align='right' sx={{ fontWeight: 700 }}>Unit Price</TableCell>
+                      <TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell>
+                      <TableCell align='right' sx={{ fontWeight: 700 }}>Est. Value</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {expandedCardDialog.data.map((item, i) => (
+                      <TableRow key={i} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                        <TableCell>
+                          <Chip 
+                            label={i + 1} 
+                            size='small' 
+                            color={i === 0 ? 'success' : i === 1 ? 'primary' : 'default'}
+                            sx={{ width: 32 }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant='body2' fontWeight={i < 3 ? 600 : 400}>
+                            {item.productName || 'Unknown Product'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant='body2' color='text.secondary'>
+                            {item.packSize || 'N/A'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align='right'>
+                          <Typography variant='body2' color='text.secondary'>
+                            Rs. {(item.unitPrice || 0).toFixed(2)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align='right'>
+                          <Chip label={item.totalScans || 0} size='small' color='primary' />
+                        </TableCell>
+                        <TableCell align='right'>
+                          <Typography variant='body2' fontWeight={i < 3 ? 600 : 400} color='success.main'>
+                            Rs. {(item.estimatedValue || 0).toFixed(2)}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              
+              {/* Grand Total */}
+              <Box sx={{ 
+                mt: 3, 
+                p: 2, 
+                bgcolor: 'success.light', 
+                borderRadius: 2,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <Typography variant='h6' sx={{ fontWeight: 700, color: 'success.dark' }}>
+                  Grand Total
+                </Typography>
+                <Typography variant='h5' sx={{ fontWeight: 700, color: 'success.dark' }}>
+                  Rs. {expandedCardDialog.data.reduce((sum, item) => sum + (item.estimatedValue || 0), 0).toFixed(2)}
+                </Typography>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button 
+            onClick={() => setExpandedCardDialog({ open: false, type: null, data: [] })}
             variant='contained'
           >
             Close
