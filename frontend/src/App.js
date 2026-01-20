@@ -2817,7 +2817,43 @@ function App() {
             <Grid container spacing={{ xs: 1.5, sm: 2.5 }}>
               {role === 'customer' && <Grid item xs={12}><TextField fullWidth label='Customer Name' variant='outlined' value={memberName} onChange={(e) => setMemberName(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>}
               <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? 'Phone Number' : 'Member ID'} placeholder={role === 'customer' ? 'e.g. 0712345678' : 'e.g. APP-001'} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
-              <Grid item xs={12}><TextField fullWidth label='Location (Optional)' placeholder='e.g. Colombo, Kandy' variant='outlined' value={location} onChange={(e) => setLocation(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }}>
+                  <InputLabel>Location (Optional)</InputLabel>
+                  <Select
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    label='Location (Optional)'
+                  >
+                    <MenuItem value=''>Select Location</MenuItem>
+                    <MenuItem value='Colombo'>Colombo</MenuItem>
+                    <MenuItem value='Gampaha'>Gampaha</MenuItem>
+                    <MenuItem value='Kalutara'>Kalutara</MenuItem>
+                    <MenuItem value='Kandy'>Kandy</MenuItem>
+                    <MenuItem value='Matale'>Matale</MenuItem>
+                    <MenuItem value='Nuwara Eliya'>Nuwara Eliya</MenuItem>
+                    <MenuItem value='Galle'>Galle</MenuItem>
+                    <MenuItem value='Matara'>Matara</MenuItem>
+                    <MenuItem value='Hambantota'>Hambantota</MenuItem>
+                    <MenuItem value='Jaffna'>Jaffna</MenuItem>
+                    <MenuItem value='Kilinochchi'>Kilinochchi</MenuItem>
+                    <MenuItem value='Mannar'>Mannar</MenuItem>
+                    <MenuItem value='Vavuniya'>Vavuniya</MenuItem>
+                    <MenuItem value='Mullaitivu'>Mullaitivu</MenuItem>
+                    <MenuItem value='Batticaloa'>Batticaloa</MenuItem>
+                    <MenuItem value='Ampara'>Ampara</MenuItem>
+                    <MenuItem value='Trincomalee'>Trincomalee</MenuItem>
+                    <MenuItem value='Kurunegala'>Kurunegala</MenuItem>
+                    <MenuItem value='Puttalam'>Puttalam</MenuItem>
+                    <MenuItem value='Anuradhapura'>Anuradhapura</MenuItem>
+                    <MenuItem value='Polonnaruwa'>Polonnaruwa</MenuItem>
+                    <MenuItem value='Badulla'>Badulla</MenuItem>
+                    <MenuItem value='Monaragala'>Monaragala</MenuItem>
+                    <MenuItem value='Ratnapura'>Ratnapura</MenuItem>
+                    <MenuItem value='Kegalle'>Kegalle</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
               <Grid item xs={12}><Button fullWidth variant='contained' size='large' disabled={loading || cart.length === 0} onClick={handleSubmitAll} startIcon={loading ? <CircularProgress size={22} color='inherit' /> : <CheckCircle />} sx={{ py: { xs: 1.5, sm: 2 }, fontSize: { xs: '0.95rem', sm: '1.1rem' }, fontWeight: 800, background: loading ? undefined : 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', boxShadow: '0 8px 20px rgba(164,210,51,0.4)', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(164,210,51,0.5)' }, '&:disabled': { opacity: 0.6 } }}>{loading ? 'Submitting...' : `Submit ${cart.length} Items`}</Button></Grid>
             </Grid>
           </Paper>
