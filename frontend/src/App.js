@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext } from '@mui/icons-material';
+import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI } from './services/api';
@@ -257,6 +257,14 @@ function App() {
   const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true });
   const [backupPasswordDialog, setBackupPasswordDialog] = useState({ open: false, password: '' });
   const [restorePasswordDialog, setRestorePasswordDialog] = useState({ open: false, password: '', file: null, backupData: null });
+  
+  // Advanced Dashboard States
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [dateFilter, setDateFilter] = useState('today'); // 'today', '7days', '30days', 'custom'
+  const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
+  const [comparisonData, setComparisonData] = useState(null);
+  const [performanceMetrics, setPerformanceMetrics] = useState(null);
+  
   const [showPassword, setShowPassword] = useState({
     adminLogin: false,
     userLogin: false,
@@ -1062,6 +1070,19 @@ function App() {
       }
     }
   }, [adminAuth, view]);
+  
+  // Auto-refresh dashboard data every 30 seconds when enabled
+  useEffect(() => {
+    if (autoRefresh && adminAuth && view === 'admin' && adminTab === 0) {
+      const interval = setInterval(() => {
+        console.log('🔄 Auto-refreshing dashboard...');
+        loadAdminData();
+        showNotification('Dashboard refreshed', 'info', 2000);
+      }, 30000); // 30 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh, adminAuth, view, adminTab]);
 
   // Load leaderboard when leaderboard view is accessed
   useEffect(() => {
@@ -2865,13 +2886,63 @@ function App() {
           </Paper>
 
           {adminTab === 0 && stats && <Grid container spacing={{ xs: 1.5, sm: 2 }}>
-            {/* Calendar Toggle Button */}
+            {/* Dashboard Header with Controls */}
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant='h5' sx={{ fontWeight: 700 }}>
-                  Dashboard Overview
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+                <Typography variant='h5' sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <DashboardIcon /> Dashboard Overview
                 </Typography>
-                <Button
+                
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* Date Filter */}
+                  <ToggleButtonGroup
+                    value={dateFilter}
+                    exclusive
+                    onChange={(e, newFilter) => {
+                      if (newFilter !== null) {
+                        setDateFilter(newFilter);
+                        if (newFilter !== 'custom') {
+                          loadAdminData(); // Reload with new filter
+                        }
+                      }
+                    }}
+                    size='small'
+                  >
+                    <ToggleButton value='today'>
+                      <Tooltip title='Today'>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          Today
+                        </Box>
+                      </Tooltip>
+                    </ToggleButton>
+                    <ToggleButton value='7days'>
+                      <Tooltip title='Last 7 Days'>
+                        <Box>7D</Box>
+                      </Tooltip>
+                    </ToggleButton>
+                    <ToggleButton value='30days'>
+                      <Tooltip title='Last 30 Days'>
+                        <Box>30D</Box>
+                      </Tooltip>
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                  
+                  {/* Auto Refresh Toggle */}
+                  <Tooltip title={autoRefresh ? 'Auto-refresh ON (30s)' : 'Auto-refresh OFF'}>
+                    <IconButton 
+                      color={autoRefresh ? 'primary' : 'default'}
+                      onClick={() => setAutoRefresh(!autoRefresh)}
+                      sx={{ 
+                        border: '1px solid',
+                        borderColor: autoRefresh ? 'primary.main' : 'grey.300'
+                      }}
+                    >
+                      <Loop sx={{ animation: autoRefresh ? 'spin 2s linear infinite' : 'none', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />
+                    </IconButton>
+                  </Tooltip>
+                  
+                  {/* Calendar Toggle */}
+                  <Button
                   variant={showCalendarView ? 'contained' : 'outlined'}
                   startIcon={<CalendarMonth />}
                   onClick={() => {
@@ -2887,9 +2958,59 @@ function App() {
                   }}
                   sx={{ fontWeight: 600 }}
                 >
-                  {showCalendarView ? 'Hide Calendar' : 'Show Calendar View'}
+                  {showCalendarView ? 'Hide Calendar' : 'Calendar View'}
                 </Button>
+                </Box>
               </Box>
+            </Grid>
+            
+            {/* Quick Performance Metrics Bar */}
+            <Grid item xs={12}>
+              <Paper sx={{ 
+                p: 2, 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white'
+              }}>
+                <Typography variant='subtitle2' gutterBottom sx={{ opacity: 0.9, fontWeight: 600 }}>
+                  <Speed sx={{ fontSize: '1rem', mr: 0.5 }} /> Quick Performance Metrics
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} sm={3}>
+                    <Box>
+                      <Typography variant='caption' sx={{ opacity: 0.8 }}>Avg Scans/Day</Typography>
+                      <Typography variant='h6' fontWeight={700}>
+                        {stats.dailyStats && stats.dailyStats.length > 0 
+                          ? Math.round(stats.total / stats.dailyStats.length)
+                          : stats.total}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Box>
+                      <Typography variant='caption' sx={{ opacity: 0.8 }}>App/Cust Ratio</Typography>
+                      <Typography variant='h6' fontWeight={700}>
+                        {stats.customer > 0 ? (stats.applicator / stats.customer).toFixed(2) : stats.applicator}:1
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Box>
+                      <Typography variant='caption' sx={{ opacity: 0.8 }}>Scans This Week</Typography>
+                      <Typography variant='h6' fontWeight={700}>
+                        {stats.lastWeek || 0}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Box>
+                      <Typography variant='caption' sx={{ opacity: 0.8 }}>Active Products</Typography>
+                      <Typography variant='h6' fontWeight={700}>
+                        {stats.topProducts?.length || 0}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
             </Grid>
 
             {/* Calendar View Section */}
@@ -3021,10 +3142,133 @@ function App() {
               </>
             )}
 
-            <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.total}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Total Scans</Typography></CardContent></Card></Grid>
-            <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.applicator}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Applicators</Typography></CardContent></Card></Grid>
-            <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.customer}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Customers</Typography></CardContent></Card></Grid>
-            <Grid item xs={6} md={3}><Card sx={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', color: 'white' }}><CardContent sx={{ p: { xs: 1.5, sm: 2 } }}><Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold' }}>{stats.last24Hours}</Typography><Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>Last 24hrs</Typography></CardContent></Card></Grid>
+            <Grid item xs={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                color: 'white',
+                position: 'relative',
+                overflow: 'visible'
+              }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box>
+                      <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold', mb: 0.5 }}>
+                        {stats.total}
+                      </Typography>
+                      <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
+                        Total Scans
+                      </Typography>
+                    </Box>
+                    <Tooltip title='Overall scan activity'>
+                      <ShowChart sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                    </Tooltip>
+                  </Box>
+                  {stats.last24Hours > 0 && (
+                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <TrendingUp sx={{ fontSize: '1rem' }} />
+                      <Typography variant='caption' sx={{ opacity: 0.9 }}>
+                        +{stats.last24Hours} in last 24hrs
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', 
+                color: 'white',
+                position: 'relative',
+                overflow: 'visible'
+              }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box>
+                      <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold', mb: 0.5 }}>
+                        {stats.applicator}
+                      </Typography>
+                      <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
+                        Applicators
+                      </Typography>
+                    </Box>
+                    <Tooltip title='Applicator scans'>
+                      <Person sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                    </Tooltip>
+                  </Box>
+                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant='caption' sx={{ opacity: 0.9 }}>
+                      {stats.total > 0 ? ((stats.applicator / stats.total) * 100).toFixed(1) : 0}% of total
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', 
+                color: 'white',
+                position: 'relative',
+                overflow: 'visible'
+              }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box>
+                      <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold', mb: 0.5 }}>
+                        {stats.customer}
+                      </Typography>
+                      <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
+                        Customers
+                      </Typography>
+                    </Box>
+                    <Tooltip title='Customer scans'>
+                      <People sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                    </Tooltip>
+                  </Box>
+                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant='caption' sx={{ opacity: 0.9 }}>
+                      {stats.total > 0 ? ((stats.customer / stats.total) * 100).toFixed(1) : 0}% of total
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', 
+                color: 'white',
+                position: 'relative',
+                overflow: 'visible'
+              }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box>
+                      <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold', mb: 0.5 }}>
+                        {stats.last24Hours}
+                      </Typography>
+                      <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
+                        Last 24hrs
+                      </Typography>
+                    </Box>
+                    <Tooltip title='Recent activity'>
+                      <Timeline sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                    </Tooltip>
+                  </Box>
+                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    {stats.lastWeek > 0 ? (
+                      <TrendingUp sx={{ fontSize: '1rem', color: 'rgba(255,255,255,0.9)' }} />
+                    ) : (
+                      <TrendingFlat sx={{ fontSize: '1rem', color: 'rgba(255,255,255,0.9)' }} />
+                    )}
+                    <Typography variant='caption' sx={{ opacity: 0.9 }}>
+                      {stats.lastWeek || 0} this week
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
             
             <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><TrendingUp /> Top Products by Scans</Typography><ResponsiveContainer width='100%' height={300}><BarChart data={stats.topProducts?.slice(0, 5).map(p => ({ name: p._id.length > 20 ? p._id.substring(0, 20) + '...' : p._id, scans: p.count }))} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}><CartesianGrid strokeDasharray='3 3' stroke='#f0f0f0' /><XAxis dataKey='name' angle={-45} textAnchor='end' height={100} tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} /><Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }} /><Bar dataKey='scans' fill='#003366' radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card></Grid>
             
@@ -3100,6 +3344,113 @@ function App() {
               const price = product ? product.price : (scan.price || 0);
               return total + price; 
             }, 0).toLocaleString()}</Typography><Typography variant='body2' sx={{ opacity: 0.9 }}>Based on {scanHistory.length} scans with product pricing</Typography></CardContent></Card></Grid>
+            
+            {/* Advanced Insights Section */}
+            <Grid item xs={12}>
+              <Paper sx={{ p: 2, bgcolor: 'info.lighter', borderLeft: '4px solid', borderLeftColor: 'info.main' }}>
+                <Typography variant='h6' sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Assessment /> Key Insights & Trends
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant='caption' color='text.secondary'>
+                          Average Scans per Location
+                        </Typography>
+                        <Typography variant='h5' fontWeight={700} color='primary.main'>
+                          {(() => {
+                            const locations = scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                              const existing = acc.find(l => l.location === scan.location); 
+                              if (existing) { existing.count++; } 
+                              else { acc.push({ location: scan.location, count: 1 }); } 
+                              return acc; 
+                            }, []);
+                            return locations.length > 0 ? Math.round(scanHistory.length / locations.length) : 0;
+                          })()}
+                        </Typography>
+                        <Typography variant='caption' color='success.main' sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                          <TrendingUp sx={{ fontSize: '0.9rem' }} /> Active locations: {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                            const existing = acc.find(l => l.location === scan.location); 
+                            if (existing) { existing.count++; } 
+                            else { acc.push({ location: scan.location, count: 1 }); } 
+                            return acc; 
+                          }, []).length}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant='caption' color='text.secondary'>
+                          Peak Hour Activity
+                        </Typography>
+                        <Typography variant='h5' fontWeight={700} color='secondary.main'>
+                          {(() => {
+                            const hourCounts = {};
+                            scanHistory.forEach(scan => {
+                              try {
+                                let scanDate = null;
+                                if (scan.scannedAt) scanDate = new Date(scan.scannedAt);
+                                else if (scan.createdAt) scanDate = new Date(scan.createdAt);
+                                else if (scan.timestamp) scanDate = new Date(scan.timestamp);
+                                
+                                if (scanDate && !isNaN(scanDate.getTime())) {
+                                  const hour = scanDate.getHours();
+                                  hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                                }
+                              } catch (e) {}
+                            });
+                            const peakHour = Object.keys(hourCounts).reduce((a, b) => hourCounts[a] > hourCounts[b] ? a : b, '0');
+                            return `${peakHour}:00`;
+                          })()}
+                        </Typography>
+                        <Typography variant='caption' color='text.secondary' sx={{ mt: 0.5, display: 'block' }}>
+                          Most active scanning time
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant='caption' color='text.secondary'>
+                          Scans per Member
+                        </Typography>
+                        <Typography variant='h5' fontWeight={700} color='warning.main'>
+                          {(() => {
+                            const uniqueMembers = [...new Set(scanHistory.map(s => s.memberId))].length;
+                            return uniqueMembers > 0 ? (scanHistory.length / uniqueMembers).toFixed(1) : 0;
+                          })()}
+                        </Typography>
+                        <Typography variant='caption' color='text.secondary' sx={{ mt: 0.5, display: 'block' }}>
+                          Active members: {[...new Set(scanHistory.map(s => s.memberId))].length}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant='caption' color='text.secondary'>
+                          Product Diversity
+                        </Typography>
+                        <Typography variant='h5' fontWeight={700} color='error.main'>
+                          {stats.topProducts?.length || 0}
+                        </Typography>
+                        <Typography variant='caption' color='text.secondary' sx={{ mt: 0.5, display: 'block' }}>
+                          Unique products scanned
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
             
             <Grid item xs={12}>
               <Card 
