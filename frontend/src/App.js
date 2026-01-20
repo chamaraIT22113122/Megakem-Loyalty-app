@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI } from './services/api';
@@ -265,6 +265,21 @@ function App() {
   const [comparisonData, setComparisonData] = useState(null);
   const [performanceMetrics, setPerformanceMetrics] = useState(null);
   
+  // Applicator & Hardware Info States
+  const [applicatorInfo, setApplicatorInfo] = useState([]);
+  const [applicatorDialog, setApplicatorDialog] = useState({ open: false, data: null });
+  const [applicatorFormData, setApplicatorFormData] = useState({
+    name: '',
+    memberId: '',
+    phoneNumber: '',
+    location: '',
+    equipment: '',
+    equipmentBrand: '',
+    purchaseDate: '',
+    condition: 'good',
+    notes: ''
+  });
+  
   const [showPassword, setShowPassword] = useState({
     adminLogin: false,
     userLogin: false,
@@ -278,6 +293,18 @@ function App() {
   });
   const scannerRef = useRef(null);
   const pollIntervalRef = useRef(null);
+
+  // Load applicator info from localStorage on mount
+  useEffect(() => {
+    const savedApplicatorInfo = localStorage.getItem('applicatorInfo');
+    if (savedApplicatorInfo) {
+      try {
+        setApplicatorInfo(JSON.parse(savedApplicatorInfo));
+      } catch (error) {
+        console.error('Error loading applicator info:', error);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -2881,6 +2908,7 @@ function App() {
               <Tab icon={<EmojiEvents />} label='Members & Loyalty' />
               <Tab icon={<CardGiftcard />} label='Cash Rewards' />
               <Tab icon={<Category />} label='Products' />
+              <Tab icon={<Build />} label='Applicator & Hardware' />
               <Tab icon={<Settings />} label='Profile' />
             </Tabs>
           </Paper>
@@ -4625,7 +4653,211 @@ function App() {
             </TableContainer>
           </Box>}
 
-          {((adminTab === 6 && isMainAdmin()) || (adminTab === 5 && !isMainAdmin())) && <Grid container spacing={3}>
+          {/* Applicator & Hardware Info Tab */}
+          {((adminTab === 6 && isMainAdmin()) || (adminTab === 5 && !isMainAdmin())) && <Box>
+            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              <Box>
+                <Typography variant='h6' sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Build /> Applicator & Hardware Information
+                </Typography>
+                <Typography variant='body2' color='text.secondary'>
+                  Manage applicator details and their equipment information
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant='outlined'
+                  startIcon={<FileDownload />}
+                  onClick={() => {
+                    if (applicatorInfo.length === 0) {
+                      showNotification('No data to export', 'warning');
+                      return;
+                    }
+                    
+                    const wb = XLSX.utils.book_new();
+                    const wsData = [
+                      ['Applicator & Hardware Information Report'],
+                      ['Generated:', new Date().toLocaleString()],
+                      [],
+                      ['Name', 'Member ID', 'Phone Number', 'Location', 'Equipment Type', 'Equipment Brand', 'Purchase Date', 'Condition', 'Notes'],
+                      ...applicatorInfo.map(a => [
+                        a.name,
+                        a.memberId,
+                        a.phoneNumber || '',
+                        a.location || '',
+                        a.equipment || '',
+                        a.equipmentBrand || '',
+                        a.purchaseDate || '',
+                        a.condition || '',
+                        a.notes || ''
+                      ])
+                    ];
+                    
+                    const ws = XLSX.utils.aoa_to_sheet(wsData);
+                    ws['!cols'] = [
+                      { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 15 },
+                      { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 30 }
+                    ];
+                    
+                    XLSX.utils.book_append_sheet(wb, ws, 'Applicator Info');
+                    XLSX.writeFile(wb, `applicator_hardware_info_${new Date().toISOString().split('T')[0]}.xlsx`);
+                    showNotification('Data exported successfully!', 'success');
+                  }}
+                  disabled={applicatorInfo.length === 0}
+                >
+                  Export
+                </Button>
+                <Button
+                  variant='contained'
+                  startIcon={<Add />}
+                  onClick={() => {
+                    setApplicatorFormData({
+                      name: '',
+                      memberId: '',
+                      phoneNumber: '',
+                      location: '',
+                      equipment: '',
+                      equipmentBrand: '',
+                      purchaseDate: '',
+                      condition: 'good',
+                      notes: ''
+                    });
+                    setApplicatorDialog({ open: true, data: null });
+                  }}
+                >
+                  Applicator & Hardware Info
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Statistics Cards */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card>
+                  <CardContent>
+                    <Typography variant='caption' color='text.secondary'>Total Applicators</Typography>
+                    <Typography variant='h4' fontWeight={700} color='primary.main'>
+                      {applicatorInfo.length}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card>
+                  <CardContent>
+                    <Typography variant='caption' color='text.secondary'>Equipment Tracked</Typography>
+                    <Typography variant='h4' fontWeight={700} color='success.main'>
+                      {applicatorInfo.filter(a => a.equipment).length}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card>
+                  <CardContent>
+                    <Typography variant='caption' color='text.secondary'>Good Condition</Typography>
+                    <Typography variant='h4' fontWeight={700} color='info.main'>
+                      {applicatorInfo.filter(a => a.condition === 'good').length}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card>
+                  <CardContent>
+                    <Typography variant='caption' color='text.secondary'>Needs Attention</Typography>
+                    <Typography variant='h4' fontWeight={700} color='warning.main'>
+                      {applicatorInfo.filter(a => a.condition === 'fair' || a.condition === 'poor').length}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* Applicator List Table */}
+            <Card>
+              <CardContent>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: 'grey.100' }}>
+                        <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Member ID</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {applicatorInfo.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} align='center'>
+                            <Box sx={{ py: 4 }}>
+                              <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+                              <Typography variant='body1' color='text.secondary'>
+                                No applicator information added yet
+                              </Typography>
+                              <Typography variant='body2' color='text.secondary'>
+                                Click "Applicator & Hardware Info" to get started
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        applicatorInfo.map((applicator, index) => (
+                          <TableRow key={index} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                            <TableCell>
+                              <Typography variant='body2' fontWeight={600}>
+                                {applicator.name}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip label={applicator.memberId} size='small' color='primary' />
+                            </TableCell>
+                            <TableCell>{applicator.phoneNumber || '-'}</TableCell>
+                            <TableCell>{applicator.location || '-'}</TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Tooltip title='Edit'>
+                                  <IconButton 
+                                    size='small' 
+                                    color='primary'
+                                    onClick={() => {
+                                      setApplicatorFormData(applicator);
+                                      setApplicatorDialog({ open: true, data: applicator });
+                                    }}
+                                  >
+                                    <Edit />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title='Delete'>
+                                  <IconButton 
+                                    size='small' 
+                                    color='error'
+                                    onClick={() => {
+                                      const newList = applicatorInfo.filter((_, i) => i !== index);
+                                      setApplicatorInfo(newList);
+                                      localStorage.setItem('applicatorInfo', JSON.stringify(newList));
+                                      showNotification('Applicator info deleted', 'success');
+                                    }}
+                                  >
+                                    <Delete />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Box>}
+
+          {/* Profile Settings Tab */}
+          {((adminTab === 7 && isMainAdmin()) || (adminTab === 6 && !isMainAdmin())) && <Grid container spacing={3}>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Profile Settings</Typography>{!editingProfile ? <Box><Typography variant='body1'><strong>Username:</strong> {user?.username}</Typography><Typography variant='body1'><strong>Email:</strong> {user?.email}</Typography><Button variant='outlined' startIcon={<Edit />} onClick={() => { setEditingProfile(true); setProfileData({ username: user?.username, email: user?.email }); }} sx={{ mt: 2 }}>Edit Profile</Button></Box> : <Box><TextField fullWidth label='Username' value={profileData.username} onChange={(e) => setProfileData({ ...profileData, username: e.target.value })} sx={{ mb: 2 }} /><TextField fullWidth label='Email' type='email' value={profileData.email} onChange={(e) => setProfileData({ ...profileData, email: e.target.value })} sx={{ mb: 2 }} /><Box sx={{ display: 'flex', gap: 1 }}><Button variant='contained' startIcon={<Save />} onClick={handleUpdateProfile} disabled={loading}>Save</Button><Button variant='outlined' startIcon={<Cancel />} onClick={() => setEditingProfile(false)}>Cancel</Button></Box></Box>}</CardContent></Card></Grid>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Change Password</Typography><TextField fullWidth type={showPassword.currentPassword ? 'text' : 'password'} label='Current Password' value={passwordData.currentPassword} onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, currentPassword: !showPassword.currentPassword })} edge="end" size="small">{showPassword.currentPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><TextField fullWidth type={showPassword.newPassword ? 'text' : 'password'} label='New Password' value={passwordData.newPassword} onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, newPassword: !showPassword.newPassword })} edge="end" size="small">{showPassword.newPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><TextField fullWidth type={showPassword.confirmPassword ? 'text' : 'password'} label='Confirm New Password' value={passwordData.confirmPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, confirmPassword: !showPassword.confirmPassword })} edge="end" size="small">{showPassword.confirmPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><Button variant='contained' onClick={handleChangePassword} disabled={loading}>Change Password</Button></CardContent></Card></Grid>
             
@@ -7044,6 +7276,147 @@ function App() {
             variant='contained'
           >
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Applicator & Hardware Info Dialog */}
+      <Dialog 
+        open={applicatorDialog.open} 
+        onClose={() => setApplicatorDialog({ open: false, data: null })} 
+        maxWidth='md' 
+        fullWidth
+      >
+        <DialogTitle>
+          {applicatorDialog.data ? 'Edit Applicator Information' : 'Add Applicator Information'}
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Name'
+                value={applicatorFormData.name}
+                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, name: e.target.value })}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Member ID'
+                value={applicatorFormData.memberId}
+                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, memberId: e.target.value.toUpperCase() })}
+                required
+                helperText='Must match existing member ID'
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Phone Number'
+                value={applicatorFormData.phoneNumber}
+                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, phoneNumber: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Location</InputLabel>
+                <Select
+                  value={applicatorFormData.location}
+                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, location: e.target.value })}
+                  label='Location'
+                >
+                  <MenuItem value=''>Select Location</MenuItem>
+                  <MenuItem value='Colombo'>Colombo</MenuItem>
+                  <MenuItem value='Gampaha'>Gampaha</MenuItem>
+                  <MenuItem value='Kalutara'>Kalutara</MenuItem>
+                  <MenuItem value='Kandy'>Kandy</MenuItem>
+                  <MenuItem value='Matale'>Matale</MenuItem>
+                  <MenuItem value='Nuwara Eliya'>Nuwara Eliya</MenuItem>
+                  <MenuItem value='Galle'>Galle</MenuItem>
+                  <MenuItem value='Matara'>Matara</MenuItem>
+                  <MenuItem value='Hambantota'>Hambantota</MenuItem>
+                  <MenuItem value='Jaffna'>Jaffna</MenuItem>
+                  <MenuItem value='Kilinochchi'>Kilinochchi</MenuItem>
+                  <MenuItem value='Mannar'>Mannar</MenuItem>
+                  <MenuItem value='Vavuniya'>Vavuniya</MenuItem>
+                  <MenuItem value='Mullaitivu'>Mullaitivu</MenuItem>
+                  <MenuItem value='Batticaloa'>Batticaloa</MenuItem>
+                  <MenuItem value='Ampara'>Ampara</MenuItem>
+                  <MenuItem value='Trincomalee'>Trincomalee</MenuItem>
+                  <MenuItem value='Kurunegala'>Kurunegala</MenuItem>
+                  <MenuItem value='Puttalam'>Puttalam</MenuItem>
+                  <MenuItem value='Anuradhapura'>Anuradhapura</MenuItem>
+                  <MenuItem value='Polonnaruwa'>Polonnaruwa</MenuItem>
+                  <MenuItem value='Badulla'>Badulla</MenuItem>
+                  <MenuItem value='Monaragala'>Monaragala</MenuItem>
+                  <MenuItem value='Ratnapura'>Ratnapura</MenuItem>
+                  <MenuItem value='Kegalle'>Kegalle</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Hardware for Applicator</InputLabel>
+                <Select
+                  value={applicatorFormData.equipment}
+                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, equipment: e.target.value })}
+                  label='Hardware for Applicator'
+                >
+                  <MenuItem value=''>None</MenuItem>
+                  <MenuItem value='Hardware'>Hardware</MenuItem>
+                  <MenuItem value='Applicator'>Applicator</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label='Notes'
+                value={applicatorFormData.notes}
+                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, notes: e.target.value })}
+                multiline
+                rows={3}
+                helperText='Additional notes about the applicator or hardware'
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button 
+            onClick={() => setApplicatorDialog({ open: false, data: null })}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant='contained'
+            onClick={() => {
+              if (!applicatorFormData.name || !applicatorFormData.memberId) {
+                showNotification('Please fill in required fields', 'error');
+                return;
+              }
+              
+              let newList;
+              if (applicatorDialog.data) {
+                // Edit existing
+                newList = applicatorInfo.map(item => 
+                  item.memberId === applicatorDialog.data.memberId ? applicatorFormData : item
+                );
+                showNotification('Applicator info updated', 'success');
+              } else {
+                // Add new
+                newList = [...applicatorInfo, applicatorFormData];
+                showNotification('Applicator info added', 'success');
+              }
+              
+              setApplicatorInfo(newList);
+              localStorage.setItem('applicatorInfo', JSON.stringify(newList));
+              setApplicatorDialog({ open: false, data: null });
+            }}
+            disabled={!applicatorFormData.name || !applicatorFormData.memberId}
+          >
+            {applicatorDialog.data ? 'Update' : 'Add'}
           </Button>
         </DialogActions>
       </Dialog>
