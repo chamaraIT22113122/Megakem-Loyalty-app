@@ -46,6 +46,11 @@ const scanSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  points: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   location: {
     type: String,
     trim: true

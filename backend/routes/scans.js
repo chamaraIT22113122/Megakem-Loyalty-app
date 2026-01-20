@@ -129,9 +129,11 @@ router.post('/', optionalAuth, async (req, res) => {
       });
     }
 
-    // Try to get product price if not provided
+    // Try to get product price and points if not provided
     let productPrice = req.body.price;
-    if ((!productPrice || productPrice === 0) && productNo) {
+    let productPoints = 0;
+    
+    if (productNo) {
       // First try to find exact match with product code and pack size (category)
       let product = await Product.findOne({ 
         productNo: productNo.toUpperCase(),
@@ -150,7 +152,7 @@ router.post('/', optionalAuth, async (req, res) => {
             const packSizePricing = product.packSizePricing.find(ps => 
               ps.packSize.toUpperCase() === qty.toUpperCase()
             );
-            if (packSizePricing) {
+            if (packSizePricing && (!productPrice || productPrice === 0)) {
               productPrice = packSizePricing.price;
             }
           }
@@ -158,8 +160,31 @@ router.post('/', optionalAuth, async (req, res) => {
       }
       
       // Use default price if no specific pricing found
-      if (product && !productPrice) {
+      if (product && (!productPrice || productPrice === 0)) {
         productPrice = product.price || 0;
+      }
+      
+      // Calculate loyalty points based on product configuration
+      if (product) {
+        // Check if product has pack-size specific points
+        if (product.pointsPerPackSize && product.pointsPerPackSize.length > 0 && qty) {
+          const packPoints = product.pointsPerPackSize.find(ps => 
+            ps.packSize.toUpperCase() === qty.toUpperCase()
+          );
+          if (packPoints) {
+            productPoints = packPoints.points || 0;
+          }
+        }
+        
+        // If no pack-size points, check for fixed points per product
+        if (productPoints === 0 && product.pointsPerProduct !== null && product.pointsPerProduct !== undefined) {
+          productPoints = product.pointsPerProduct;
+        }
+        
+        // If no fixed points, use price-based calculation (1 point per 1000 Rs)
+        if (productPoints === 0 && productPrice > 0) {
+          productPoints = Math.floor(productPrice / 1000);
+        }
       }
     }
 
@@ -172,7 +197,8 @@ router.post('/', optionalAuth, async (req, res) => {
       batchNo,
       bagNo,
       qty,
-      price: productPrice || 0
+      price: productPrice || 0,
+      points: productPoints
     };
 
     // Add user ID if authenticated
@@ -185,27 +211,11 @@ router.post('/', optionalAuth, async (req, res) => {
     // Create or update member from scan
     await updateMemberFromScan(scan);
 
-    // Award points if user is authenticated
+    // Update scan count if user is authenticated
     if (req.user) {
       const user = await User.findById(req.user._id);
       if (user) {
-        await user.addPoints(10); // 10 points per scan
         user.totalScans += 1;
-        
-        // Check for achievements
-        if (user.totalScans === 1 && !user.achievements.some(a => a.name === 'First Scan')) {
-          user.achievements.push({ name: 'First Scan' });
-        }
-        if (user.totalScans === 10 && !user.achievements.some(a => a.name === '10 Scans')) {
-          user.achievements.push({ name: '10 Scans' });
-        }
-        if (user.totalScans === 50 && !user.achievements.some(a => a.name === '50 Scans')) {
-          user.achievements.push({ name: '50 Scans' });
-        }
-        if (user.totalScans === 100 && !user.achievements.some(a => a.name === 'Century Club')) {
-          user.achievements.push({ name: 'Century Club' });
-        }
-        
         await user.save();
       }
     }
@@ -253,14 +263,56 @@ router.post('/batch', optionalAuth, async (req, res) => {
           bagNo: scan.bagNo
         });
       } else {
-        // Try to get product price if not provided
+        // Try to get product price and points if not provided
         let productPrice = scan.price;
-        if (!productPrice && scan.productNo) {
-          const product = await Product.findOne({ 
-            productNo: scan.productNo.toUpperCase() 
+        let productPoints = 0;
+        
+        if (scan.productNo) {
+          // Try to find product
+          let product = await Product.findOne({ 
+            productNo: scan.productNo.toUpperCase(),
+            category: scan.qty ? scan.qty.toUpperCase() : undefined
           });
+          
+          if (!product) {
+            product = await Product.findOne({ 
+              productNo: scan.productNo.toUpperCase() 
+            });
+          }
+          
           if (product) {
-            productPrice = product.price || 0;
+            // Get price
+            if (!productPrice || productPrice === 0) {
+              if (product.packSizePricing && product.packSizePricing.length > 0 && scan.qty) {
+                const packSizePricing = product.packSizePricing.find(ps => 
+                  ps.packSize.toUpperCase() === scan.qty.toUpperCase()
+                );
+                if (packSizePricing) {
+                  productPrice = packSizePricing.price;
+                }
+              }
+              if (!productPrice) {
+                productPrice = product.price || 0;
+              }
+            }
+            
+            // Calculate points
+            if (product.pointsPerPackSize && product.pointsPerPackSize.length > 0 && scan.qty) {
+              const packPoints = product.pointsPerPackSize.find(ps => 
+                ps.packSize.toUpperCase() === scan.qty.toUpperCase()
+              );
+              if (packPoints) {
+                productPoints = packPoints.points || 0;
+              }
+            }
+            
+            if (productPoints === 0 && product.pointsPerProduct !== null && product.pointsPerProduct !== undefined) {
+              productPoints = product.pointsPerProduct;
+            }
+            
+            if (productPoints === 0 && productPrice > 0) {
+              productPoints = Math.floor(productPrice / 1000);
+            }
           }
         }
 
@@ -268,6 +320,7 @@ router.post('/batch', optionalAuth, async (req, res) => {
           ...scan,
           memberId: scan.memberId.toUpperCase(),
           price: productPrice || 0,
+          points: productPoints,
           userId: req.user ? req.user._id : undefined
         });
       }
@@ -288,11 +341,10 @@ router.post('/batch', optionalAuth, async (req, res) => {
       await updateMemberFromScan(scan);
     }
 
-    // Award points if user is authenticated
+    // Update scan count if user is authenticated
     if (req.user) {
       const user = await User.findById(req.user._id);
       if (user) {
-        await user.addPoints(createdScans.length * 10); // 10 points per scan
         user.totalScans += createdScans.length;
         await user.save();
       }
@@ -496,8 +548,8 @@ async function updateMemberFromScan(scan) {
       }
     }
 
-    // Calculate and add points for this scan
-    const pointsEarned = await calculatePointsForScan(scan);
+    // Use points from scan (already calculated during scan creation)
+    const pointsEarned = scan.points || 0;
     member.points += pointsEarned;
     member.totalScans += 1;
     member.lastScanDate = scan.timestamp || new Date();

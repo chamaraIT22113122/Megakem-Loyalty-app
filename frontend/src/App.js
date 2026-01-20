@@ -589,7 +589,7 @@ function App() {
       'Member ID': scan.memberId || 'N/A',
       'Phone': scan.phone || 'N/A',
       'Location': scan.location || 'N/A',
-      'Points': scan.points || 0
+      'Loyalty Points': scan.points || 0
     }));
     exportToExcel(exportData, 'Purchase_History', 'History');
   };
@@ -804,6 +804,11 @@ function App() {
       // Refresh dashboard immediately after submission
       await refreshScanHistory();
       
+      // Reload members to keep Members tab in sync
+      if (adminAuth) {
+        await reloadMembers();
+      }
+      
       if (response.data.duplicates && response.data.duplicates.length > 0) {
         showNotification(`${response.data.count} items submitted. ${response.data.duplicates.length} duplicates skipped.`, 'warning');
       } else {
@@ -903,6 +908,18 @@ function App() {
       console.log('✅ Products loaded:', productsRes.data.data.length, 'products');
     } catch (error) {
       console.error('❌ Error loading admin data:', error);
+    }
+  };
+
+  // Function to reload only members data (for keeping members tab in sync)
+  const reloadMembers = async () => {
+    if (!adminAuth) return;
+    try {
+      const membersRes = await membersAPI.getAll();
+      setMembers(membersRes.data.data || []);
+      console.log('✅ Members reloaded:', membersRes.data.data.length, 'members');
+    } catch (error) {
+      console.error('❌ Error reloading members:', error);
     }
   };
 
@@ -1125,6 +1142,8 @@ function App() {
       showNotification('Scan deleted successfully!', 'success');
       addToActivityLog('Scan Deleted', `Deleted scan ID: ${deleteDialog.scanId}`, 'warning');
       setDeleteDialog({ open: false, scanId: null, scanDetails: null });
+      // Reload members to keep Members tab in sync
+      await reloadMembers();
     } catch (error) {
       console.error('Delete scan error:', error);
       console.error('Error response:', error.response?.data);
@@ -1587,6 +1606,9 @@ function App() {
           // Reload scans from backend to get updated data
           const scansRes = await scansAPI.getLive();
           setScanHistory(scansRes.data.data);
+          
+          // Reload members to keep Members tab in sync
+          await reloadMembers();
         } catch (error) {
           console.error('Error restoring scans:', error);
           showNotification('Failed to restore scans to database', 'error', 5000);
@@ -1763,34 +1785,21 @@ function App() {
         </Box>}
 
         {view === 'history' && <Box sx={{ py: { xs: 2, sm: 3 }, animation: 'fadeIn 0.5s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, gap: 2, flexWrap: 'wrap' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <IconButton 
-                onClick={() => setView('welcome')} 
-                sx={{ 
-                  bgcolor: 'primary.lighter',
-                  '&:hover': { bgcolor: 'primary.light', transform: 'translateX(-4px)' },
-                  transition: 'all 0.3s'
-                }}
-              >
-                <ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main' }} />
-              </IconButton>
-              <Box>
-                <Typography variant='h4' fontWeight={800} sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>Purchase History</Typography>
-                <Typography variant='body2' color='text.secondary'>Search and track your purchase history</Typography>
-              </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
+            <IconButton 
+              onClick={() => setView('welcome')} 
+              sx={{ 
+                bgcolor: 'primary.lighter',
+                '&:hover': { bgcolor: 'primary.light', transform: 'translateX(-4px)' },
+                transition: 'all 0.3s'
+              }}
+            >
+              <ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main' }} />
+            </IconButton>
+            <Box>
+              <Typography variant='h4' fontWeight={800} sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>Purchase History</Typography>
+              <Typography variant='body2' color='text.secondary'>Search and track your purchase history</Typography>
             </Box>
-            {memberHistory.length > 0 && (
-              <Button
-                variant='contained'
-                color='success'
-                startIcon={<FileDownload />}
-                onClick={handleExportPurchaseHistory}
-                sx={{ minWidth: 150 }}
-              >
-                Export to Excel
-              </Button>
-            )}
           </Box>
           <Card sx={{ mb: 3, overflow: 'hidden', boxShadow: '0 8px 32px -8px rgba(0,51,102,0.2)', bgcolor: 'background.paper' }}>
             <Box sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', p: 2, color: 'white' }}>
@@ -1935,11 +1944,11 @@ function App() {
                     </Grid>
                     <Grid item xs={6} sm={6}>
                       <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                        <TrendingUp sx={{ fontSize: 40, mb: 1 }} />
+                        <EmojiEvents sx={{ fontSize: 40, mb: 1 }} />
                         <Typography variant='h3' fontWeight={700}>
-                          Rs. {memberHistory.reduce((sum, s) => sum + (s.price || 0), 0).toLocaleString()}
+                          {memberHistory.reduce((sum, s) => sum + (s.points || 0), 0).toLocaleString()}
                         </Typography>
-                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Total Purchase Value</Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Total Loyalty Points</Typography>
                       </Box>
                     </Grid>
                   </Grid>
@@ -1983,16 +1992,15 @@ function App() {
                 </Box>
               </Card>
               {memberHistory.map((scan, idx) => {
-                const basePoints = Math.floor((scan.price || 0) / 1000);
-                const bonusPoints = scan.role === 'applicator' ? Math.floor(basePoints * 0.1) : 0;
-                const totalPoints = basePoints + bonusPoints;
+                const loyaltyPoints = scan.points || 0;
                 return (
                 <Card key={scan._id || idx} sx={{ mb: 2, position: 'relative', overflow: 'visible' }}>
-                  {/* Price Badge */}
+                  {/* Loyalty Points Badge */}
                   <Box sx={{ position: 'absolute', top: -12, right: 16, zIndex: 1 }}>
                     <Chip 
-                      label={`Rs. ${(scan.price || 0).toLocaleString()}`} 
-                      color='primary' 
+                      icon={<EmojiEvents sx={{ fontSize: '1.1rem !important' }} />}
+                      label={`${loyaltyPoints} Points`} 
+                      color='success' 
                       sx={{ 
                         fontWeight: 700,
                         fontSize: '0.9rem',
@@ -2029,16 +2037,16 @@ function App() {
                       return null;
                     })()}
                     
-                    {/* Purchase Price Information */}
-                    {scan.price > 0 && (
-                      <Box sx={{ mt: 2, p: 1.5, bgcolor: 'info.lighter', borderRadius: 1, border: '1px solid', borderColor: 'info.light' }}>
+                    {/* Loyalty Points Information */}
+                    {loyaltyPoints > 0 && (
+                      <Box sx={{ mt: 2, p: 1.5, bgcolor: 'success.lighter', borderRadius: 1, border: '1px solid', borderColor: 'success.light' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Typography variant='body2' fontWeight={700} color='primary.main'>
-                            Purchase Value:
+                          <Typography variant='body2' fontWeight={700} color='success.main' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <EmojiEvents sx={{ fontSize: '1.2rem' }} /> Loyalty Points Earned:
                           </Typography>
                           <Chip 
-                            label={`Rs. ${scan.price.toLocaleString()}`} 
-                            color='primary' 
+                            label={`${loyaltyPoints} Points`} 
+                            color='success' 
                             size='small'
                             sx={{ fontWeight: 700 }}
                           />
@@ -2061,107 +2069,401 @@ function App() {
 
         {view === 'profile' && (() => {
           const currentMember = members.find(m => m.memberId === memberId?.toUpperCase());
+          const memberScans = scanHistory.filter(s => s.memberId === currentMember?.memberId) || [];
+          const totalScans = memberScans.length;
+          const totalAmount = memberScans.reduce((sum, s) => sum + (s.price || 0), 0);
+          const totalPoints = memberScans.reduce((sum, s) => sum + (s.points || 0), 0);
+          
           return (
-            <Box sx={{ py: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <IconButton onClick={() => setView(adminAuth ? 'admin' : 'welcome')} sx={{ mr: 2 }}>
-                  <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
-                </IconButton>
-                <Typography variant="h4" fontWeight={700}>Member Profile</Typography>
+            <Box sx={{ 
+              minHeight: '100vh',
+              bgcolor: '#f5f7fa',
+              py: 3,
+              px: 2
+            }}>
+              {/* Header */}
+              <Box sx={{ 
+                maxWidth: '1400px',
+                mx: 'auto',
+                mb: 3
+              }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 2,
+                  mb: 3
+                }}>
+                  <IconButton 
+                    onClick={() => setView(adminAuth ? 'admin' : 'welcome')} 
+                    sx={{ 
+                      bgcolor: 'white',
+                      boxShadow: 2,
+                      '&:hover': { bgcolor: 'primary.main', color: 'white' }
+                    }}
+                  >
+                    <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
+                  </IconButton>
+                  <Typography variant="h4" fontWeight={700} color="text.primary">
+                    Member Profile
+                  </Typography>
+                </Box>
               </Box>
+
               {currentMember ? (
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={4}>
-                    <Card sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
-                      <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                        <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'secondary.main', fontSize: '2rem' }}>
-                          {currentMember.memberName?.[0]?.toUpperCase() || currentMember.memberId?.[0] || 'M'}
-                        </Avatar>
-                        <Typography variant="h5" fontWeight={700} gutterBottom>{currentMember.memberName || currentMember.memberId}</Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>{currentMember.memberId}</Typography>
-                        {currentMember.phone && <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>{currentMember.phone}</Typography>}
-                        <Chip 
-                          label={currentMember.role === 'applicator' ? 'Applicator' : 'Customer'} 
-                          color="secondary" 
-                          sx={{ fontWeight: 700, fontSize: '1rem' }} 
-                        />
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} md={8}>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <Card>
-                          <CardContent sx={{ textAlign: 'center' }}>
-                            <Typography variant="h4" fontWeight={700} color="primary">{currentMember.totalScans || 0}</Typography>
-                            <Typography variant="caption" color="text.secondary">Total Scans</Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Card>
-                          <CardContent sx={{ textAlign: 'center' }}>
-                            <Typography variant="h4" fontWeight={700} color="secondary">
-                              Rs. {(currentMember.totalCashRewards || 0).toLocaleString()}
+                <Box sx={{ maxWidth: '1400px', mx: 'auto' }}>
+                  {/* Top Section - Profile Card with Stats */}
+                  <Card sx={{ 
+                    mb: 3,
+                    borderRadius: 3,
+                    overflow: 'hidden',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                  }}>
+                    <Box sx={{ 
+                      background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90a4 100%)',
+                      p: 4
+                    }}>
+                      <Grid container spacing={4} alignItems="center">
+                        {/* Profile Info */}
+                        <Grid item xs={12} md={3}>
+                          <Box sx={{ textAlign: 'center', color: 'white' }}>
+                            <Avatar sx={{ 
+                              width: 120, 
+                              height: 120, 
+                              mx: 'auto', 
+                              mb: 2, 
+                              bgcolor: 'secondary.main',
+                              fontSize: '3rem',
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                              border: '4px solid rgba(255,255,255,0.2)'
+                            }}>
+                              {currentMember.memberName?.[0]?.toUpperCase() || currentMember.memberId?.[0] || 'M'}
+                            </Avatar>
+                            <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>
+                              {currentMember.memberName || currentMember.memberId}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">Total Cash Rewards</Typography>
-                          </CardContent>
-                        </Card>
+                            <Typography variant="h6" sx={{ opacity: 0.9, mb: 1 }}>
+                              {currentMember.memberId}
+                            </Typography>
+                            {currentMember.phone && (
+                              <Typography variant="body1" sx={{ opacity: 0.85, mb: 2 }}>
+                                📞 {currentMember.phone}
+                              </Typography>
+                            )}
+                            <Chip 
+                              label={currentMember.role === 'applicator' ? 'Applicator' : 'Customer'}
+                              sx={{ 
+                                bgcolor: 'secondary.main',
+                                color: 'white',
+                                fontWeight: 700,
+                                fontSize: '1.1rem',
+                                px: 3,
+                                py: 3,
+                                boxShadow: 2
+                              }}
+                            />
+                            {currentMember.location && (
+                              <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                                <Typography variant="body2" sx={{ opacity: 0.7, mb: 0.5 }}>
+                                  Location
+                                </Typography>
+                                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                                  📍 {currentMember.location}
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        </Grid>
+
+                        {/* Stats Cards */}
+                        <Grid item xs={12} md={9}>
+                          <Grid container spacing={3}>
+                            <Grid item xs={12} sm={4}>
+                              <Box sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.95)',
+                                borderRadius: 3,
+                                p: 3,
+                                textAlign: 'center',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                height: '100%'
+                              }}>
+                                <Box sx={{ 
+                                  width: 60,
+                                  height: 60,
+                                  borderRadius: '50%',
+                                  bgcolor: 'primary.lighter',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  mx: 'auto',
+                                  mb: 2
+                                }}>
+                                  <Typography variant="h4">📊</Typography>
+                                </Box>
+                                <Typography variant="h2" fontWeight={700} color="primary.main" sx={{ mb: 1 }}>
+                                  {totalScans}
+                                </Typography>
+                                <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                                  Total Scans
+                                </Typography>
+                              </Box>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                              <Box sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.95)',
+                                borderRadius: 3,
+                                p: 3,
+                                textAlign: 'center',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                height: '100%'
+                              }}>
+                                <Box sx={{ 
+                                  width: 60,
+                                  height: 60,
+                                  borderRadius: '50%',
+                                  bgcolor: 'success.lighter',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  mx: 'auto',
+                                  mb: 2
+                                }}>
+                                  <Typography variant="h4">💰</Typography>
+                                </Box>
+                                <Typography variant="h4" fontWeight={700} color="success.main" sx={{ mb: 1 }}>
+                                  Rs. {totalAmount.toLocaleString()}
+                                </Typography>
+                                <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                                  Total Amount
+                                </Typography>
+                              </Box>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                              <Box sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.95)',
+                                borderRadius: 3,
+                                p: 3,
+                                textAlign: 'center',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                height: '100%'
+                              }}>
+                                <Box sx={{ 
+                                  width: 60,
+                                  height: 60,
+                                  borderRadius: '50%',
+                                  bgcolor: 'warning.lighter',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  mx: 'auto',
+                                  mb: 2
+                                }}>
+                                  <EmojiEvents sx={{ fontSize: '2rem', color: 'warning.main' }} />
+                                </Box>
+                                <Typography variant="h2" fontWeight={700} color="warning.main" sx={{ mb: 1 }}>
+                                  {totalPoints.toLocaleString()}
+                                </Typography>
+                                <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                                  Loyalty Points
+                                </Typography>
+                              </Box>
+                            </Grid>
+                          </Grid>
+                        </Grid>
                       </Grid>
-                    </Grid>
-                    {currentMember.location && (
-                      <Card sx={{ mt: 2 }}>
-                        <CardContent>
-                          <Typography variant="body2" color="text.secondary">📍 Location: {currentMember.location}</Typography>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Card>
-                      <CardContent>
-                        <Typography variant="h6" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                          <HistoryIcon sx={{ mr: 1 }} /> Scan History
-                        </Typography>
-                        <Divider sx={{ my: 2 }} />
-                        {scanHistory.length > 0 ? (
-                          <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-                            {scanHistory.slice(0, 10).map((scan) => (
-                              <Box key={scan._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                                <Box>
-                                  <Typography variant="body1" fontWeight={600}>{scan.productName || scan.product?.name}</Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    Batch: {scan.batchNo} | Bag: {scan.bagNo}
-                                  </Typography>
+                    </Box>
+                  </Card>
+
+                  {/* Scan History Section */}
+                  <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+                    <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <HistoryIcon sx={{ fontSize: '2rem' }} />
+                        <Box>
+                          <Typography variant="h5" fontWeight={700}>Scan History</Typography>
+                          <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                            Complete purchase records and loyalty points earned
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+                    <Box sx={{ p: 3 }}>
+                      {memberScans.length > 0 ? (
+                        <Box sx={{ maxHeight: 700, overflow: 'auto' }}>
+                          {memberScans.map((scan, index) => (
+                              <Card key={scan._id} sx={{ 
+                                mb: 3, 
+                                position: 'relative', 
+                                overflow: 'visible',
+                                boxShadow: 3,
+                                transition: 'all 0.3s ease',
+                                '&:hover': {
+                                  boxShadow: 6,
+                                  transform: 'translateY(-4px)'
+                                }
+                              }}>
+                                <Box sx={{ position: 'absolute', top: -16, right: 20, zIndex: 1 }}>
+                                  <Chip 
+                                    icon={<EmojiEvents sx={{ fontSize: '1.2rem !important' }} />}
+                                    label={`${scan.points || 0} Points`} 
+                                    color='success' 
+                                    sx={{ 
+                                      fontWeight: 700, 
+                                      fontSize: '1rem', 
+                                      height: 40, 
+                                      boxShadow: 4,
+                                      px: 1.5
+                                    }}
+                                  />
+                                </Box>
+                                <CardContent sx={{ p: 3, pt: 4 }}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
+                                    <Typography variant="h6" fontWeight={700} color="text.primary">
+                                      {scan.productName || scan.product?.name}
+                                    </Typography>
+                                    <Chip 
+                                      label={scan.role} 
+                                      size="medium" 
+                                      color={scan.role === 'applicator' ? 'primary' : 'secondary'} 
+                                      sx={{ fontWeight: 700, px: 1.5 }} 
+                                    />
+                                  </Box>
+                                  <Box sx={{ display: 'flex', gap: 1.5, mb: 2.5, flexWrap: 'wrap' }}>
+                                    <Chip 
+                                      label={`Batch: ${scan.batchNo}`} 
+                                      size="medium" 
+                                      variant="outlined" 
+                                      sx={{ fontWeight: 600 }}
+                                    />
+                                    <Chip 
+                                      label={`Bag: ${scan.bagNo}`} 
+                                      size="medium" 
+                                      variant="outlined" 
+                                      sx={{ fontWeight: 600 }}
+                                    />
+                                    {scan.qty && (
+                                      <Chip 
+                                        label={`Pack: ${scan.qty}`} 
+                                        size="medium" 
+                                        variant="outlined"
+                                        color="primary"
+                                        sx={{ fontWeight: 600 }}
+                                      />
+                                    )}
+                                  </Box>
                                   {(() => {
                                     const batchInfo = parseBatchInfo(scan.batchNo);
                                     if (batchInfo?.parsed) {
                                       return (
-                                        <Typography variant="caption" display="block" color="primary.main" sx={{ mt: 0.5 }}>
-                                          {batchInfo.productCode} • Mat: {batchInfo.materialBatch} • {batchInfo.date}
-                                        </Typography>
+                                        <Box sx={{ 
+                                          mb: 2.5, 
+                                          p: 2, 
+                                          bgcolor: 'info.lighter', 
+                                          borderRadius: 2,
+                                          borderLeft: '4px solid',
+                                          borderColor: 'info.main'
+                                        }}>
+                                          <Typography variant="body2" color="info.main" fontWeight={700} display="block" sx={{ mb: 1 }}>
+                                            📋 Batch Details
+                                          </Typography>
+                                          <Grid container spacing={1}>
+                                            <Grid item xs={6}>
+                                              <Typography variant="caption" color="text.secondary" display="block">Product Code</Typography>
+                                              <Typography variant="body2" fontWeight={600}>{batchInfo.productCode}</Typography>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                              <Typography variant="caption" color="text.secondary" display="block">Material Batch</Typography>
+                                              <Typography variant="body2" fontWeight={600}>{batchInfo.materialBatch}</Typography>
+                                            </Grid>
+                                            <Grid item xs={4}>
+                                              <Typography variant="caption" color="text.secondary" display="block">Date</Typography>
+                                              <Typography variant="body2" fontWeight={600}>{batchInfo.date}</Typography>
+                                            </Grid>
+                                            <Grid item xs={4}>
+                                              <Typography variant="caption" color="text.secondary" display="block">Pack Size</Typography>
+                                              <Typography variant="body2" fontWeight={600}>{batchInfo.packSize}</Typography>
+                                            </Grid>
+                                            <Grid item xs={4}>
+                                              <Typography variant="caption" color="text.secondary" display="block">Pack No</Typography>
+                                              <Typography variant="body2" fontWeight={600}>{batchInfo.packNo}</Typography>
+                                            </Grid>
+                                          </Grid>
+                                        </Box>
                                       );
                                     }
                                     return null;
                                   })()}
-                                </Box>
-                                <Box sx={{ textAlign: 'right' }}>
-                                  <Chip label={scan.role} size="small" color={scan.role === 'applicator' ? 'primary' : 'secondary'} />
-                                  <Typography variant="caption" display="block" color="text.secondary">
-                                    {new Date(scan.timestamp || scan.scannedAt || scan.createdAt).toLocaleDateString()}
-                                  </Typography>
-                                </Box>
-                              </Box>
+                                  <Box sx={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between', 
+                                    alignItems: 'center', 
+                                    mt: 2.5, 
+                                    p: 2.5, 
+                                    background: 'linear-gradient(135deg, #e3f2fd 0%, #f1f8e9 100%)', 
+                                    borderRadius: 2,
+                                    boxShadow: 1
+                                  }}>
+                                    <Box>
+                                      <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ mb: 0.5 }}>
+                                        💰 Price
+                                      </Typography>
+                                      <Typography variant="h5" fontWeight={700} color="primary.main">
+                                        Rs. {(scan.price || 0).toLocaleString()}
+                                      </Typography>
+                                    </Box>
+                                    <Box sx={{ 
+                                      textAlign: 'right',
+                                      bgcolor: 'success.lighter',
+                                      p: 1.5,
+                                      borderRadius: 1.5,
+                                      minWidth: 120
+                                    }}>
+                                      <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ mb: 0.5 }}>
+                                        Points Earned
+                                      </Typography>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                        <EmojiEvents sx={{ fontSize: '1.5rem', color: 'success.main' }} />
+                                        <Typography variant="h5" fontWeight={700} color="success.main">
+                                          {scan.points || 0}
+                                        </Typography>
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                  <Box sx={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between', 
+                                    alignItems: 'center',
+                                    mt: 2.5,
+                                    pt: 2,
+                                    borderTop: '1px solid',
+                                    borderColor: 'divider'
+                                  }}>
+                                    {scan.location && (
+                                      <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                        <Box component="span" sx={{ fontSize: '1.2rem' }}>📍</Box>
+                                        {scan.location}
+                                      </Typography>
+                                    )}
+                                    <Typography variant="caption" color="text.disabled" fontWeight={600} sx={{ ml: 'auto' }}>
+                                      🕒 {new Date(scan.timestamp || scan.scannedAt || scan.createdAt).toLocaleString()}
+                                    </Typography>
+                                  </Box>
+                                </CardContent>
+                              </Card>
                             ))}
                           </Box>
                         ) : (
-                          <Typography variant="body2" color="text.secondary">No scan history available.</Typography>
+                          <Box sx={{ textAlign: 'center', py: 6 }}>
+                            <HistoryIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+                            <Typography variant="h6" color="text.secondary">No scan history available</Typography>
+                            <Typography variant="body2" color="text.disabled" sx={{ mt: 1 }}>
+                              Scans will appear here once products are scanned
+                            </Typography>
+                          </Box>
                         )}
-                      </CardContent>
+                      </Box>
                     </Card>
-                  </Grid>
-                </Grid>
-              ) : (
+                  </Box>
+                ) : (
                 <Card>
                   <CardContent sx={{ textAlign: 'center', py: 6 }}>
                     <Person sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
@@ -2238,8 +2540,16 @@ function App() {
                               </Box>
                             </Box>
                             <Box sx={{ textAlign: 'right' }}>
-                              <Typography variant="h5" fontWeight={700} color="primary">{member.totalScans || 0}</Typography>
-                              <Typography variant="caption" color="text.secondary">scans</Typography>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                                  <EmojiEvents sx={{ fontSize: '1rem', color: 'success.main' }} />
+                                  <Typography variant="h6" fontWeight={700} color="success.main">{member.points || 0}</Typography>
+                                </Box>
+                                <Typography variant="caption" color="text.secondary">Loyalty Points</Typography>
+                                <Divider sx={{ my: 0.5 }} />
+                                <Typography variant="h6" fontWeight={600} color="primary">{member.totalScans || 0}</Typography>
+                                <Typography variant="caption" color="text.secondary">Total Scans</Typography>
+                              </Box>
                             </Box>
                           </Box>
                         </CardContent>
@@ -2851,21 +3161,17 @@ function App() {
           </Box>}
 
           {((adminTab === 3 && isMainAdmin()) || (adminTab === 2 && !isMainAdmin())) && <Box>
-            <Box sx={{ mb: 2, display: 'flex', gap: 2, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-              <Box>
-                <Typography variant='h6' sx={{ fontWeight: 700 }}>Members & Monthly Purchases</Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  Total: {members.length} | Applicators: {members.filter(m => m.role === 'applicator').length} | Customers: {members.filter(m => m.role === 'customer').length}
-                </Typography>
-              </Box>
-              <Button 
-                variant='outlined' 
-                startIcon={<Settings />} 
-                onClick={() => setLoyaltyConfigDialog({ open: true })}
-                size='small'
-              >
-                Configure Cash Rewards
-              </Button>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant='h6' sx={{ fontWeight: 700 }}>MEMBERS & LOYALTY</Typography>
+              <Typography variant='body2' color='text.secondary'>
+                {(() => {
+                  // Calculate stats based on members who have scans
+                  const membersWithScans = members.filter(m => scanHistory.some(s => s.memberId === m.memberId));
+                  const applicatorsCount = membersWithScans.filter(m => m.role === 'applicator').length;
+                  const customersCount = membersWithScans.filter(m => m.role === 'customer').length;
+                  return `Total: ${membersWithScans.length} | Applicators: ${applicatorsCount} | Customers: ${customersCount}`;
+                })()}
+              </Typography>
             </Box>
             <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
               <TextField 
@@ -2907,19 +3213,21 @@ function App() {
                     <TableCell><strong>Role</strong></TableCell>
                     <TableCell><strong>Total Scans</strong></TableCell>
                     <TableCell><strong>Total Amount (Rs.)</strong></TableCell>
-                    <TableCell><strong>Cash Rewards (Rs.)</strong></TableCell>
+                    <TableCell><strong>Total Points</strong></TableCell>
                     <TableCell><strong>Actions</strong></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {(() => {
+                    // Filter to only show members who have scans in scanHistory
                     let filteredMembers = members.filter(m => {
+                      const hasScans = scanHistory.some(s => s.memberId === m.memberId);
                       const matchesSearch = !memberSearchQuery || 
                         m.memberId?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
                         m.memberName?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
                         m.phone?.toLowerCase().includes(memberSearchQuery.toLowerCase());
                       const matchesRole = memberRoleFilter === 'all' || m.role === memberRoleFilter;
-                      return matchesSearch && matchesRole;
+                      return hasScans && matchesSearch && matchesRole;
                     });
 
                     if (filteredMembers.length === 0) {
@@ -2941,8 +3249,8 @@ function App() {
                       const memberScans = scanHistory.filter(s => s.memberId === m.memberId);
                       const actualTotalScans = memberScans.length;
                       const actualTotalAmount = memberScans.reduce((sum, s) => sum + (s.price || 0), 0);
-                      // Use the member's totalCashRewards from database (calculated via monthly purchase rewards)
-                      const actualTotalCashRewards = m.totalCashRewards || 0;
+                      // Calculate total points from all scans
+                      const actualTotalPoints = memberScans.reduce((sum, s) => sum + (s.points || 0), 0);
                       
                       return (
                         <TableRow key={m._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
@@ -2974,10 +3282,11 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Chip 
-                              label={`Rs. ${actualTotalCashRewards.toLocaleString()}`}
+                              label={`${actualTotalPoints.toLocaleString()} pts`}
                               size='small' 
                               color='success' 
                               sx={{ fontWeight: 700, fontSize: '0.875rem' }}
+                              icon={<EmojiEvents sx={{ fontSize: '1rem !important' }} />}
                             />
                           </TableCell>
                           <TableCell>
@@ -3366,6 +3675,15 @@ function App() {
           </Box>}
 
           {((adminTab === 5 && isMainAdmin()) || (adminTab === 4 && !isMainAdmin())) && <Box>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant='h6' sx={{ fontWeight: 700, mb: 1 }}>Products & Loyalty Points</Typography>
+                <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 1, mb: 2 }}>
+                  <Typography variant='body2' color='info.dark' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <EmojiEvents sx={{ fontSize: '1.2rem' }} />
+                    <strong>Loyalty Points System:</strong> Each product can earn loyalty points for customers. Click the trophy icon to customize points for each product.
+                  </Typography>
+                </Box>
+              </Box>
               <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
                 <Button 
                   variant='contained' 
@@ -3391,7 +3709,7 @@ function App() {
             </Box>
             {console.log('🏷️ Rendering Products tab, products array:', products, 'Count:', products.length)}
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-              <Table><TableHead><TableRow><TableCell>Product Name</TableCell><TableCell>Product Code</TableCell><TableCell>Pack Size</TableCell><TableCell>Price (LKR)</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
+              <Table><TableHead><TableRow><TableCell>Product Name</TableCell><TableCell>Product Code</TableCell><TableCell>Pack Size</TableCell><TableCell>Price (LKR)</TableCell><TableCell>Loyalty Points</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
                 <TableBody>
                   {(() => {
                     const filteredProducts = products.filter(p => 
@@ -3404,7 +3722,7 @@ function App() {
                     if (filteredProducts.length === 0) {
                       return (
                         <TableRow>
-                          <TableCell colSpan={5} align="center">
+                          <TableCell colSpan={6} align="center">
                             <Box sx={{ py: 4 }}>
                               <Typography variant='body1' color='text.secondary'>
                                 {products.length === 0 ? 'No products found. Click "Add Product" to create one.' : 'No products match your search.'}
@@ -3418,7 +3736,45 @@ function App() {
                       );
                     }
                     
-                    return filteredProducts.map(p => <TableRow key={p._id}><TableCell>{p.name}</TableCell><TableCell>{p.productNo}</TableCell><TableCell>{p.category}</TableCell><TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell><TableCell><Box sx={{ display: 'flex', gap: 0.5 }}><IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Edit Product'><Edit /></IconButton><IconButton size='small' color='primary' onClick={() => setProductPointsDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Configure Points'><EmojiEvents /></IconButton><IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts')} title='Delete Product'><Delete /></IconButton></Box></TableCell></TableRow>);
+                    return filteredProducts.map(p => {
+                      // Calculate points display
+                      let pointsDisplay = 'Not Set';
+                      
+                      if (p.pointsPerPackSize && p.pointsPerPackSize.length > 0) {
+                        const pointsValues = p.pointsPerPackSize.map(ps => ps.points);
+                        const minPoints = Math.min(...pointsValues);
+                        const maxPoints = Math.max(...pointsValues);
+                        pointsDisplay = minPoints === maxPoints ? `${minPoints} pts` : `${minPoints}-${maxPoints} pts`;
+                      } else if (p.pointsPerProduct !== null && p.pointsPerProduct !== undefined) {
+                        pointsDisplay = `${p.pointsPerProduct} pts (Fixed)`;
+                      } else if (p.price > 0) {
+                        pointsDisplay = `~${Math.floor(p.price / 1000)} pts (Auto)`;
+                      }
+                      
+                      return (
+                        <TableRow key={p._id}>
+                          <TableCell>{p.name}</TableCell>
+                          <TableCell>{p.productNo}</TableCell>
+                          <TableCell>{p.category}</TableCell>
+                          <TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={pointsDisplay} 
+                              size='small' 
+                              color={pointsDisplay === 'Not Set' ? 'default' : 'success'}
+                              icon={<EmojiEvents sx={{ fontSize: '0.9rem !important' }} />}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                              <IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Edit Product'><Edit /></IconButton>
+                              <IconButton size='small' color='primary' onClick={() => setProductPointsDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Configure Points'><EmojiEvents /></IconButton>
+                              <IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts')} title='Delete Product'><Delete /></IconButton>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
                   })()}
                 </TableBody>
               </Table>
@@ -3980,20 +4336,26 @@ function App() {
             </DialogActions>
           </Dialog>
 
-          <Dialog open={productPointsDialog.open} onClose={() => setProductPointsDialog({ open: false, product: null })} maxWidth='sm' fullWidth>
+          <Dialog open={productPointsDialog.open} onClose={() => setProductPointsDialog({ open: false, product: null })} maxWidth='md' fullWidth>
             <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <EmojiEvents color='primary' />
-              Configure Product Points
+              Configure Product Loyalty Points
             </DialogTitle>
             <DialogContent>
               {productPointsDialog.product && (
                 <>
-                  <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
-                    Product: <strong>{productPointsDialog.product.name}</strong> ({productPointsDialog.product.productNo})
-                  </Typography>
+                  <Box sx={{ mb: 3, p: 2, bgcolor: 'primary.lighter', borderRadius: 1 }}>
+                    <Typography variant='body1' fontWeight={600} color='primary.main'>
+                      {productPointsDialog.product.name}
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary'>
+                      Product Code: {productPointsDialog.product.productNo}
+                    </Typography>
+                  </Box>
+                  
                   <TextField
                     fullWidth
-                    label='Points Per Product (Fixed)'
+                    label='Fixed Points Per Product'
                     type='number'
                     value={productPointsDialog.product.pointsPerProduct || ''}
                     onChange={(e) => setProductPointsDialog({
@@ -4004,18 +4366,85 @@ function App() {
                       }
                     })}
                     inputProps={{ min: 0 }}
-                    helperText='Set fixed points for this product (leave empty to use price-based calculation)'
-                    sx={{ mb: 2 }}
+                    helperText='Set fixed points for this product (leave empty to use price-based or pack-size specific points)'
+                    sx={{ mb: 3 }}
                   />
-                  <Typography variant='body2' fontWeight={600} sx={{ mb: 1 }}>
-                    Points Per Pack Size (Optional)
-                  </Typography>
-                  <Typography variant='caption' color='text.secondary' sx={{ mb: 2, display: 'block' }}>
-                    Set different points for different pack sizes. If not set, will use fixed points or price-based calculation.
-                  </Typography>
-                  <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                    <Typography variant='caption' color='text.secondary'>
-                      Pack size points configuration can be added here. For now, the system uses the fixed points or price-based calculation.
+                  
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant='body2' fontWeight={600} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <EmojiEvents sx={{ fontSize: '1.2rem' }} />
+                      Pack Size Specific Points
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary' sx={{ mb: 2, display: 'block' }}>
+                      Configure different loyalty points for different pack sizes. This overrides fixed points.
+                    </Typography>
+                    
+                    {productPointsDialog.product.packSizePricing && productPointsDialog.product.packSizePricing.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                        {productPointsDialog.product.packSizePricing.map((packSize, idx) => {
+                          const existingPoints = productPointsDialog.product.pointsPerPackSize?.find(p => p.packSize === packSize.packSize);
+                          return (
+                            <Box key={idx} sx={{ display: 'flex', gap: 2, alignItems: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant='body2' fontWeight={600}>{packSize.packSize}</Typography>
+                                <Typography variant='caption' color='text.secondary'>Price: Rs. {packSize.price?.toLocaleString() || 0}</Typography>
+                              </Box>
+                              <TextField
+                                label='Points'
+                                type='number'
+                                size='small'
+                                value={existingPoints?.points || ''}
+                                onChange={(e) => {
+                                  const newPoints = e.target.value ? parseInt(e.target.value) : 0;
+                                  const updatedPointsPerPackSize = [...(productPointsDialog.product.pointsPerPackSize || [])];
+                                  const existingIndex = updatedPointsPerPackSize.findIndex(p => p.packSize === packSize.packSize);
+                                  
+                                  if (existingIndex >= 0) {
+                                    updatedPointsPerPackSize[existingIndex] = { packSize: packSize.packSize, points: newPoints };
+                                  } else {
+                                    updatedPointsPerPackSize.push({ packSize: packSize.packSize, points: newPoints });
+                                  }
+                                  
+                                  setProductPointsDialog({
+                                    ...productPointsDialog,
+                                    product: {
+                                      ...productPointsDialog.product,
+                                      pointsPerPackSize: updatedPointsPerPackSize
+                                    }
+                                  });
+                                }}
+                                inputProps={{ min: 0 }}
+                                sx={{ width: 120 }}
+                              />
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    ) : (
+                      <Box sx={{ p: 2, bgcolor: 'warning.lighter', borderRadius: 1, border: '1px dashed', borderColor: 'warning.main' }}>
+                        <Typography variant='caption' color='warning.dark'>
+                          ⚠️ No pack sizes configured for this product. Add pack size pricing first to enable pack-size specific points.
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                  
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
+                    <Typography variant='caption' color='info.dark' sx={{ display: 'block', fontWeight: 600, mb: 1 }}>
+                      💡 How Points are Calculated:
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5 }}>
+                      1. If pack-size specific points are set → Use pack-size points
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5 }}>
+                      2. Else if fixed points are set → Use fixed points
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>
+                      3. Otherwise → Calculate based on price (1 point per Rs. 1000)
                     </Typography>
                   </Box>
                 </>
@@ -4031,7 +4460,7 @@ function App() {
                 disabled={loading || !productPointsDialog.product}
                 startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Save />}
               >
-                {loading ? 'Saving...' : 'Save Points'}
+                {loading ? 'Saving...' : 'Save Points Configuration'}
               </Button>
             </DialogActions>
           </Dialog>
