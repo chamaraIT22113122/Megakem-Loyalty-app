@@ -1,4 +1,13 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
+
+// Configure DNS fallback for MongoDB SRV resolution issues
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+  console.log('🌐 DNS fallback configured (8.8.8.8, 1.1.1.1)');
+} catch (err) {
+  console.warn('⚠️  Could not set custom DNS servers:', err.message);
+}
 
 const connectDB = async () => {
   try {
@@ -8,6 +17,7 @@ const connectDB = async () => {
       socketTimeoutMS: 45000,
       retryWrites: true,
       retryReads: true,
+      family: 4, // Force IPv4
     });
     console.log(`📦 MongoDB Connected: ${conn.connection.host}`);
     

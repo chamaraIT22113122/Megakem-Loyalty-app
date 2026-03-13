@@ -223,14 +223,16 @@ router.delete('/', protect, qrAdmin, async (req, res) => {
   }
 });
 
-// Bulk generate QR codes
+// Bulk generate QR codes with range support and duplicate prevention
 router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
   try {
-    const {
+    let {
       productId,
       quantity,
       batchNo,
-      packageNo,
+      packageNoPrefix = '',
+      startNo,
+      endNo,
       manufactureDate,
       expiryDate,
       customLink,
@@ -238,10 +240,26 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       printSettings
     } = req.body;
 
-    if (!productId || !quantity || !batchNo) {
+    if (!productId || !batchNo) {
       return res.status(400).json({
-        error: 'productId, quantity, and batchNo are required'
+        error: 'productId and batchNo are required'
       });
+    }
+
+    // Determine range
+    let start = parseInt(startNo);
+    let end = parseInt(endNo);
+    let qty = parseInt(quantity);
+
+    if (isNaN(start) || isNaN(end)) {
+      start = 1;
+      end = qty || 1;
+    } else {
+      qty = end - start + 1;
+    }
+
+    if (qty <= 0 || qty > 2000) {
+      return res.status(400).json({ error: 'Invalid quantity or range (max 2000 per batch)' });
     }
 
     const product = await Product.findById(productId);
@@ -249,28 +267,56 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const generatedQRs = [];
+    // Check for duplicates in the database first
+    const existingQRs = await QRCodeModel.find({
+      product: productId,
+      batchNo: batchNo,
+      status: { $ne: 'archived' }
+    });
 
-    for (let i = 0; i < quantity; i++) {
-      const qrId = `${product.productNo}-${batchNo}-${packageNo || 'STD'}-${i + 1}-${Date.now()}`;
-      const qrLink = customLink || `${baseUrl}/product/${product.productNo}?batch=${batchNo}&package=${packageNo}&seq=${i + 1}`;
+    const existingPackageNos = new Set(existingQRs.map(qr => qr.packageNo));
+    const duplicates = [];
+    for (let i = start; i <= end; i++) {
+       const pNo = `${packageNoPrefix}${i}`;
+       if (existingPackageNos.has(pNo)) {
+         duplicates.push(pNo);
+       }
+    }
+
+    if (duplicates.length > 0) {
+      return res.status(400).json({
+        error: `Duplicate package numbers detected in this batch: ${duplicates.slice(0, 5).join(', ')}${duplicates.length > 5 ? '...' : ''}`,
+        duplicateCount: duplicates.length
+      });
+    }
+
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const qrRecords = [];
+
+    // Generate in chunks with the database to avoid memory issues and long transactions
+    for (let i = start; i <= end; i++) {
+      const pNo = `${packageNoPrefix}${i}`;
+      const qrId = `${product.productNo}-${batchNo}-${pNo}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      
+      // The user wants the link and batch info in the QR
+      const qrLink = customLink || `${baseUrl}/scan?p=${product.productNo}&b=${batchNo}&pkg=${pNo}`;
+      
+      // Pipe delimited data as secondary info or for the scanner app
+      const pipeData = `${product.productNo}|${product.name}|${batchNo}|${pNo}|${product.packSize || 'N/A'}`;
 
       const qrDataUrl = await QRCode.toDataURL(qrLink, {
         errorCorrectionLevel: 'H',
-        type: 'image/png',
-        quality: 0.95,
         margin: 1,
         width: 300
       });
 
-      const qrRecord = new QRCodeModel({
+      qrRecords.push({
         qrId,
         product: productId,
         productName: product.name,
         productNo: product.productNo,
         batchNo,
-        packageNo,
+        packageNo: pNo,
         manufactureDate,
         expiryDate,
         qrLink,
@@ -284,16 +330,16 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
         },
         status: 'generated'
       });
-
-      await qrRecord.save();
-      generatedQRs.push(qrRecord);
     }
 
+    // Bulk insert
+    const savedCodes = await QRCodeModel.insertMany(qrRecords);
+
     res.status(201).json({
-      message: `Generated ${generatedQRs.length} QR codes in bulk`,
-      count: generatedQRs.length,
-      batchNo,
-      qrCodes: generatedQRs
+      message: `Generated ${savedCodes.length} QR codes for batch ${batchNo}`,
+      count: savedCodes.length,
+      range: `${packageNoPrefix}${start} to ${packageNoPrefix}${end}`,
+      batchNo
     });
   } catch (error) {
     console.error('Bulk QR generation error:', error);

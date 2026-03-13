@@ -555,9 +555,9 @@ router.post('/users', protect, async (req, res) => {
       });
     }
 
-    const { username, email, password, role, permissions } = req.body;
+    const { username, email, password, role, adminType, permissions } = req.body;
 
-    console.log('👥 Creating new user:', { username, email, role: role || 'user', permissions });
+    console.log('👥 Creating new user:', { username, email, role: role || 'user', adminType, permissions });
 
     // Validate input
     if (!username || !email || !password) {
@@ -589,6 +589,7 @@ router.post('/users', protect, async (req, res) => {
       email,
       password,
       role: role || 'user',
+      adminType: adminType || null,
       isActive: true
     };
 
@@ -598,7 +599,23 @@ router.post('/users', protect, async (req, res) => {
         canDelete: permissions.canDelete === true,
         canExport: permissions.canExport === true,
         canManageUsers: permissions.canManageUsers === true,
-        canManageProducts: permissions.canManageProducts === true
+        canManageProducts: permissions.canManageProducts === true,
+        canManageQRCodes: permissions.canManageQRCodes === true,
+        canPrintQRCodes: permissions.canPrintQRCodes === true,
+        canViewQRAnalytics: permissions.canViewQRAnalytics === true
+      };
+    }
+
+    // For QR admin type, automatically enable QR permissions
+    if (adminType === 'qr_admin') {
+      userData.permissions = {
+        canDelete: false,
+        canExport: false,
+        canManageUsers: false,
+        canManageProducts: false,
+        canManageQRCodes: true,
+        canPrintQRCodes: true,
+        canViewQRAnalytics: true
       };
     }
 
@@ -613,6 +630,7 @@ router.post('/users', protect, async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        adminType: user.adminType,
         isActive: user.isActive,
         permissions: user.permissions
       },

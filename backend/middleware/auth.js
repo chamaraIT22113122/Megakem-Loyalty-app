@@ -135,3 +135,49 @@ exports.optionalAuth = async (req, res, next) => {
     next();
   }
 };
+
+// QR Code Admin - can manage QR codes
+exports.qrAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Not authenticated'
+    });
+  }
+
+  // Allow super admin or QR admin
+  if (req.user.role === 'admin' || req.user.adminType === 'qr_admin' || req.user.permissions?.canManageQRCodes) {
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. QR code admin privileges required.'
+  });
+};
+
+// Check specific permissions
+exports.hasPermission = (permission) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated'
+      });
+    }
+
+    // Super admin has all permissions
+    if (req.user.role === 'admin') {
+      return next();
+    }
+
+    if (req.user.permissions && req.user.permissions[permission]) {
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: `Access denied. Missing permission: ${permission}`
+    });
+  };
+};

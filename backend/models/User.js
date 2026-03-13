@@ -56,7 +56,24 @@ const userSchema = new mongoose.Schema({
     canManageProducts: {
       type: Boolean,
       default: false
+    },
+    canManageQRCodes: {
+      type: Boolean,
+      default: false
+    },
+    canPrintQRCodes: {
+      type: Boolean,
+      default: false
+    },
+    canViewQRAnalytics: {
+      type: Boolean,
+      default: false
     }
+  },
+  adminType: {
+    type: String,
+    enum: ['super_admin', 'product_admin', 'qr_admin', 'analytics_admin'],
+    default: null
   },
   resetPasswordToken: String,
   resetPasswordExpires: Date

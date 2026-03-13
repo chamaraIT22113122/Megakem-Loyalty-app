@@ -63,10 +63,13 @@ const QRCodeManager = ({ userInfo, onShowNotification }) => {
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [batchNo, setBatchNo] = useState('');
   const [packageNo, setPackageNo] = useState('');
+  const [packageNoPrefix, setPackageNoPrefix] = useState('');
+  const [startNo, setStartNo] = useState(1);
+  const [endNo, setEndNo] = useState(100);
   const [manufactureDate, setManufactureDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [customLink, setCustomLink] = useState('');
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(100);
   const [selectedProduct, setSelectedProduct] = useState('');
   
   // Printer settings
@@ -187,8 +190,10 @@ const QRCodeManager = ({ userInfo, onShowNotification }) => {
         body: JSON.stringify({
           productId: selectedProduct,
           quantity: parseInt(quantity),
+          packageNoPrefix,
+          startNo: parseInt(startNo),
+          endNo: parseInt(endNo),
           batchNo,
-          packageNo,
           manufactureDate: manufactureDate ? new Date(manufactureDate).toISOString() : null,
           expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
           customLink,
@@ -306,33 +311,50 @@ const QRCodeManager = ({ userInfo, onShowNotification }) => {
 
   const generatePrintHTML = (qrs) => {
     const getSize = (size) => {
-      const sizes = { small: '3x3', medium: '4x6', large: '4x6' };
-      return sizes[size] || '4x6';
+      const sizes = { 
+        small: 'width: 50mm; height: 50mm;', 
+        medium: 'width: 101.6mm; height: 101.6mm;', // 4x4
+        large: 'width: 101.6mm; height: 152.4mm;'   // 4x6
+      };
+      return sizes[size] || sizes.medium;
     };
 
     let html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>QR Code Labels</title>
+        <title>Zebra ZD320 Print Job</title>
         <style>
-          body { margin: 0; padding: 10mm; font-family: Arial, sans-serif; }
+          @page { size: auto; margin: 0; }
+          body { margin: 0; padding: 0; background: #fff; }
           .label {
-            display: inline-block;
-            page-break-inside: avoid;
-            margin: 5mm;
-            padding: 10mm;
-            border: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            page-break-after: always;
+            box-sizing: border-box;
+            border: 1px dashed #eee;
+            padding: 5mm;
+            ${getSize(printSize)}
             text-align: center;
-            ${getSize(printSize) === '3x3' ? 'width: 75mm; height: 75mm;' : 'width: 101.6mm; height: 152.4mm;'}
+            overflow: hidden;
           }
-          .qr-container { margin: 10px 0; }
-          .qr-container img { max-width: 100%; height: auto; }
-          .product-info { font-size: 10px; margin: 5px 0; }
-          .scan-text { font-weight: bold; margin-top: 10px; font-size: 14px; }
+          .product-header { font-size: 14pt; font-weight: bold; margin-bottom: 2mm; text-transform: uppercase; }
+          .qr-container { width: 60%; margin: 2mm 0; }
+          .qr-container img { width: 100%; height: auto; display: block; }
+          .batch-info { font-size: 10pt; margin: 1mm 0; }
+          .scan-text { 
+            font-weight: 900; 
+            margin-top: 3mm; 
+            font-size: 18pt; 
+            letter-spacing: 2px;
+            border-top: 2px solid #000;
+            padding-top: 1mm;
+            width: 80%;
+          }
           @media print {
-            body { margin: 0; padding: 0; }
-            .label { margin: 0; page-break-inside: avoid; }
+            .label { border: none; }
           }
         </style>
       </head>
@@ -342,15 +364,16 @@ const QRCodeManager = ({ userInfo, onShowNotification }) => {
     qrs.forEach(qr => {
       html += `
         <div class="label">
-          <div class="product-info">
-            <strong>${qr.productName}</strong><br>
-            Batch: ${qr.batchNo}<br>
-            ${qr.packageNo ? `Package: ${qr.packageNo}<br>` : ''}
+          <div class="product-header">${qr.productName}</div>
+          <div class="batch-info">
+            BATCH: <strong>${qr.batchNo}</strong><br>
+            PKG: <strong>${qr.packageNo}</strong>
           </div>
           <div class="qr-container">
-            <img src="${qr.qrData}" alt="QR Code">
+            <img src="${qr.qrData}" alt="QR">
           </div>
           <div class="scan-text">SCAN ME</div>
+          <div style="font-size: 8pt; margin-top: 1mm;">Megakem Loyalty System</div>
         </div>
       `;
     });
@@ -604,30 +627,52 @@ const QRCodeManager = ({ userInfo, onShowNotification }) => {
 
           <TextField
             fullWidth
-            label="Quantity"
-            type="number"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            margin="normal"
-            inputProps={{ min: 1, max: 1000 }}
-          />
-
-          <TextField
-            fullWidth
             label="Batch Number"
             value={batchNo}
             onChange={(e) => setBatchNo(e.target.value)}
             margin="normal"
             required
+            helperText="Enter production batch number"
           />
 
-          <TextField
-            fullWidth
-            label="Package Number"
-            value={packageNo}
-            onChange={(e) => setPackageNo(e.target.value)}
-            margin="normal"
-          />
+          <Grid container spacing={2}>
+            <Grid item xs={4}>
+              <TextField
+                fullWidth
+                label="Prefix"
+                value={packageNoPrefix}
+                onChange={(e) => setPackageNoPrefix(e.target.value)}
+                margin="normal"
+                placeholder="e.g. PKG-"
+              />
+            </Grid>
+            <Grid item xs={4}>
+              <TextField
+                fullWidth
+                label="Start No"
+                type="number"
+                value={startNo}
+                onChange={(e) => setStartNo(e.target.value)}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={4}>
+              <TextField
+                fullWidth
+                label="End No"
+                type="number"
+                value={endNo}
+                onChange={(e) => setEndNo(e.target.value)}
+                margin="normal"
+                required
+              />
+            </Grid>
+          </Grid>
+
+          <Typography variant="caption" color="textSecondary">
+            This will generate {parseInt(endNo) - parseInt(startNo) + 1} QR codes.
+          </Typography>
 
           <TextField
             fullWidth
@@ -635,7 +680,8 @@ const QRCodeManager = ({ userInfo, onShowNotification }) => {
             value={customLink}
             onChange={(e) => setCustomLink(e.target.value)}
             margin="normal"
-            placeholder="https://yourdomain.com/product?id=123"
+            placeholder="https://yourdomain.com"
+            helperText="Optional: Override default product scan link"
           />
 
           <Typography variant="subtitle2" sx={{ mt: 3, mb: 2 }}>Printer Settings</Typography>

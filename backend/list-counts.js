@@ -1,0 +1,26 @@
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const path = require('path');
+const dns = require('dns');
+
+dns.setServers(['8.8.8.8']);
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+const checkData = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, { family: 4 });
+    const db = mongoose.connection.db;
+    const collections = await db.listCollections().toArray();
+    console.log('DB:', mongoose.connection.name);
+    for (const coll of collections) {
+      const count = await db.collection(coll.name).countDocuments();
+      console.log(`- ${coll.name}: ${count}`);
+    }
+    process.exit(0);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+};
+
+checkData();
