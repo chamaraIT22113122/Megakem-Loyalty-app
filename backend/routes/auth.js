@@ -265,6 +265,7 @@ router.post('/admin/login', [
         username: user.username,
         email: user.email,
         role: user.role,
+        permissions: user.permissions,
         token,
         refreshToken
       }
@@ -596,19 +597,21 @@ router.post('/users', protect, async (req, res) => {
     // Add permissions if provided
     if (permissions) {
       userData.permissions = {
-        canDelete: permissions.canDelete === true,
-        canExport: permissions.canExport === true,
-        canManageUsers: permissions.canManageUsers === true,
-        canManageProducts: permissions.canManageProducts === true,
-        canManageQRCodes: permissions.canManageQRCodes === true,
-        canPrintQRCodes: permissions.canPrintQRCodes === true,
-        canViewQRAnalytics: permissions.canViewQRAnalytics === true
+        canViewDashboard: permissions.canViewDashboard !== false,
+        canDelete: permissions.canDelete !== false,
+        canExport: permissions.canExport !== false,
+        canManageUsers: permissions.canManageUsers !== false,
+        canManageProducts: permissions.canManageProducts !== false,
+        canManageQRCodes: permissions.canManageQRCodes !== false,
+        canPrintQRCodes: permissions.canPrintQRCodes !== false,
+        canViewQRAnalytics: permissions.canViewQRAnalytics !== false
       };
     }
 
     // For QR admin type, automatically enable QR permissions
     if (adminType === 'qr_admin') {
       userData.permissions = {
+        canViewDashboard: true,
         canDelete: false,
         canExport: false,
         canManageUsers: false,
@@ -680,10 +683,12 @@ router.put('/users/:id', protect, async (req, res) => {
     // Update permissions
     if (permissions !== undefined) {
       user.permissions = {
-        canDelete: permissions.canDelete === true,
-        canExport: permissions.canExport === true,
-        canManageUsers: permissions.canManageUsers === true,
-        canManageProducts: permissions.canManageProducts === true
+        canViewDashboard: permissions.canViewDashboard !== false,
+        canDelete: permissions.canDelete !== false,
+        canExport: permissions.canExport !== false,
+        canManageUsers: permissions.canManageUsers !== false,
+        canManageProducts: permissions.canManageProducts !== false,
+        canManageQRCodes: permissions.canManageQRCodes !== false
       };
     }
 

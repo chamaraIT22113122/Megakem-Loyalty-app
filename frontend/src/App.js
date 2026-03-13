@@ -1,9 +1,10 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI } from './services/api';
+import QRCodeManager from './components/QRCodeManager';
 import megakemLogo from './assets/Megakem Logo.png';
 import megakemBrandLogo from './assets/Megakem Brand Logo-01.png';
 
@@ -201,7 +202,7 @@ function App() {
     return localStorage.getItem('adminEmail') || '';
   });
   const [adminPassword, setAdminPassword] = useState('');
-  const [adminTab, setAdminTab] = useState(0);
+  const [adminTab, setAdminTab] = useState('dashboard');
   const [userLoginEmail, setUserLoginEmail] = useState('');
   const [userLoginPassword, setUserLoginPassword] = useState('');
   const [showUserLogin, setShowUserLogin] = useState(false);
@@ -254,7 +255,7 @@ function App() {
   const [expandedCardDialog, setExpandedCardDialog] = useState({ open: false, type: null, data: [] });
   const [notificationPrefs, setNotificationPrefs] = useState({ email: true, push: true, autoRefresh: true, soundEnabled: false });
   const [activityLog, setActivityLog] = useState([]);
-  const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true });
+  const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true, canManageQRCodes: true });
   const [backupPasswordDialog, setBackupPasswordDialog] = useState({ open: false, password: '' });
   const [restorePasswordDialog, setRestorePasswordDialog] = useState({ open: false, password: '', file: null, backupData: null });
   
@@ -879,8 +880,8 @@ function App() {
     setLoading(true);
     try {
       const response = await authAPI.adminLogin({ email: adminEmail, password: adminPassword });
-      const { token, id, username, role, email } = response.data.data;
-      const userData = { id, username, role, email };
+      const { token, id, username, role, email, permissions } = response.data.data;
+      const userData = { id, username, role, email, permissions };
       localStorage.setItem('token', token);
       localStorage.setItem('adminAuth', 'true');
       localStorage.setItem('user', JSON.stringify(userData));
@@ -1100,7 +1101,7 @@ function App() {
   
   // Auto-refresh dashboard data every 30 seconds when enabled
   useEffect(() => {
-    if (autoRefresh && adminAuth && view === 'admin' && adminTab === 0) {
+    if (autoRefresh && adminAuth && view === 'admin' && adminTab === 'dashboard') {
       const interval = setInterval(() => {
         console.log('🔄 Auto-refreshing dashboard...');
         loadAdminData();
@@ -1110,6 +1111,31 @@ function App() {
       return () => clearInterval(interval);
     }
   }, [autoRefresh, adminAuth, view, adminTab]);
+
+  // Tab protection and redirection logic
+  useEffect(() => {
+    if (adminAuth && user && view === 'admin') {
+      const checkCurrentTab = () => {
+        if (adminTab === 'dashboard' && !hasPermission('canViewDashboard')) return false;
+        if (adminTab === 'scans' && !hasPermission('canDelete')) return false;
+        if (adminTab === 'co-admins' && !isMainAdmin()) return false;
+        if (adminTab === 'members' && !hasPermission('canManageUsers')) return false;
+        if (adminTab === 'rewards' && !hasPermission('canExport')) return false;
+        if (adminTab === 'products' && !hasPermission('canManageProducts')) return false;
+        if (adminTab === 'qr-codes' && !hasPermission('canManageQRCodes')) return false;
+        if (adminTab === 'applicator' && !hasPermission('canManageProducts')) return false;
+        return true;
+      };
+
+      if (!checkCurrentTab()) {
+        if (hasPermission('canViewDashboard')) setAdminTab('dashboard');
+        else if (hasPermission('canManageQRCodes')) setAdminTab('qr-codes');
+        else if (hasPermission('canManageProducts')) setAdminTab('products');
+        else if (hasPermission('canManageUsers')) setAdminTab('members');
+        else setAdminTab('profile');
+      }
+    }
+  }, [adminAuth, user, view, adminTab]);
 
   // Load leaderboard when leaderboard view is accessed
   useEffect(() => {
@@ -1376,10 +1402,12 @@ function App() {
         email,
         role: role || 'admin',
         permissions: {
-          canDelete: permissions?.canDelete === true,
-          canExport: permissions?.canExport === true,
-          canManageUsers: permissions?.canManageUsers === true,
-          canManageProducts: permissions?.canManageProducts === true
+          canViewDashboard: permissions?.canViewDashboard !== false,
+          canDelete: permissions?.canDelete !== false,
+          canExport: permissions?.canExport !== false,
+          canManageUsers: permissions?.canManageUsers !== false,
+          canManageProducts: permissions?.canManageProducts !== false,
+          canManageQRCodes: permissions?.canManageQRCodes !== false
         }
       };
 
@@ -1839,17 +1867,22 @@ function App() {
       return true;
     }
     
-    // Check user role - admins have all permissions
-    if (user && user.role === 'admin' && user.email === 'admin@megakem.com') {
+    // Main admin always has all permissions
+    if (user && (user.email === 'admin@megakem.com' || (user.role === 'admin' && !user.permissions))) {
       return true;
     }
+
+    // Check user state's direct permissions first (populated during login)
+    if (user && user.permissions) {
+      return user.permissions[permission] !== false;
+    }
     
-    // Find current logged-in user from users array
+    // Fallback: Find current logged-in user from users array
     const currentUser = users.find(u => u.email === adminEmail || u.email === user?.email);
     
-    // If user found, check their specific permission (must be explicitly true)
+    // If user found, check their specific permission
     if (currentUser && currentUser.permissions) {
-      return currentUser.permissions[permission] === true;
+      return currentUser.permissions[permission] !== false;
     }
     
     // Default to false if no permission found
@@ -2938,18 +2971,19 @@ function App() {
         {view === 'admin' && adminAuth && <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
           <Paper sx={{ mb: 2 }}>
             <Tabs value={adminTab} onChange={(e, v) => setAdminTab(v)} variant='scrollable' scrollButtons='auto'>
-              <Tab icon={<DashboardIcon />} label='Dashboard' />
-              <Tab icon={<HistoryIcon />} label='Scans' />
-              {isMainAdmin() && <Tab icon={<People />} label='Co-Admins' />}
-              <Tab icon={<EmojiEvents />} label='Members & Loyalty' />
-              <Tab icon={<CardGiftcard />} label='Cash Rewards' />
-              <Tab icon={<Category />} label='Products' />
-              <Tab icon={<Build />} label='Applicator & Hardware' />
-              <Tab icon={<Settings />} label='Profile' />
+              {hasPermission('canViewDashboard') && <Tab icon={<DashboardIcon />} label='Dashboard' value='dashboard' />}
+              {hasPermission('canDelete') && <Tab icon={<HistoryIcon />} label='Scans' value='scans' />}
+              {isMainAdmin() && <Tab icon={<People />} label='Co-Admins' value='co-admins' />}
+              {hasPermission('canManageUsers') && <Tab icon={<EmojiEvents />} label='Members & Loyalty' value='members' />}
+              {hasPermission('canExport') && <Tab icon={<CardGiftcard />} label='Cash Rewards' value='rewards' />}
+              {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
+              {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
+              {hasPermission('canManageProducts') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
+              <Tab icon={<Settings />} label='Profile' value='profile' />
             </Tabs>
           </Paper>
 
-          {adminTab === 0 && stats && <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+          {adminTab === 'dashboard' && stats && <Grid container spacing={{ xs: 1.5, sm: 2 }}>
             {/* Dashboard Header with Controls */}
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
@@ -3334,9 +3368,9 @@ function App() {
               </Card>
             </Grid>
             
-            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><TrendingUp /> Top Products by Scans</Typography><ResponsiveContainer width='100%' height={300}><BarChart data={stats.topProducts?.slice(0, 5).map(p => ({ name: p._id.length > 20 ? p._id.substring(0, 20) + '...' : p._id, scans: p.count }))} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}><CartesianGrid strokeDasharray='3 3' stroke='#f0f0f0' /><XAxis dataKey='name' angle={-45} textAnchor='end' height={100} tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} /><Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }} /><Bar dataKey='scans' fill='#003366' radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card></Grid>
+            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><TrendingUp /> Top Products by Scans</Typography><ResponsiveContainer width='100%' height={300}><BarChart data={stats.topProducts?.slice(0, 5).map(p => ({ name: p._id.length > 20 ? p._id.substring(0, 20) + '...' : p._id, scans: p.count }))} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}><CartesianGrid strokeDasharray='3 3' stroke='#f0f0f0' /><XAxis dataKey='name' angle={-45} textAnchor='end' height={100} tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} /><RechartsTooltip contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }} /><Bar dataKey='scans' fill='#003366' radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>User Distribution</Typography><ResponsiveContainer width='100%' height={300}><PieChart><Pie data={[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }]} cx='50%' cy='50%' labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill='#8884d8' dataKey='value'>{[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></CardContent></Card></Grid>
+            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>User Distribution</Typography><ResponsiveContainer width='100%' height={300}><PieChart><Pie data={[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }]} cx='50%' cy='50%' labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill='#8884d8' dataKey='value'>{[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><RechartsTooltip /></PieChart></ResponsiveContainer></CardContent></Card></Grid>
             
             <Grid item xs={12} md={6}>
               <Card 
@@ -3841,7 +3875,7 @@ function App() {
             ))}{activityLog.length === 0 && <Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center', py: 2 }}>No recent activity</Typography>}</List></CardContent></Card></Grid>
           </Grid>}
 
-          {adminTab === 1 && <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+          {adminTab === 'scans' && <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
             <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
               <TextField 
                 size='small' 
@@ -4068,7 +4102,7 @@ function App() {
     })()}
           </Box>}
 
-          {((adminTab === 3 && isMainAdmin()) || (adminTab === 2 && !isMainAdmin())) && <Box>
+          {adminTab === 'members' && <Box>
             <Box sx={{ mb: 2 }}>
               <Typography variant='h6' sx={{ fontWeight: 700 }}>MEMBERS & LOYALTY</Typography>
               <Typography variant='body2' color='text.secondary'>
@@ -4219,7 +4253,7 @@ function App() {
             </TableContainer>
           </Box>}
 
-          {adminTab === 2 && isMainAdmin() && <Box>
+          {adminTab === 'co-admins' && isMainAdmin() && <Box>
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Button 
                 variant='contained' 
@@ -4232,10 +4266,12 @@ function App() {
                     password: '', 
                     role: 'admin', 
                     permissions: { 
+                      canViewDashboard: true,
                       canDelete: true, 
                       canExport: true, 
                       canManageUsers: true, 
-                      canManageProducts: true 
+                      canManageProducts: true,
+                      canManageQRCodes: true
                     } 
                   } 
                 })}
@@ -4266,17 +4302,21 @@ function App() {
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                       {u.email === 'admin@megakem.com' ? (
                         <>
+                          <Chip label='Dashboard' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Delete' size='small' color='error' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Export' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Users' size='small' color='warning' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Products' size='small' color='success' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='QR' size='small' color='secondary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                         </>
                       ) : (
                         <>
-                          {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canExport === true && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageUsers === true && <Chip label='Users' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageProducts === true && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canViewDashboard !== false && <Chip label='Dashboard' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canDelete !== false && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canExport !== false && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageUsers !== false && <Chip label='Users' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageProducts !== false && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageQRCodes !== false && <Chip label='QR' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                         </>
                       )}
                     </Box>
@@ -4300,10 +4340,12 @@ function App() {
                             ...u, 
                             password: '',
                             permissions: {
+                              canViewDashboard: u.permissions?.canViewDashboard !== false,
                               canDelete: u.permissions?.canDelete !== false,
                               canExport: u.permissions?.canExport !== false,
                               canManageUsers: u.permissions?.canManageUsers !== false,
-                              canManageProducts: u.permissions?.canManageProducts !== false
+                              canManageProducts: u.permissions?.canManageProducts !== false,
+                              canManageQRCodes: u.permissions?.canManageQRCodes !== false
                             }
                           } 
                         })} 
@@ -4329,7 +4371,7 @@ function App() {
           </Box>}
 
           {/* Cash Rewards Management Tab */}
-          {((adminTab === 4 && isMainAdmin()) || (adminTab === 3 && !isMainAdmin())) && <Box>
+          {adminTab === 'rewards' && <Box>
             <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
               <Typography variant='h5' sx={{ flexGrow: 1 }}>
                 <CardGiftcard sx={{ mr: 1, verticalAlign: 'middle' }} />
@@ -4582,7 +4624,7 @@ function App() {
             )}
           </Box>}
 
-          {((adminTab === 5 && isMainAdmin()) || (adminTab === 4 && !isMainAdmin())) && <Box>
+          {adminTab === 'products' && <Box>
               <Box sx={{ mb: 2 }}>
                 <Typography variant='h6' sx={{ fontWeight: 700, mb: 1 }}>Products & Loyalty Points</Typography>
                 <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 1, mb: 2 }}>
@@ -4690,7 +4732,7 @@ function App() {
           </Box>}
 
           {/* Applicator & Hardware Info Tab */}
-          {((adminTab === 6 && isMainAdmin()) || (adminTab === 5 && !isMainAdmin())) && <Box>
+          {adminTab === 'applicator' && <Box>
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
               <Box>
                 <Typography variant='h6' sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -4892,8 +4934,13 @@ function App() {
             </Card>
           </Box>}
 
+          {/* QR Printing Tab */}
+          {adminTab === 'qr-codes' && <Box>
+            <QRCodeManager products={products} onShowNotification={showNotification} userInfo={user} />
+          </Box>}
+
           {/* Profile Settings Tab */}
-          {((adminTab === 7 && isMainAdmin()) || (adminTab === 6 && !isMainAdmin())) && <Grid container spacing={3}>
+          {adminTab === 'profile' && <Grid container spacing={3}>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Profile Settings</Typography>{!editingProfile ? <Box><Typography variant='body1'><strong>Username:</strong> {user?.username}</Typography><Typography variant='body1'><strong>Email:</strong> {user?.email}</Typography><Button variant='outlined' startIcon={<Edit />} onClick={() => { setEditingProfile(true); setProfileData({ username: user?.username, email: user?.email }); }} sx={{ mt: 2 }}>Edit Profile</Button></Box> : <Box><TextField fullWidth label='Username' value={profileData.username} onChange={(e) => setProfileData({ ...profileData, username: e.target.value })} sx={{ mb: 2 }} /><TextField fullWidth label='Email' type='email' value={profileData.email} onChange={(e) => setProfileData({ ...profileData, email: e.target.value })} sx={{ mb: 2 }} /><Box sx={{ display: 'flex', gap: 1 }}><Button variant='contained' startIcon={<Save />} onClick={handleUpdateProfile} disabled={loading}>Save</Button><Button variant='outlined' startIcon={<Cancel />} onClick={() => setEditingProfile(false)}>Cancel</Button></Box></Box>}</CardContent></Card></Grid>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Change Password</Typography><TextField fullWidth type={showPassword.currentPassword ? 'text' : 'password'} label='Current Password' value={passwordData.currentPassword} onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, currentPassword: !showPassword.currentPassword })} edge="end" size="small">{showPassword.currentPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><TextField fullWidth type={showPassword.newPassword ? 'text' : 'password'} label='New Password' value={passwordData.newPassword} onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, newPassword: !showPassword.newPassword })} edge="end" size="small">{showPassword.newPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><TextField fullWidth type={showPassword.confirmPassword ? 'text' : 'password'} label='Confirm New Password' value={passwordData.confirmPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, confirmPassword: !showPassword.confirmPassword })} edge="end" size="small">{showPassword.confirmPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><Button variant='contained' onClick={handleChangePassword} disabled={loading}>Change Password</Button></CardContent></Card></Grid>
             
@@ -5144,11 +5191,28 @@ function App() {
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, pl: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
+                    <Typography variant='body2' fontWeight={600}>Can View Dashboard</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to see overall stats</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canViewDashboard !== false} 
+                    onChange={(e) => setUserDialog({ 
+                      ...userDialog, 
+                      user: { 
+                        ...userDialog.user, 
+                        permissions: { ...userDialog.user?.permissions, canViewDashboard: e.target.checked } 
+                      } 
+                    })} 
+                    color='info' 
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
                     <Typography variant='body2' fontWeight={600}>Can Delete Records</Typography>
                     <Typography variant='caption' color='text.secondary'>Permission to delete scans</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canDelete === true} 
+                    checked={userDialog.user?.permissions?.canDelete !== false} 
                     onChange={(e) => setUserDialog({ 
                       ...userDialog, 
                       user: { 
@@ -5165,7 +5229,7 @@ function App() {
                     <Typography variant='caption' color='text.secondary'>Permission to export reports</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canExport === true} 
+                    checked={userDialog.user?.permissions?.canExport !== false} 
                     onChange={(e) => setUserDialog({ 
                       ...userDialog, 
                       user: { 
@@ -5182,7 +5246,7 @@ function App() {
                     <Typography variant='caption' color='text.secondary'>Permission to add/edit users</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canManageUsers === true} 
+                    checked={userDialog.user?.permissions?.canManageUsers !== false} 
                     onChange={(e) => setUserDialog({ 
                       ...userDialog, 
                       user: { 
@@ -5199,7 +5263,7 @@ function App() {
                     <Typography variant='caption' color='text.secondary'>Permission to modify products</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canManageProducts === true} 
+                    checked={userDialog.user?.permissions?.canManageProducts !== false} 
                     onChange={(e) => setUserDialog({ 
                       ...userDialog, 
                       user: { 
@@ -5208,6 +5272,23 @@ function App() {
                       } 
                     })} 
                     color='success' 
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Manage QR Codes</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to generate/print QR codes</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canManageQRCodes !== false} 
+                    onChange={(e) => setUserDialog({ 
+                      ...userDialog, 
+                      user: { 
+                        ...userDialog.user, 
+                        permissions: { ...userDialog.user?.permissions, canManageQRCodes: e.target.checked } 
+                      } 
+                    })} 
+                    color='secondary' 
                   />
                 </Box>
               </Box>

@@ -47,10 +47,10 @@ import {
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-const QRCodeManager = ({ userInfo, onShowNotification }) => {
+const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts }) => {
   const [loading, setLoading] = useState(false);
   const [qrCodes, setQRCodes] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState(initialProducts || []);
   const [batchSummary, setBatchSummary] = useState([]);
   
   // Dialog states
@@ -85,6 +85,13 @@ const QRCodeManager = ({ userInfo, onShowNotification }) => {
   
   const qrPreviewRef = useRef();
 
+  // Sync products from props
+  useEffect(() => {
+    if (initialProducts && initialProducts.length > 0) {
+      setProducts(initialProducts);
+    }
+  }, [initialProducts]);
+
   // Fetch data on mount
   useEffect(() => {
     loadData();
@@ -111,13 +118,15 @@ const QRCodeManager = ({ userInfo, onShowNotification }) => {
         setBatchSummary(await batchResponse.json());
       }
       
-      // Fetch products
-      const productsResponse = await fetch('/api/products', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (productsResponse.ok) {
-        const data = await productsResponse.json();
-        setProducts(data.data || []);
+      // Fetch products if not provided
+      if (!initialProducts || initialProducts.length === 0) {
+        const productsResponse = await fetch('/api/products', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (productsResponse.ok) {
+          const data = await productsResponse.json();
+          setProducts(data.data || []);
+        }
       }
     } catch (error) {
       onShowNotification('Error loading data: ' + error.message, 'error');
@@ -440,6 +449,57 @@ const QRCodeManager = ({ userInfo, onShowNotification }) => {
           </Paper>
         </Grid>
       </Grid>
+      
+      {/* Production Batch Summary */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FilterList /> Production Batch History
+          </Typography>
+          <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300 }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Batch No</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Total QRs</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Printed</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Scanned</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Last Print Date</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {batchSummary.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                      <Typography variant="body2" color="textSecondary">No batches found</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  batchSummary.map(batch => (
+                    <TableRow key={batch._id} hover>
+                      <TableCell>
+                        <Chip label={batch._id} size="small" variant="outlined" color="primary" sx={{ fontWeight: 'bold' }} />
+                      </TableCell>
+                      <TableCell align="center">{batch.totalQRs}</TableCell>
+                      <TableCell align="center">
+                        <Chip 
+                          label={`${batch.printed}/${batch.totalQRs}`} 
+                          size="small" 
+                          color={batch.printed === batch.totalQRs ? "success" : "warning"}
+                        />
+                      </TableCell>
+                      <TableCell align="center">{batch.scanned}</TableCell>
+                      <TableCell align="right">
+                        {batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : 'N/A'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
 
       {/* Action Buttons */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>

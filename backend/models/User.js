@@ -41,6 +41,10 @@ const userSchema = new mongoose.Schema({
     min: 0
   },
   permissions: {
+    canViewDashboard: {
+      type: Boolean,
+      default: true
+    },
     canDelete: {
       type: Boolean,
       default: false
