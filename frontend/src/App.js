@@ -1402,12 +1402,12 @@ function App() {
         email,
         role: role || 'admin',
         permissions: {
-          canViewDashboard: permissions?.canViewDashboard !== false,
-          canDelete: permissions?.canDelete !== false,
-          canExport: permissions?.canExport !== false,
-          canManageUsers: permissions?.canManageUsers !== false,
-          canManageProducts: permissions?.canManageProducts !== false,
-          canManageQRCodes: permissions?.canManageQRCodes !== false
+          canViewDashboard: permissions?.canViewDashboard === true,
+          canDelete: permissions?.canDelete === true,
+          canExport: permissions?.canExport === true,
+          canManageUsers: permissions?.canManageUsers === true,
+          canManageProducts: permissions?.canManageProducts === true,
+          canManageQRCodes: permissions?.canManageQRCodes === true
         }
       };
 
@@ -1874,7 +1874,7 @@ function App() {
 
     // Check user state's direct permissions first (populated during login)
     if (user && user.permissions) {
-      return user.permissions[permission] !== false;
+      return user.permissions[permission] === true;
     }
     
     // Fallback: Find current logged-in user from users array
@@ -1882,7 +1882,7 @@ function App() {
     
     // If user found, check their specific permission
     if (currentUser && currentUser.permissions) {
-      return currentUser.permissions[permission] !== false;
+      return currentUser.permissions[permission] === true;
     }
     
     // Default to false if no permission found
@@ -4266,12 +4266,12 @@ function App() {
                     password: '', 
                     role: 'admin', 
                     permissions: { 
-                      canViewDashboard: true,
-                      canDelete: true, 
-                      canExport: true, 
-                      canManageUsers: true, 
-                      canManageProducts: true,
-                      canManageQRCodes: true
+                      canViewDashboard: false,
+                      canDelete: false, 
+                      canExport: false, 
+                      canManageUsers: false, 
+                      canManageProducts: false,
+                      canManageQRCodes: false
                     } 
                   } 
                 })}
@@ -4311,12 +4311,12 @@ function App() {
                         </>
                       ) : (
                         <>
-                          {u.permissions?.canViewDashboard !== false && <Chip label='Dashboard' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canDelete !== false && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canExport !== false && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageUsers !== false && <Chip label='Users' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageProducts !== false && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageQRCodes !== false && <Chip label='QR' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canViewDashboard === true && <Chip label='Dashboard' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canExport === true && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageUsers === true && <Chip label='Users' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageProducts === true && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageQRCodes === true && <Chip label='QR' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                         </>
                       )}
                     </Box>
@@ -4340,12 +4340,12 @@ function App() {
                             ...u, 
                             password: '',
                             permissions: {
-                              canViewDashboard: u.permissions?.canViewDashboard !== false,
-                              canDelete: u.permissions?.canDelete !== false,
-                              canExport: u.permissions?.canExport !== false,
-                              canManageUsers: u.permissions?.canManageUsers !== false,
-                              canManageProducts: u.permissions?.canManageProducts !== false,
-                              canManageQRCodes: u.permissions?.canManageQRCodes !== false
+                              canViewDashboard: u.permissions?.canViewDashboard === true,
+                              canDelete: u.permissions?.canDelete === true,
+                              canExport: u.permissions?.canExport === true,
+                              canManageUsers: u.permissions?.canManageUsers === true,
+                              canManageProducts: u.permissions?.canManageProducts === true,
+                              canManageQRCodes: u.permissions?.canManageQRCodes === true
                             }
                           } 
                         })} 
@@ -5195,14 +5195,17 @@ function App() {
                     <Typography variant='caption' color='text.secondary'>Permission to see overall stats</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canViewDashboard !== false} 
-                    onChange={(e) => setUserDialog({ 
-                      ...userDialog, 
-                      user: { 
-                        ...userDialog.user, 
-                        permissions: { ...userDialog.user?.permissions, canViewDashboard: e.target.checked } 
-                      } 
-                    })} 
+                    checked={userDialog.user?.permissions?.canViewDashboard === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canViewDashboard: checked } 
+                        } 
+                      }));
+                    }} 
                     color='info' 
                   />
                 </Box>
@@ -5212,14 +5215,17 @@ function App() {
                     <Typography variant='caption' color='text.secondary'>Permission to delete scans</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canDelete !== false} 
-                    onChange={(e) => setUserDialog({ 
-                      ...userDialog, 
-                      user: { 
-                        ...userDialog.user, 
-                        permissions: { ...userDialog.user?.permissions, canDelete: e.target.checked } 
-                      } 
-                    })} 
+                    checked={userDialog.user?.permissions?.canDelete === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canDelete: checked } 
+                        } 
+                      }));
+                    }} 
                     color='error' 
                   />
                 </Box>
@@ -5229,14 +5235,17 @@ function App() {
                     <Typography variant='caption' color='text.secondary'>Permission to export reports</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canExport !== false} 
-                    onChange={(e) => setUserDialog({ 
-                      ...userDialog, 
-                      user: { 
-                        ...userDialog.user, 
-                        permissions: { ...userDialog.user?.permissions, canExport: e.target.checked } 
-                      } 
-                    })} 
+                    checked={userDialog.user?.permissions?.canExport === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canExport: checked } 
+                        } 
+                      }));
+                    }} 
                     color='primary' 
                   />
                 </Box>
@@ -5246,14 +5255,17 @@ function App() {
                     <Typography variant='caption' color='text.secondary'>Permission to add/edit users</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canManageUsers !== false} 
-                    onChange={(e) => setUserDialog({ 
-                      ...userDialog, 
-                      user: { 
-                        ...userDialog.user, 
-                        permissions: { ...userDialog.user?.permissions, canManageUsers: e.target.checked } 
-                      } 
-                    })} 
+                    checked={userDialog.user?.permissions?.canManageUsers === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canManageUsers: checked } 
+                        } 
+                      }));
+                    }} 
                     color='warning' 
                   />
                 </Box>
@@ -5263,14 +5275,17 @@ function App() {
                     <Typography variant='caption' color='text.secondary'>Permission to modify products</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canManageProducts !== false} 
-                    onChange={(e) => setUserDialog({ 
-                      ...userDialog, 
-                      user: { 
-                        ...userDialog.user, 
-                        permissions: { ...userDialog.user?.permissions, canManageProducts: e.target.checked } 
-                      } 
-                    })} 
+                    checked={userDialog.user?.permissions?.canManageProducts === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canManageProducts: checked } 
+                        } 
+                      }));
+                    }} 
                     color='success' 
                   />
                 </Box>
@@ -5280,14 +5295,17 @@ function App() {
                     <Typography variant='caption' color='text.secondary'>Permission to generate/print QR codes</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canManageQRCodes !== false} 
-                    onChange={(e) => setUserDialog({ 
-                      ...userDialog, 
-                      user: { 
-                        ...userDialog.user, 
-                        permissions: { ...userDialog.user?.permissions, canManageQRCodes: e.target.checked } 
-                      } 
-                    })} 
+                    checked={userDialog.user?.permissions?.canManageQRCodes === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canManageQRCodes: checked } 
+                        } 
+                      }));
+                    }} 
                     color='secondary' 
                   />
                 </Box>

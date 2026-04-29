@@ -594,35 +594,34 @@ router.post('/users', protect, async (req, res) => {
       isActive: true
     };
 
-    // Add permissions if provided
+    // Create user
+    const user = new User(userData);
+    
+    // Set permissions using set() for reliability
     if (permissions) {
-      userData.permissions = {
-        canViewDashboard: permissions.canViewDashboard !== false,
-        canDelete: permissions.canDelete !== false,
-        canExport: permissions.canExport !== false,
-        canManageUsers: permissions.canManageUsers !== false,
-        canManageProducts: permissions.canManageProducts !== false,
-        canManageQRCodes: permissions.canManageQRCodes !== false,
-        canPrintQRCodes: permissions.canPrintQRCodes !== false,
-        canViewQRAnalytics: permissions.canViewQRAnalytics !== false
-      };
+      user.set('permissions.canViewDashboard', permissions.canViewDashboard === true);
+      user.set('permissions.canDelete', permissions.canDelete === true);
+      user.set('permissions.canExport', permissions.canExport === true);
+      user.set('permissions.canManageUsers', permissions.canManageUsers === true);
+      user.set('permissions.canManageProducts', permissions.canManageProducts === true);
+      user.set('permissions.canManageQRCodes', permissions.canManageQRCodes === true);
+      user.set('permissions.canPrintQRCodes', permissions.canPrintQRCodes === true);
+      user.set('permissions.canViewQRAnalytics', permissions.canViewQRAnalytics === true);
     }
 
     // For QR admin type, automatically enable QR permissions
     if (adminType === 'qr_admin') {
-      userData.permissions = {
-        canViewDashboard: true,
-        canDelete: false,
-        canExport: false,
-        canManageUsers: false,
-        canManageProducts: false,
-        canManageQRCodes: true,
-        canPrintQRCodes: true,
-        canViewQRAnalytics: true
-      };
+      user.set('permissions.canViewDashboard', true);
+      user.set('permissions.canDelete', false);
+      user.set('permissions.canExport', false);
+      user.set('permissions.canManageUsers', false);
+      user.set('permissions.canManageProducts', false);
+      user.set('permissions.canManageQRCodes', true);
+      user.set('permissions.canPrintQRCodes', true);
+      user.set('permissions.canViewQRAnalytics', true);
     }
 
-    const user = await User.create(userData);
+    await user.save();
 
     console.log('✅ User created successfully:', user.username);
 
@@ -661,6 +660,7 @@ router.put('/users/:id', protect, async (req, res) => {
     }
 
     const { role, isActive, points, permissions, username, email } = req.body;
+    console.log('📝 Updating user:', req.params.id, { permissions });
     const user = await User.findById(req.params.id);
 
     if (!user) {
@@ -670,41 +670,46 @@ router.put('/users/:id', protect, async (req, res) => {
       });
     }
 
-    // Update basic fields
-    if (username !== undefined) user.username = username;
-    if (email !== undefined) user.email = email;
-    if (role !== undefined) user.role = role;
-    if (isActive !== undefined) user.isActive = isActive;
+    // Use an atomic $set update to ensure nested permissions are persisted regardless of Mongoose instance tracking
+    const updateData = {
+      $set: {
+        ...(username !== undefined && { username }),
+        ...(email !== undefined && { email }),
+        ...(role !== undefined && { role }),
+        ...(isActive !== undefined && { isActive }),
+        ...(points !== undefined && { points: Math.max(0, points) }),
+        ...(permissions !== undefined && {
+          'permissions.canViewDashboard': permissions.canViewDashboard === true,
+          'permissions.canDelete': permissions.canDelete === true,
+          'permissions.canExport': permissions.canExport === true,
+          'permissions.canManageUsers': permissions.canManageUsers === true,
+          'permissions.canManageProducts': permissions.canManageProducts === true,
+          'permissions.canManageQRCodes': permissions.canManageQRCodes === true
+        })
+      }
+    };
+
+    await User.updateOne({ _id: req.params.id }, updateData, { runValidators: true });
+    
+    // Fetch the updated document to confirm and return
+    const updatedUser = await User.findById(req.params.id);
+
     if (points !== undefined) {
-      user.points = Math.max(0, points); // Ensure points are not negative
-      user.updateTier(); // Update tier based on new points
+      updatedUser.updateTier();
+      await updatedUser.save();
     }
-
-    // Update permissions
-    if (permissions !== undefined) {
-      user.permissions = {
-        canViewDashboard: permissions.canViewDashboard !== false,
-        canDelete: permissions.canDelete !== false,
-        canExport: permissions.canExport !== false,
-        canManageUsers: permissions.canManageUsers !== false,
-        canManageProducts: permissions.canManageProducts !== false,
-        canManageQRCodes: permissions.canManageQRCodes !== false
-      };
-    }
-
-    await user.save();
 
     res.json({
       success: true,
       data: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        isActive: user.isActive,
-        points: user.points,
-        tier: user.tier,
-        permissions: user.permissions
+        _id: updatedUser._id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        isActive: updatedUser.isActive,
+        points: updatedUser.points,
+        tier: updatedUser.tier,
+        permissions: updatedUser.permissions
       }
     });
   } catch (error) {
