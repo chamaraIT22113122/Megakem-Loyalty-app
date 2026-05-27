@@ -115,6 +115,20 @@ router.post('/', optionalAuth, async (req, res) => {
       qty
     } = req.body;
 
+    // Check if applicator is registered in Applicator & Hardware Info
+    if (role === 'applicator') {
+      const member = await Member.findOne({ 
+        memberId: memberId.toUpperCase().trim(), 
+        role: 'applicator' 
+      });
+      if (!member) {
+        return res.status(400).json({
+          success: false,
+          message: `Applicator ID ${memberId} is not registered. Please register in Applicator & Hardware Info first.`
+        });
+      }
+    }
+
     // Check for duplicate scan - check if this batch number has been scanned by the same role
     const duplicateScan = await Scan.findOne({
       batchNo,
@@ -244,6 +258,22 @@ router.post('/batch', optionalAuth, async (req, res) => {
         success: false,
         message: 'Scans array is required'
       });
+    }
+
+    // Check if applicator is registered for all applicator scans in batch
+    for (const scan of scans) {
+      if (scan.role === 'applicator') {
+        const member = await Member.findOne({ 
+          memberId: scan.memberId.toUpperCase().trim(), 
+          role: 'applicator' 
+        });
+        if (!member) {
+          return res.status(400).json({
+            success: false,
+            message: `Applicator ID ${scan.memberId} is not registered. Please register in Applicator & Hardware Info first.`
+          });
+        }
+      }
     }
 
     // Check for duplicates and filter them out
@@ -525,6 +555,10 @@ async function updateMemberFromScan(scan) {
     let member = await Member.findOne({ memberId });
     
     if (!member) {
+      if (scan.role === 'applicator') {
+        throw new Error(`Applicator with ID ${memberId} is not registered in the system.`);
+      }
+
       // Create new member
       member = await Member.create({
         memberId,
