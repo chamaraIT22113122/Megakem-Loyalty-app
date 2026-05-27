@@ -3531,6 +3531,7 @@ function App() {
                         <ListItemText 
                           primary={<Typography variant='body1' fontWeight={600}>{loc.location}</Typography>} 
                           secondary={<Chip label={`${loc.count} scans`} size='small' color={i === 0 ? 'success' : 'default'} />} 
+                          secondaryTypographyProps={{ component: 'span' }}
                         />
                       </ListItem>
                     )}
@@ -3836,6 +3837,7 @@ function App() {
                               <Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography>
                             </Box>
                           } 
+                          secondaryTypographyProps={{ component: 'div' }}
                         />
                       </ListItem>
                     )}
@@ -3906,6 +3908,7 @@ function App() {
                     <ListItemText 
                       primary={<Typography variant='body2' fontWeight={600}>{hour}:00 - {hour}:59</Typography>}
                       secondary={<Chip label={`${count} scans`} size='small' color={i === 0 ? 'primary' : 'default'} />}
+                      secondaryTypographyProps={{ component: 'span' }}
                     />
                   </ListItem>
                 ));
