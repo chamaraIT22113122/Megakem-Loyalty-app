@@ -7761,16 +7761,7 @@ function App() {
                 required
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label='Member ID'
-                value={applicatorFormData.memberId}
-                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, memberId: e.target.value.toUpperCase() })}
-                required
-                helperText='Must match existing member ID'
-              />
-            </Grid>
+
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -7867,16 +7858,17 @@ function App() {
           <Button 
             variant='contained'
             onClick={async () => {
-              if (!applicatorFormData.name || !applicatorFormData.memberId) {
+              if (!applicatorFormData.name) {
                 showNotification('Please fill in required fields', 'error');
                 return;
               }
               
               setLoading(true);
               try {
+                const generatedMemberId = applicatorDialog.data ? applicatorDialog.data.memberId : 'MA' + Math.floor(1000 + Math.random() * 9000).toString();
                 const backendPayload = {
                   memberName: applicatorFormData.name,
-                  memberId: applicatorFormData.memberId.toUpperCase().trim(),
+                  memberId: generatedMemberId,
                   phone: applicatorFormData.phoneNumber,
                   whatsappNumber: applicatorFormData.whatsappNumber,
                   nic: applicatorFormData.nic,
@@ -7904,7 +7896,7 @@ function App() {
                 setLoading(false);
               }
             }}
-            disabled={!applicatorFormData.name || !applicatorFormData.memberId}
+            disabled={!applicatorFormData.name}
           >
             {applicatorDialog.data ? 'Update' : 'Add'}
           </Button>
@@ -7932,16 +7924,7 @@ function App() {
                 required
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label='Member ID'
-                value={hardwareFormData.memberId}
-                onChange={(e) => setHardwareFormData({ ...hardwareFormData, memberId: e.target.value.toUpperCase() })}
-                required
-                helperText='Must match existing member ID'
-              />
-            </Grid>
+
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -8023,16 +8006,17 @@ function App() {
           <Button 
             variant='contained'
             onClick={async () => {
-              if (!hardwareFormData.name || !hardwareFormData.memberId) {
+              if (!hardwareFormData.name) {
                 showNotification('Please fill in required fields', 'error');
                 return;
               }
               
               setLoading(true);
               try {
+                const generatedHardwareId = hardwareDialog.data ? hardwareDialog.data.memberId : 'MH' + Math.floor(1000 + Math.random() * 9000).toString();
                 const backendPayload = {
                   memberName: hardwareFormData.name,
-                  memberId: hardwareFormData.memberId.toUpperCase().trim(),
+                  memberId: generatedHardwareId,
                   phone: hardwareFormData.phoneNumber,
                   City: hardwareFormData.location,
                   equipment: hardwareFormData.equipment,
@@ -8060,7 +8044,7 @@ function App() {
                 setLoading(false);
               }
             }}
-            disabled={!hardwareFormData.name || !hardwareFormData.memberId}
+            disabled={!hardwareFormData.name}
           >
             {hardwareDialog.data ? 'Update' : 'Add'}
           </Button>
