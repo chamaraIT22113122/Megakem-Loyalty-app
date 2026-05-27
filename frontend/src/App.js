@@ -281,7 +281,7 @@ function App() {
     whatsappNumber: '',
     nic: '',
     birthday: '',
-    location: '',
+    City: '',
     equipment: '',
     equipmentBrand: '',
     purchaseDate: '',
@@ -294,7 +294,7 @@ function App() {
     name: '',
     memberId: '',
     phoneNumber: '',
-    location: '',
+    City: '',
     equipment: '',
     equipmentBrand: '',
     purchaseDate: '',
@@ -330,7 +330,7 @@ function App() {
           whatsappNumber: m.whatsappNumber || '',
           nic: m.nic || '',
           birthday: m.birthday ? new Date(m.birthday).toISOString().split('T')[0] : '',
-          location: m.location || '',
+          City: m.location || '',
           equipment: m.equipment || '',
           equipmentBrand: m.equipmentBrand || '',
           purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
@@ -688,7 +688,7 @@ function App() {
       'Batch Number': scan.batchNo,
       'Member ID': scan.memberId || 'N/A',
       'Phone': scan.phone || 'N/A',
-      'Location': scan.location || 'N/A',
+      'City': scan.location || 'N/A',
       'Loyalty Points': scan.points || 0
     }));
     exportToExcel(exportData, 'Purchase_History', 'History');
@@ -713,7 +713,7 @@ function App() {
         'Batch Number': scan.batchNo,
         'Member ID': scan.memberId || 'N/A',
         'Phone': scan.phone || 'N/A',
-        'Location': scan.location || 'N/A',
+        'City': scan.location || 'N/A',
         'Points': scan.points || 0
       };
     });
@@ -923,7 +923,7 @@ function App() {
         bagNo: item.bag, 
         qty: item.qty,
         price: item.price || 0,
-        location: finalLocation || '' 
+        City: finalLocation || '' 
       }));
       const response = await scansAPI.createBatch(scansData);
       
@@ -1030,7 +1030,7 @@ function App() {
                   memberName: app.name,
                   memberId: app.memberId.toUpperCase().trim(),
                   phone: app.phoneNumber,
-                  location: app.location,
+                  City: app.location,
                   equipment: app.equipment,
                   equipmentBrand: app.equipmentBrand,
                   purchaseDate: app.purchaseDate || null,
@@ -1088,7 +1088,7 @@ function App() {
         name: m.memberName,
         memberId: m.memberId,
         phoneNumber: m.phone || '',
-        location: m.location || '',
+        City: m.location || '',
         equipment: m.equipment || '',
         equipmentBrand: m.equipmentBrand || '',
         purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
@@ -1128,7 +1128,7 @@ function App() {
         name: m.memberName,
         memberId: m.memberId,
         phoneNumber: m.phone || '',
-        location: m.location || '',
+        City: m.location || '',
         equipment: m.equipment || '',
         equipmentBrand: m.equipmentBrand || '',
         purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
@@ -1778,7 +1778,7 @@ function App() {
 
       // Create CSV or Excel data
       if (format === 'csv') {
-        const headers = ['Date', 'Member ID', 'Member Name', 'Product', 'Batch No', 'Pack Size', 'Location', 'Points'];
+        const headers = ['Date', 'Member ID', 'Member Name', 'Product', 'Batch No', 'Pack Size', 'City', 'Points'];
         const rows = dataToExport.map(scan => [
           new Date(scan.createdAt).toLocaleDateString(),
           scan.memberId,
@@ -1970,7 +1970,7 @@ function App() {
             bagNo: scan.bagNo,
             qty: scan.qty,
             price: scan.price,
-            location: scan.location,
+            City: scan.location,
             timestamp: scan.timestamp
           }));
           
@@ -3024,13 +3024,13 @@ function App() {
               <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? 'Phone Number' : 'Member ID'} placeholder={role === 'customer' ? 'e.g. 0712345678' : 'e.g. APP-001'} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
               <Grid item xs={12}>
                 <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }}>
-                  <InputLabel>Location (Optional)</InputLabel>
+                  <InputLabel>City (Optional)</InputLabel>
                   <Select
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    label='Location (Optional)'
+                    label='City (Optional)'
                   >
-                    <MenuItem value=''>Select Location</MenuItem>
+                    <MenuItem value=''>Select City</MenuItem>
                     <MenuItem value='Colombo'>Colombo</MenuItem>
                     <MenuItem value='Gampaha'>Gampaha</MenuItem>
                     <MenuItem value='Kalutara'>Kalutara</MenuItem>
@@ -3555,7 +3555,7 @@ function App() {
                   const allLocations = scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                     const existing = acc.find(l => l.location === scan.location); 
                     if (existing) { existing.count++; } 
-                    else { acc.push({ location: scan.location, count: 1 }); } 
+                    else { acc.push({ City: scan.location, count: 1 }); } 
                     return acc; 
                   }, []).sort((a, b) => b.count - a.count);
                   setExpandedCardDialog({ open: true, type: 'locations', data: allLocations });
@@ -3564,19 +3564,19 @@ function App() {
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant='h6' sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
-                      📍 Top Locations
+                      📍 Top Cities
                     </Typography>
                     {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                       const existing = acc.find(l => l.location === scan.location); 
                       if (existing) { existing.count++; } 
-                      else { acc.push({ location: scan.location, count: 1 }); } 
+                      else { acc.push({ City: scan.location, count: 1 }); } 
                       return acc; 
                     }, []).length > 6 && (
                       <Chip 
                         label={`+${scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                           const existing = acc.find(l => l.location === scan.location); 
                           if (existing) { existing.count++; } 
-                          else { acc.push({ location: scan.location, count: 1 }); } 
+                          else { acc.push({ City: scan.location, count: 1 }); } 
                           return acc; 
                         }, []).length - 6} more`}
                         size='small'
@@ -3588,7 +3588,7 @@ function App() {
                     {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                       const existing = acc.find(l => l.location === scan.location); 
                       if (existing) { existing.count++; } 
-                      else { acc.push({ location: scan.location, count: 1 }); } 
+                      else { acc.push({ City: scan.location, count: 1 }); } 
                       return acc; 
                     }, []).sort((a, b) => b.count - a.count).slice(0, 6).map((loc, i) => 
                       <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: i === 0 ? 'success.main' : 'grey.400', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
@@ -3601,7 +3601,7 @@ function App() {
                     )}
                   </List>
                   <Typography variant='caption' color='text.secondary' sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
-                    Click to view all locations
+                    Click to view all cities
                   </Typography>
                 </CardContent>
               </Card>
@@ -3627,24 +3627,24 @@ function App() {
                     <Card sx={{ height: '100%' }}>
                       <CardContent>
                         <Typography variant='caption' color='text.secondary'>
-                          Average Scans per Location
+                          Average Scans per City
                         </Typography>
                         <Typography variant='h5' fontWeight={700} color='primary.main'>
                           {(() => {
                             const locations = scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                               const existing = acc.find(l => l.location === scan.location); 
                               if (existing) { existing.count++; } 
-                              else { acc.push({ location: scan.location, count: 1 }); } 
+                              else { acc.push({ City: scan.location, count: 1 }); } 
                               return acc; 
                             }, []);
                             return locations.length > 0 ? Math.round(scanHistory.length / locations.length) : 0;
                           })()}
                         </Typography>
                         <Typography variant='caption' color='success.main' sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                          <TrendingUp sx={{ fontSize: '0.9rem' }} /> Active locations: {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                          <TrendingUp sx={{ fontSize: '0.9rem' }} /> Active cities: {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                             const existing = acc.find(l => l.location === scan.location); 
                             if (existing) { existing.count++; } 
-                            else { acc.push({ location: scan.location, count: 1 }); } 
+                            else { acc.push({ City: scan.location, count: 1 }); } 
                             return acc; 
                           }, []).length}
                         </Typography>
@@ -4957,7 +4957,7 @@ function App() {
                       ['Applicator & Hardware Information Report'],
                       ['Generated:', new Date().toLocaleString()],
                       [],
-                      ['Name', 'Member ID', 'Phone Number', 'Whatsapp Number', 'NIC', 'Birthday', 'Location', 'Equipment Type', 'Equipment Brand', 'Purchase Date', 'Condition', 'Notes'],
+                      ['Name', 'Member ID', 'Phone Number', 'Whatsapp Number', 'NIC', 'Birthday', 'City', 'Equipment Type', 'Equipment Brand', 'Purchase Date', 'Condition', 'Notes'],
                       ...applicatorInfo.map(a => [
                         a.name,
                         a.memberId,
@@ -5016,7 +5016,7 @@ function App() {
                       whatsappNumber: '',
                       nic: '',
                       birthday: '',
-                      location: '',
+                      City: '',
                       equipment: 'Applicator',
                       equipmentBrand: '',
                       purchaseDate: '',
@@ -5038,7 +5038,7 @@ function App() {
                       name: '',
                       memberId: '',
                       phoneNumber: '',
-                      location: '',
+                      City: '',
                       equipment: 'Hardware',
                       equipmentBrand: '',
                       purchaseDate: '',
@@ -5143,7 +5143,7 @@ function App() {
                         <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>NIC</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -6393,7 +6393,7 @@ function App() {
                             ['TOP ACTIVE MEMBERS ANALYSIS'],
                             [dateStr],
                             [],
-                            ['Rank', 'Member Name', 'Member ID', 'Role', 'Location', 'Total Scans', '% of Total', 'Avg per Hour'],
+                            ['Rank', 'Member Name', 'Member ID', 'Role', 'City', 'Total Scans', '% of Total', 'Avg per Hour'],
                             ...dailyReport.topMembers.map((member, i) => [
                               i + 1,
                               member.memberName,
@@ -6484,7 +6484,7 @@ function App() {
                             ['DETAILED SCAN LOG'],
                             [dateStr],
                             [],
-                            ['#', 'Time', 'Member Name', 'Member ID', 'Role', 'Product Name', 'Product Code', 'Location', 'Points Earned'],
+                            ['#', 'Time', 'Member Name', 'Member ID', 'Role', 'Product Name', 'Product Code', 'City', 'Points Earned'],
                             ...dailyReport.scans.map((scan, i) => {
                               // Handle multiple date field options
                               let timeStr = 'N/A';
@@ -6913,7 +6913,7 @@ function App() {
                           <TableCell sx={{ fontWeight: 700 }}>Rank</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>Member</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                           <TableCell align='right' sx={{ fontWeight: 700 }}>Scans</TableCell>
                           <TableCell align='right' sx={{ fontWeight: 700 }}>% of Total</TableCell>
                         </TableRow>
@@ -7358,7 +7358,7 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>Member</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -7483,7 +7483,7 @@ function App() {
         }}>
           <Box>
             <Typography variant='h6' sx={{ fontWeight: 700 }}>
-              {expandedCardDialog.type === 'locations' && '📍 All Locations'}
+              {expandedCardDialog.type === 'locations' && '📍 all cities'}
               {expandedCardDialog.type === 'products' && '📦 All Products'}
               {expandedCardDialog.type === 'priceEstimation' && '💵 Complete Price Estimation'}
             </Typography>
@@ -7502,10 +7502,10 @@ function App() {
                   
                   if (expandedCardDialog.type === 'locations') {
                     wsData = [
-                      ['Top Locations Report'],
+                      ['Top Cities Report'],
                       ['Generated:', new Date().toLocaleString()],
                       [],
-                      ['Rank', 'Location', 'Total Scans', '% of Total'],
+                      ['Rank', 'City', 'Total Scans', '% of Total'],
                       ...expandedCardDialog.data.map((loc, i) => [
                         i + 1,
                         loc.location,
@@ -7576,7 +7576,7 @@ function App() {
                 <TableHead>
                   <TableRow sx={{ bgcolor: 'grey.100' }}>
                     <TableCell sx={{ fontWeight: 700 }}>Rank</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                     <TableCell align='right' sx={{ fontWeight: 700 }}>Scans</TableCell>
                     <TableCell align='right' sx={{ fontWeight: 700 }}>% of Total</TableCell>
                   </TableRow>
@@ -7807,13 +7807,13 @@ function App() {
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
-                <InputLabel>Location</InputLabel>
+                <InputLabel>City</InputLabel>
                 <Select
                   value={applicatorFormData.location}
-                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, location: e.target.value })}
-                  label='Location'
+                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, City: e.target.value })}
+                  label='City'
                 >
-                  <MenuItem value=''>Select Location</MenuItem>
+                  <MenuItem value=''>Select City</MenuItem>
                   <MenuItem value='Colombo'>Colombo</MenuItem>
                   <MenuItem value='Gampaha'>Gampaha</MenuItem>
                   <MenuItem value='Kalutara'>Kalutara</MenuItem>
@@ -7881,7 +7881,7 @@ function App() {
                   whatsappNumber: applicatorFormData.whatsappNumber,
                   nic: applicatorFormData.nic,
                   birthday: applicatorFormData.birthday || null,
-                  location: applicatorFormData.location,
+                  City: applicatorFormData.location,
                   condition: applicatorFormData.condition || 'good',
                   equipment: 'Applicator',
                   role: 'applicator'
@@ -7952,13 +7952,13 @@ function App() {
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
-                <InputLabel>Location</InputLabel>
+                <InputLabel>City</InputLabel>
                 <Select
                   value={hardwareFormData.location}
-                  onChange={(e) => setHardwareFormData({ ...hardwareFormData, location: e.target.value })}
-                  label='Location'
+                  onChange={(e) => setHardwareFormData({ ...hardwareFormData, City: e.target.value })}
+                  label='City'
                 >
-                  <MenuItem value=''>Select Location</MenuItem>
+                  <MenuItem value=''>Select City</MenuItem>
                   <MenuItem value='Colombo'>Colombo</MenuItem>
                   <MenuItem value='Gampaha'>Gampaha</MenuItem>
                   <MenuItem value='Kalutara'>Kalutara</MenuItem>
@@ -8034,7 +8034,7 @@ function App() {
                   memberName: hardwareFormData.name,
                   memberId: hardwareFormData.memberId.toUpperCase().trim(),
                   phone: hardwareFormData.phoneNumber,
-                  location: hardwareFormData.location,
+                  City: hardwareFormData.location,
                   equipment: hardwareFormData.equipment,
                   equipmentBrand: hardwareFormData.equipmentBrand,
                   purchaseDate: hardwareFormData.purchaseDate || null,
