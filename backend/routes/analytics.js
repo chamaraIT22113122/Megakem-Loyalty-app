@@ -3,12 +3,12 @@ const router = express.Router();
 const XLSX = require('xlsx');
 const Scan = require('../models/Scan');
 const User = require('../models/User');
-const { protect, admin } = require('../middleware/auth');
+const { protect, admin, hasPermission } = require('../middleware/auth');
 
 // @route   GET /api/analytics/dashboard
 // @desc    Get comprehensive dashboard analytics
 // @access  Private/Admin
-router.get('/dashboard', protect, admin, async (req, res) => {
+router.get('/dashboard', protect, hasPermission('canViewDashboard'), async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
@@ -135,7 +135,7 @@ router.get('/user-stats', protect, async (req, res) => {
 // @route   GET /api/analytics/daily-report
 // @desc    Get daily sales and scans report for a specific date
 // @access  Private/Admin
-router.get('/daily-report', protect, admin, async (req, res) => {
+router.get('/daily-report', protect, hasPermission('canViewDashboard'), async (req, res) => {
   try {
     const { date } = req.query;
     
@@ -232,7 +232,7 @@ router.get('/daily-report', protect, admin, async (req, res) => {
 // @route   GET /api/analytics/calendar-data
 // @desc    Get summary data for calendar month view
 // @access  Private/Admin
-router.get('/calendar-data', protect, admin, async (req, res) => {
+router.get('/calendar-data', protect, hasPermission('canViewDashboard'), async (req, res) => {
   try {
     const { year, month } = req.query;
     
@@ -285,7 +285,7 @@ router.get('/calendar-data', protect, admin, async (req, res) => {
 // @route   GET /api/analytics/export
 // @desc    Export analytics data as CSV or Excel
 // @access  Private/Admin
-router.get('/export', protect, admin, async (req, res) => {
+router.get('/export', protect, hasPermission('canExport'), async (req, res) => {
   try {
     const { type = 'scans', startDate, endDate, format = 'csv' } = req.query;
     

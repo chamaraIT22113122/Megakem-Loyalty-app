@@ -5,7 +5,7 @@ const User = require('../models/User');
 const Member = require('../models/Member');
 const Product = require('../models/Product');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
-const { optionalAuth, protect, authorize } = require('../middleware/auth');
+const { optionalAuth, protect, authorize, hasPermission } = require('../middleware/auth');
 
 // @route   GET /api/scans
 // @desc    Get all scans (with pagination and filters)
@@ -400,7 +400,7 @@ router.post('/batch', optionalAuth, async (req, res) => {
 // @route   DELETE /api/scans/:id
 // @desc    Delete scan
 // @access  Private (Admin only)
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+router.delete('/:id', protect, hasPermission('canDelete'), async (req, res) => {
   try {
     const scan = await Scan.findById(req.params.id);
 
@@ -611,7 +611,7 @@ async function updateMemberFromScan(scan) {
 // @route   POST /api/scans/sync-members
 // @desc    Sync members from all existing scans (one-time operation)
 // @access  Private/Admin
-router.post('/sync-members', protect, authorize('admin'), async (req, res) => {
+router.post('/sync-members', protect, hasPermission('canManageUsers'), async (req, res) => {
   try {
     const allScans = await Scan.find().sort({ timestamp: 1 });
     let created = 0;

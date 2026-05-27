@@ -857,23 +857,37 @@ function App() {
     if (cart.length === 0) return showNotification('List is empty', 'error');
     if (!memberId.trim()) return showNotification(role === 'customer' ? 'Please enter Phone Number' : 'Please enter Member ID', 'error');
     
+    setLoading(true);
     let finalMemberName = memberName;
     let finalLocation = location;
 
-    if (role === 'customer') {
-      if (!memberName.trim()) return showNotification('Please enter Name', 'error');
-      if (!/^\d{10}$/.test(memberId)) return showNotification('Phone number must be exactly 10 digits', 'error');
-    } else if (role === 'applicator') {
-      const applicator = applicatorInfo.find(a => a.memberId.toUpperCase() === memberId.toUpperCase());
-      if (!applicator) {
-        return showNotification(`Applicator ID ${memberId} is not registered. Please register in Applicator & Hardware Info first.`, 'error', 5000);
-      }
-      finalMemberName = applicator.name || memberId.toUpperCase();
-      finalLocation = location || applicator.location || '';
-    }
-
-    setLoading(true);
     try {
+      if (role === 'customer') {
+        if (!memberName.trim()) {
+          setLoading(false);
+          return showNotification('Please enter Name', 'error');
+        }
+        if (!/^\d{10}$/.test(memberId)) {
+          setLoading(false);
+          return showNotification('Phone number must be exactly 10 digits', 'error');
+        }
+      } else if (role === 'applicator') {
+        let applicator = null;
+        try {
+          const res = await membersAPI.getAll({ role: 'applicator', search: memberId.toUpperCase().trim() });
+          const allFetched = res.data.data || [];
+          applicator = allFetched.find(m => m.memberId.toUpperCase() === memberId.toUpperCase().trim());
+        } catch (err) {
+          console.error('Error fetching applicator for validation:', err);
+        }
+
+        if (!applicator) {
+          setLoading(false);
+          return showNotification(`Applicator ID ${memberId} is not registered. Please register in Applicator & Hardware Info first.`, 'error', 5000);
+        }
+        finalMemberName = applicator.memberName || memberId.toUpperCase();
+        finalLocation = location || applicator.location || '';
+      }
       const scansData = cart.map(item => ({ 
         memberName: finalMemberName || (role === 'customer' ? `CUS-${memberId}` : memberId.toUpperCase()), 
         memberId: role === 'customer' ? `CUS-${memberId}` : memberId.toUpperCase(), 
@@ -1014,20 +1028,35 @@ function App() {
         }
       }
 
+      // Check permissions for conditional fetching
+      const hasUsers = hasPermission('canManageUsers');
+      const hasProducts = hasPermission('canManageProducts');
+
+      const membersPromise = hasUsers
+        ? membersAPI.getAll()
+        : (hasProducts 
+            ? membersAPI.getAll({ role: 'applicator' }) 
+            : Promise.resolve({ data: { data: [] } }));
+
+      const usersPromise = isMainAdmin()
+        ? authAPI.getUsers()
+        : Promise.resolve({ data: { data: [] } });
+
       const [statsRes, scansRes, usersRes, productsRes, membersRes, loyaltyConfigRes] = await Promise.all([
-        scansAPI.getStats(),
-        scansAPI.getLive(),
-        authAPI.getUsers(),
-        productsAPI.getAll(),
-        membersAPI.getAll().catch(() => ({ data: { data: [] } })),
+        scansAPI.getStats().catch(() => ({ data: { data: {} } })),
+        scansAPI.getLive().catch(() => ({ data: { data: [] } })),
+        usersPromise.catch(() => ({ data: { data: [] } })),
+        productsAPI.getAll().catch(() => ({ data: { data: [] } })),
+        membersPromise.catch(() => ({ data: { data: [] } })),
         loyaltyAPI.getConfig().catch(() => ({ data: { data: null } }))
       ]);
+
       console.log('📦 Products response:', productsRes.data);
-      setStats(statsRes.data.data);
-      setScanHistory(scansRes.data.data);
-      setUsers(usersRes.data.data);
-      setProducts(productsRes.data.data);
-      const allMembers = membersRes.data.data || [];
+      setStats(statsRes.data?.data || {});
+      setScanHistory(scansRes.data?.data || []);
+      setUsers(usersRes.data?.data || []);
+      setProducts(productsRes.data?.data || []);
+      const allMembers = membersRes.data?.data || [];
       setMembers(allMembers);
       
       const applicators = allMembers.filter(m => m.role === 'applicator').map(m => ({
@@ -1044,8 +1073,8 @@ function App() {
       }));
       setApplicatorInfo(applicators);
 
-      setLoyaltyConfig(loyaltyConfigRes.data.data);
-      console.log('✅ Products loaded:', productsRes.data.data.length, 'products');
+      setLoyaltyConfig(loyaltyConfigRes.data?.data || null);
+      console.log('✅ Products loaded:', productsRes.data?.data?.length || 0, 'products');
     } catch (error) {
       console.error('❌ Error loading admin data:', error);
     }
@@ -1055,8 +1084,19 @@ function App() {
   const reloadMembers = async () => {
     if (!adminAuth) return;
     try {
-      const membersRes = await membersAPI.getAll();
-      const allMembers = membersRes.data.data || [];
+      const hasUsers = hasPermission('canManageUsers');
+      const hasProducts = hasPermission('canManageProducts');
+      
+      let membersRes;
+      if (hasUsers) {
+        membersRes = await membersAPI.getAll();
+      } else if (hasProducts) {
+        membersRes = await membersAPI.getAll({ role: 'applicator' });
+      } else {
+        return; // No permission to load members or applicators
+      }
+
+      const allMembers = membersRes.data?.data || [];
       setMembers(allMembers);
       
       const applicators = allMembers.filter(m => m.role === 'applicator').map(m => ({
@@ -4895,6 +4935,23 @@ function App() {
                   disabled={applicatorInfo.length === 0}
                 >
                   Export
+                </Button>
+                <Button
+                  variant='outlined'
+                  startIcon={<Refresh />}
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      await loadAdminData();
+                      showNotification('Applicator info refreshed successfully!', 'success');
+                    } catch (error) {
+                      showNotification('Failed to refresh applicator info', 'error');
+                    }
+                    setLoading(false);
+                  }}
+                  disabled={loading}
+                >
+                  Refresh
                 </Button>
                 <Button
                   variant='contained'

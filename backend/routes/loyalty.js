@@ -10,7 +10,7 @@ const { protect } = require('../middleware/auth');
 // @access  Private/Admin
 router.get('/config', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && req.user.role !== 'co-admin') {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -43,7 +43,7 @@ router.put('/config', protect, [
   body('pointsCalculation.applicatorBonus').optional().isFloat({ min: 0, max: 1 })
 ], async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && !(req.user.role === 'co-admin' && req.user.permissions?.canManageProducts === true)) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -98,7 +98,7 @@ router.put('/products/:id/points', protect, [
   body('pointsPerPackSize').optional().isArray()
 ], async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && !(req.user.role === 'co-admin' && req.user.permissions?.canManageProducts === true)) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'

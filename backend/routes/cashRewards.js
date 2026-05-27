@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Member = require('../models/Member');
 const Scan = require('../models/Scan');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize, hasPermission } = require('../middleware/auth');
 
 // @route   GET /api/cash-rewards/:memberId
 // @desc    Get cash rewards for a specific member
@@ -78,7 +78,7 @@ router.get('/:memberId', protect, async (req, res) => {
 // @route   GET /api/cash-rewards
 // @desc    Get all applicators' cash rewards (with optional filters)
 // @access  Private/Admin
-router.get('/', protect, authorize('admin'), async (req, res) => {
+router.get('/', protect, hasPermission('canExport'), async (req, res) => {
   try {
     const { year, month, role = 'applicator' } = req.query;
     
@@ -144,7 +144,7 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
 // @route   POST /api/cash-rewards/calculate/:memberId
 // @desc    Calculate cash reward for a specific member and month
 // @access  Private/Admin
-router.post('/calculate/:memberId', protect, authorize('admin'), async (req, res) => {
+router.post('/calculate/:memberId', protect, hasPermission('canExport'), async (req, res) => {
   try {
     const { year, month } = req.body;
 
@@ -206,7 +206,7 @@ router.post('/calculate/:memberId', protect, authorize('admin'), async (req, res
 // @route   PUT /api/cash-rewards/mark-paid/:memberId
 // @desc    Mark cash reward as paid for a specific month
 // @access  Private/Admin
-router.put('/mark-paid/:memberId', protect, authorize('admin'), async (req, res) => {
+router.put('/mark-paid/:memberId', protect, hasPermission('canExport'), async (req, res) => {
   try {
     const { year, month } = req.body;
 
