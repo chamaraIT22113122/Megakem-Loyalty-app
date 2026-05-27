@@ -330,7 +330,7 @@ function App() {
           whatsappNumber: m.whatsappNumber || '',
           nic: m.nic || '',
           birthday: m.birthday ? new Date(m.birthday).toISOString().split('T')[0] : '',
-          City: m.location || '',
+          location: m.location || '',
           equipment: m.equipment || '',
           equipmentBrand: m.equipmentBrand || '',
           purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
@@ -923,7 +923,7 @@ function App() {
         bagNo: item.bag, 
         qty: item.qty,
         price: item.price || 0,
-        City: finalLocation || '' 
+        location: finalLocation || '' 
       }));
       const response = await scansAPI.createBatch(scansData);
       
@@ -1030,7 +1030,7 @@ function App() {
                   memberName: app.name,
                   memberId: app.memberId.toUpperCase().trim(),
                   phone: app.phoneNumber,
-                  City: app.location,
+                  location: app.location,
                   equipment: app.equipment,
                   equipmentBrand: app.equipmentBrand,
                   purchaseDate: app.purchaseDate || null,
@@ -1088,7 +1088,7 @@ function App() {
         name: m.memberName,
         memberId: m.memberId,
         phoneNumber: m.phone || '',
-        City: m.location || '',
+        location: m.location || '',
         equipment: m.equipment || '',
         equipmentBrand: m.equipmentBrand || '',
         purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
@@ -1128,7 +1128,7 @@ function App() {
         name: m.memberName,
         memberId: m.memberId,
         phoneNumber: m.phone || '',
-        City: m.location || '',
+        location: m.location || '',
         equipment: m.equipment || '',
         equipmentBrand: m.equipmentBrand || '',
         purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
@@ -1970,7 +1970,7 @@ function App() {
             bagNo: scan.bagNo,
             qty: scan.qty,
             price: scan.price,
-            City: scan.location,
+            location: scan.location,
             timestamp: scan.timestamp
           }));
           
@@ -3555,7 +3555,7 @@ function App() {
                   const allLocations = scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                     const existing = acc.find(l => l.location === scan.location); 
                     if (existing) { existing.count++; } 
-                    else { acc.push({ City: scan.location, count: 1 }); } 
+                    else { acc.push({ location: scan.location, count: 1 }); } 
                     return acc; 
                   }, []).sort((a, b) => b.count - a.count);
                   setExpandedCardDialog({ open: true, type: 'locations', data: allLocations });
@@ -3569,14 +3569,14 @@ function App() {
                     {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                       const existing = acc.find(l => l.location === scan.location); 
                       if (existing) { existing.count++; } 
-                      else { acc.push({ City: scan.location, count: 1 }); } 
+                      else { acc.push({ location: scan.location, count: 1 }); } 
                       return acc; 
                     }, []).length > 6 && (
                       <Chip 
                         label={`+${scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                           const existing = acc.find(l => l.location === scan.location); 
                           if (existing) { existing.count++; } 
-                          else { acc.push({ City: scan.location, count: 1 }); } 
+                          else { acc.push({ location: scan.location, count: 1 }); } 
                           return acc; 
                         }, []).length - 6} more`}
                         size='small'
@@ -3588,7 +3588,7 @@ function App() {
                     {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                       const existing = acc.find(l => l.location === scan.location); 
                       if (existing) { existing.count++; } 
-                      else { acc.push({ City: scan.location, count: 1 }); } 
+                      else { acc.push({ location: scan.location, count: 1 }); } 
                       return acc; 
                     }, []).sort((a, b) => b.count - a.count).slice(0, 6).map((loc, i) => 
                       <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: i === 0 ? 'success.main' : 'grey.400', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
@@ -3634,7 +3634,7 @@ function App() {
                             const locations = scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                               const existing = acc.find(l => l.location === scan.location); 
                               if (existing) { existing.count++; } 
-                              else { acc.push({ City: scan.location, count: 1 }); } 
+                              else { acc.push({ location: scan.location, count: 1 }); } 
                               return acc; 
                             }, []);
                             return locations.length > 0 ? Math.round(scanHistory.length / locations.length) : 0;
@@ -3644,7 +3644,7 @@ function App() {
                           <TrendingUp sx={{ fontSize: '0.9rem' }} /> Active cities: {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
                             const existing = acc.find(l => l.location === scan.location); 
                             if (existing) { existing.count++; } 
-                            else { acc.push({ City: scan.location, count: 1 }); } 
+                            else { acc.push({ location: scan.location, count: 1 }); } 
                             return acc; 
                           }, []).length}
                         </Typography>
@@ -4011,7 +4011,7 @@ function App() {
                 <Typography variant='h5' fontWeight='bold' color='info.dark'>{new Set(scanHistory.map(s => s.productNo)).size}</Typography>
               </Box>
               <Box sx={{ p: 2, bgcolor: 'warning.50', borderRadius: 2 }}>
-                <Typography variant='body2' color='text.secondary'>Unique Locations</Typography>
+                <Typography variant='body2' color='text.secondary'>Unique Cities</Typography>
                 <Typography variant='h5' fontWeight='bold' color='warning.dark'>{new Set(scanHistory.filter(s => s.location).map(s => s.location)).size}</Typography>
               </Box>
             </Box></CardContent></Card></Grid>
@@ -7810,7 +7810,7 @@ function App() {
                 <InputLabel>City</InputLabel>
                 <Select
                   value={applicatorFormData.location}
-                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, City: e.target.value })}
+                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, location: e.target.value })}
                   label='City'
                 >
                   <MenuItem value=''>Select City</MenuItem>
@@ -7955,7 +7955,7 @@ function App() {
                 <InputLabel>City</InputLabel>
                 <Select
                   value={hardwareFormData.location}
-                  onChange={(e) => setHardwareFormData({ ...hardwareFormData, City: e.target.value })}
+                  onChange={(e) => setHardwareFormData({ ...hardwareFormData, location: e.target.value })}
                   label='City'
                 >
                   <MenuItem value=''>Select City</MenuItem>
