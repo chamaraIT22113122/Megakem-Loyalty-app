@@ -11,15 +11,16 @@ const { logAction } = require('../middleware/audit');
 // @access  Private/Admin
 router.get('/', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    const { role, search, sortBy = 'points', sortOrder = 'desc' } = req.query;
+    
+    // Allow non-admins to fetch only applicator list for scan validation
+    if (req.user.role !== 'admin' && role !== 'applicator') {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
       });
     }
 
-    const { role, search, sortBy = 'points', sortOrder = 'desc' } = req.query;
-    
     let query = {};
     if (role) {
       query.role = role;
@@ -35,7 +36,13 @@ router.get('/', protect, async (req, res) => {
     const sort = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-    const members = await Member.find(query).sort(sort);
+    let selectFields = '';
+    if (req.user.role !== 'admin') {
+      // Exclude sensitive financial and points info for non-admins
+      selectFields = 'memberId memberName phone role location equipment equipmentBrand purchaseDate condition notes';
+    }
+
+    const members = await Member.find(query).select(selectFields).sort(sort);
 
     res.json({
       success: true,
@@ -340,6 +347,215 @@ router.put('/:id/points', protect, [
         tier: member.tier
       },
       message: `Points ${operation === 'set' ? 'set' : operation === 'add' ? 'added' : 'subtracted'} successfully`
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   POST /api/members
+// @desc    Create a new member (applicator or customer)
+// @access  Private/Admin
+router.post('/', protect, [
+  body('memberId')
+    .notEmpty()
+    .withMessage('Member ID is required'),
+  body('memberName')
+    .notEmpty()
+    .withMessage('Member name is required')
+], async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const { 
+      memberId, 
+      memberName, 
+      phone, 
+      role = 'applicator', 
+      location, 
+      points = 0,
+      equipment,
+      equipmentBrand,
+      purchaseDate,
+      condition = 'good',
+      notes
+    } = req.body;
+
+    const existingMember = await Member.findOne({ memberId: memberId.toUpperCase().trim() });
+    if (existingMember) {
+      return res.status(400).json({
+        success: false,
+        message: `Member with ID ${memberId} already exists`
+      });
+    }
+
+    const newMember = new Member({
+      memberId: memberId.toUpperCase().trim(),
+      memberName,
+      phone,
+      role,
+      location,
+      points,
+      equipment,
+      equipmentBrand,
+      purchaseDate: purchaseDate || null,
+      condition,
+      notes
+    });
+
+    const config = await LoyaltyConfig.getConfig();
+    newMember.updateTier(config.tierThresholds);
+
+    await newMember.save();
+
+    // Audit Log
+    await logAction(req, 'CREATE_MEMBER', 'MEMBERS', {
+      memberId: newMember._id,
+      memberCode: newMember.memberId,
+      role: newMember.role
+    });
+
+    res.status(201).json({
+      success: true,
+      data: newMember,
+      message: 'Member created successfully'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   PUT /api/members/:id
+// @desc    Update a member
+// @access  Private/Admin
+router.put('/:id', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    const member = await Member.findById(req.params.id);
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found'
+      });
+    }
+
+    const fieldsToUpdate = [
+      'memberName',
+      'phone',
+      'role',
+      'location',
+      'points',
+      'equipment',
+      'equipmentBrand',
+      'condition',
+      'notes'
+    ];
+
+    fieldsToUpdate.forEach(field => {
+      if (req.body[field] !== undefined) {
+        member[field] = req.body[field];
+      }
+    });
+
+    if (req.body.purchaseDate !== undefined) {
+      member.purchaseDate = req.body.purchaseDate || null;
+    }
+
+    if (req.body.memberId !== undefined) {
+      const newMemberId = req.body.memberId.toUpperCase().trim();
+      if (newMemberId !== member.memberId) {
+        const existingMember = await Member.findOne({ memberId: newMemberId });
+        if (existingMember) {
+          return res.status(400).json({
+            success: false,
+            message: `Member with ID ${newMemberId} already exists`
+          });
+        }
+        member.memberId = newMemberId;
+      }
+    }
+
+    const config = await LoyaltyConfig.getConfig();
+    member.updateTier(config.tierThresholds);
+
+    await member.save();
+
+    // Audit Log
+    await logAction(req, 'UPDATE_MEMBER', 'MEMBERS', {
+      memberId: member._id,
+      memberCode: member.memberId
+    });
+
+    res.json({
+      success: true,
+      data: member,
+      message: 'Member updated successfully'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   DELETE /api/members/:id
+// @desc    Delete a member
+// @access  Private/Admin
+router.delete('/:id', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    const member = await Member.findById(req.params.id);
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found'
+      });
+    }
+
+    await Member.deleteOne({ _id: req.params.id });
+
+    // Audit Log
+    await logAction(req, 'DELETE_MEMBER', 'MEMBERS', {
+      memberId: member._id,
+      memberCode: member.memberId
+    });
+
+    res.json({
+      success: true,
+      message: 'Member deleted successfully'
     });
   } catch (error) {
     res.status(400).json({

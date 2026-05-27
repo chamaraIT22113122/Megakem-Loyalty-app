@@ -44,6 +44,26 @@ const memberSchema = new mongoose.Schema({
   lastScanDate: {
     type: Date
   },
+  equipment: {
+    type: String,
+    trim: true
+  },
+  equipmentBrand: {
+    type: String,
+    trim: true
+  },
+  purchaseDate: {
+    type: Date
+  },
+  condition: {
+    type: String,
+    enum: ['good', 'fair', 'poor'],
+    default: 'good'
+  },
+  notes: {
+    type: String,
+    trim: true
+  },
   // Monthly purchase tracking for cash rewards
   monthlyPurchases: [{
     year: {

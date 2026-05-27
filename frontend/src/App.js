@@ -296,17 +296,33 @@ function App() {
   const pollIntervalRef = useRef(null);
   const scanErrorCountRef = useRef(0);
 
-  // Load applicator info from localStorage on mount
+  // Load applicator info from database when user session is available
   useEffect(() => {
-    const savedApplicatorInfo = localStorage.getItem('applicatorInfo');
-    if (savedApplicatorInfo) {
+    const fetchApplicators = async () => {
       try {
-        setApplicatorInfo(JSON.parse(savedApplicatorInfo));
+        const res = await membersAPI.getAll({ role: 'applicator' });
+        const mapped = (res.data.data || []).map(m => ({
+          _id: m._id,
+          name: m.memberName,
+          memberId: m.memberId,
+          phoneNumber: m.phone || '',
+          location: m.location || '',
+          equipment: m.equipment || '',
+          equipmentBrand: m.equipmentBrand || '',
+          purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
+          condition: m.condition || 'good',
+          notes: m.notes || ''
+        }));
+        setApplicatorInfo(mapped);
       } catch (error) {
         console.error('Error loading applicator info:', error);
       }
+    };
+    
+    if (user) {
+      fetchApplicators();
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -975,7 +991,23 @@ function App() {
       setScanHistory(scansRes.data.data);
       setUsers(usersRes.data.data);
       setProducts(productsRes.data.data);
-      setMembers(membersRes.data.data || []);
+      const allMembers = membersRes.data.data || [];
+      setMembers(allMembers);
+      
+      const applicators = allMembers.filter(m => m.role === 'applicator').map(m => ({
+        _id: m._id,
+        name: m.memberName,
+        memberId: m.memberId,
+        phoneNumber: m.phone || '',
+        location: m.location || '',
+        equipment: m.equipment || '',
+        equipmentBrand: m.equipmentBrand || '',
+        purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
+        condition: m.condition || 'good',
+        notes: m.notes || ''
+      }));
+      setApplicatorInfo(applicators);
+
       setLoyaltyConfig(loyaltyConfigRes.data.data);
       console.log('✅ Products loaded:', productsRes.data.data.length, 'products');
     } catch (error) {
@@ -988,8 +1020,23 @@ function App() {
     if (!adminAuth) return;
     try {
       const membersRes = await membersAPI.getAll();
-      setMembers(membersRes.data.data || []);
-      console.log('✅ Members reloaded:', membersRes.data.data.length, 'members');
+      const allMembers = membersRes.data.data || [];
+      setMembers(allMembers);
+      
+      const applicators = allMembers.filter(m => m.role === 'applicator').map(m => ({
+        _id: m._id,
+        name: m.memberName,
+        memberId: m.memberId,
+        phoneNumber: m.phone || '',
+        location: m.location || '',
+        equipment: m.equipment || '',
+        equipmentBrand: m.equipmentBrand || '',
+        purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
+        condition: m.condition || 'good',
+        notes: m.notes || ''
+      }));
+      setApplicatorInfo(applicators);
+      console.log('✅ Members reloaded:', allMembers.length, 'members');
     } catch (error) {
       console.error('❌ Error reloading members:', error);
     }
@@ -4937,11 +4984,26 @@ function App() {
                                   <IconButton 
                                     size='small' 
                                     color='error'
-                                    onClick={() => {
-                                      const newList = applicatorInfo.filter((_, i) => i !== index);
-                                      setApplicatorInfo(newList);
-                                      localStorage.setItem('applicatorInfo', JSON.stringify(newList));
-                                      showNotification('Applicator info deleted', 'success');
+                                    onClick={async () => {
+                                      if (window.confirm(`Are you sure you want to delete applicator ${applicator.name}?`)) {
+                                        setLoading(true);
+                                        try {
+                                          if (applicator._id) {
+                                            await membersAPI.delete(applicator._id);
+                                            showNotification('Applicator info deleted successfully', 'success');
+                                            await loadAdminData();
+                                          } else {
+                                            const newList = applicatorInfo.filter((_, i) => i !== index);
+                                            setApplicatorInfo(newList);
+                                            showNotification('Applicator info deleted', 'success');
+                                          }
+                                        } catch (error) {
+                                          console.error('Error deleting applicator:', error);
+                                          showNotification(error.response?.data?.message || 'Failed to delete applicator information', 'error');
+                                        } finally {
+                                          setLoading(false);
+                                        }
+                                      }
                                     }}
                                   >
                                     <Delete />
@@ -7551,28 +7613,43 @@ function App() {
           </Button>
           <Button 
             variant='contained'
-            onClick={() => {
+            onClick={async () => {
               if (!applicatorFormData.name || !applicatorFormData.memberId) {
                 showNotification('Please fill in required fields', 'error');
                 return;
               }
               
-              let newList;
-              if (applicatorDialog.data) {
-                // Edit existing
-                newList = applicatorInfo.map(item => 
-                  item.memberId === applicatorDialog.data.memberId ? applicatorFormData : item
-                );
-                showNotification('Applicator info updated', 'success');
-              } else {
-                // Add new
-                newList = [...applicatorInfo, applicatorFormData];
-                showNotification('Applicator info added', 'success');
+              setLoading(true);
+              try {
+                const backendPayload = {
+                  memberName: applicatorFormData.name,
+                  memberId: applicatorFormData.memberId.toUpperCase().trim(),
+                  phone: applicatorFormData.phoneNumber,
+                  location: applicatorFormData.location,
+                  equipment: applicatorFormData.equipment,
+                  equipmentBrand: applicatorFormData.equipmentBrand,
+                  purchaseDate: applicatorFormData.purchaseDate || null,
+                  condition: applicatorFormData.condition || 'good',
+                  notes: applicatorFormData.notes,
+                  role: 'applicator'
+                };
+
+                if (applicatorDialog.data && applicatorDialog.data._id) {
+                  await membersAPI.update(applicatorDialog.data._id, backendPayload);
+                  showNotification('Applicator info updated successfully', 'success');
+                } else {
+                  await membersAPI.create(backendPayload);
+                  showNotification('Applicator info added successfully', 'success');
+                }
+                
+                await loadAdminData();
+                setApplicatorDialog({ open: false, data: null });
+              } catch (error) {
+                console.error('Error saving applicator:', error);
+                showNotification(error.response?.data?.message || 'Failed to save applicator information', 'error');
+              } finally {
+                setLoading(false);
               }
-              
-              setApplicatorInfo(newList);
-              localStorage.setItem('applicatorInfo', JSON.stringify(newList));
-              setApplicatorDialog({ open: false, data: null });
             }}
             disabled={!applicatorFormData.name || !applicatorFormData.memberId}
           >

@@ -127,6 +127,9 @@ export const analyticsAPI = {
 export const membersAPI = {
   getAll: (params) => api.get('/members', { params }),
   getOne: (id) => api.get(`/members/${id}`),
+  create: (data) => api.post('/members', data),
+  update: (id, data) => api.put(`/members/${id}`, data),
+  delete: (id) => api.delete(`/members/${id}`),
   updatePoints: (id, points, operation = 'set') => api.put(`/members/${id}/points`, { points, operation }),
   getStats: () => api.get('/members/stats/summary'),
   syncFromScans: () => api.post('/members/sync-from-scans'),
