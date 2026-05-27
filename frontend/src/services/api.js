@@ -56,7 +56,7 @@ api.interceptors.response.use(
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         localStorage.removeItem('adminAuth');
-        window.location.href = '/';
+        window.dispatchEvent(new Event('auth_error'));
         return Promise.reject(refreshError);
       }
     }
@@ -67,6 +67,7 @@ api.interceptors.response.use(
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       localStorage.removeItem('adminAuth');
+      window.dispatchEvent(new Event('auth_error'));
     }
     
     return Promise.reject(error);
