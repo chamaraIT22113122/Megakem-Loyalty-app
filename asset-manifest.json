@@ -1,14 +1,15 @@
 {
   "files": {
-    "main.css": "/Megakem-Loyalty-app/static/css/main.7a287b93.css",
-    "main.js": "/Megakem-Loyalty-app/static/js/main.c1ef3efb.js",
-    "static/media/Megakem  Logo.png": "/Megakem-Loyalty-app/static/media/Megakem  Logo.f9d1032af7adb880423c.png",
-    "index.html": "/Megakem-Loyalty-app/index.html",
-    "main.7a287b93.css.map": "/Megakem-Loyalty-app/static/css/main.7a287b93.css.map",
-    "main.c1ef3efb.js.map": "/Megakem-Loyalty-app/static/js/main.c1ef3efb.js.map"
+    "main.css": "/Megakem-Loyalty-app/static/css/main.e6e25ce1.css",
+    "main.js": "/Megakem-Loyalty-app/static/js/main.5bfcc5dd.js",
+    "static/js/82.b99c05cf.chunk.js": "/Megakem-Loyalty-app/static/js/82.b99c05cf.chunk.js",
+    "static/js/239.57732ca3.chunk.js": "/Megakem-Loyalty-app/static/js/239.57732ca3.chunk.js",
+    "static/media/MegakemLogo.png": "/Megakem-Loyalty-app/static/media/MegakemLogo.f9d1032af7adb880423c.png",
+    "static/media/MegakemBrandLogo.png": "/Megakem-Loyalty-app/static/media/MegakemBrandLogo.e68fc05a8779fc4c003c.png",
+    "index.html": "/Megakem-Loyalty-app/index.html"
   },
   "entrypoints": [
-    "static/css/main.7a287b93.css",
-    "static/js/main.c1ef3efb.js"
+    "static/css/main.e6e25ce1.css",
+    "static/js/main.5bfcc5dd.js"
   ]
 }
