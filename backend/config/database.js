@@ -20,9 +20,9 @@ const connectDB = async () => {
     let uri = process.env.MONGODB_URI;
 
     const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 4000,
-      socketTimeoutMS: 30000,
-      connectTimeoutMS: 4000,
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000,
       retryWrites: true,
       retryReads: true,
       family: 4, // Force IPv4
