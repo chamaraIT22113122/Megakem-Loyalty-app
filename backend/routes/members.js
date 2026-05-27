@@ -398,11 +398,33 @@ router.post('/', protect, [
       notes
     } = req.body;
 
-    const existingMember = await Member.findOne({ memberId: memberId.toUpperCase().trim() });
-    if (existingMember) {
-      return res.status(400).json({
-        success: false,
-        message: `Member with ID ${memberId} already exists`
+    let member = await Member.findOne({ memberId: memberId.toUpperCase().trim() });
+    if (member) {
+      member.memberName = memberName;
+      if (phone !== undefined) member.phone = phone;
+      if (role !== undefined) member.role = role;
+      if (location !== undefined) member.location = location;
+      if (equipment !== undefined) member.equipment = equipment;
+      if (equipmentBrand !== undefined) member.equipmentBrand = equipmentBrand;
+      if (purchaseDate !== undefined) member.purchaseDate = purchaseDate || null;
+      if (condition !== undefined) member.condition = condition || 'good';
+      if (notes !== undefined) member.notes = notes;
+
+      const config = await LoyaltyConfig.getConfig();
+      member.updateTier(config.tierThresholds);
+      await member.save();
+
+      await logAction(req, 'UPDATE_MEMBER', 'MEMBERS', {
+        memberId: member._id,
+        memberCode: member.memberId,
+        role: member.role,
+        isMigrationUpdate: true
+      });
+
+      return res.json({
+        success: true,
+        data: member,
+        message: 'Member updated with hardware/applicator info successfully'
       });
     }
 
