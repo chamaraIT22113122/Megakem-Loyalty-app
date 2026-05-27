@@ -82,6 +82,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   // Filter states
   const [filterBatch, setFilterBatch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedForPrint, setSelectedForPrint] = useState([]);
   
   const qrPreviewRef = useRef();
@@ -352,6 +353,15 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const filteredQRCodes = qrCodes.filter(qr => {
     if (filterBatch && qr.batchNo !== filterBatch) return false;
     if (filterStatus && qr.status !== filterStatus) return false;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const match = (
+        qr.productName?.toLowerCase().includes(query) ||
+        qr.batchNo?.toLowerCase().includes(query) ||
+        qr.packageNo?.toLowerCase().includes(query)
+      );
+      if (!match) return false;
+    }
     return true;
   });
 
@@ -712,7 +722,17 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       {/* QR Codes Table */}
       <Card>
         <CardContent>
-          <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
+          <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <TextField 
+              size="small"
+              placeholder="Search products, batches..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              sx={{ minWidth: 200, flexGrow: 1 }}
+              InputProps={{
+                startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+              }}
+            />
             <FormControl sx={{ minWidth: 200 }}>
               <InputLabel>Filter by Batch</InputLabel>
               <Select

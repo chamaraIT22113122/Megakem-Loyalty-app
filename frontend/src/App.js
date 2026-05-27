@@ -4454,6 +4454,16 @@ function App() {
               >
                 Add Co-Admin
               </Button>
+              <TextField 
+                size='small' 
+                placeholder='Search co-admins...' 
+                value={coAdminSearchQuery}
+                onChange={(e) => setCoAdminSearchQuery(e.target.value)}
+                sx={{ mx: 2, flexGrow: 1, maxWidth: 300 }}
+                InputProps={{
+                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+                }}
+              />
               <Typography variant='body2' color='text.secondary'>Total Co-Admins: {users.filter(u => u.role === 'admin' || u.role === 'co-admin').length}</Typography>
             </Box>
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
@@ -4466,7 +4476,10 @@ function App() {
                 <TableCell><strong>Created</strong></TableCell>
                 <TableCell><strong>Actions</strong></TableCell>
               </TableRow></TableHead>
-                <TableBody>{users.filter(u => u.role === 'admin' || u.role === 'co-admin').map(u => <TableRow key={u._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                <TableBody>{users.filter(u => 
+                  (u.role === 'admin' || u.role === 'co-admin') && 
+                  (!coAdminSearchQuery || u.username?.toLowerCase().includes(coAdminSearchQuery.toLowerCase()) || u.email?.toLowerCase().includes(coAdminSearchQuery.toLowerCase()))
+                ).map(u => <TableRow key={u._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
                   <TableCell>
                     <Typography variant='body2' fontWeight={600}>{u.username}</Typography>
                     {u.email === 'admin@megakem.com' && <Chip label='Main Admin' size='small' color='success' sx={{ mt: 0.5, fontSize: '0.65rem' }} />}
@@ -4552,6 +4565,16 @@ function App() {
                 <CardGiftcard sx={{ mr: 1, verticalAlign: 'middle' }} />
                 Cash Rewards Management
               </Typography>
+              <TextField 
+                size='small' 
+                placeholder='Search rewards...' 
+                value={rewardSearchQuery}
+                onChange={(e) => setRewardSearchQuery(e.target.value)}
+                sx={{ minWidth: 200 }}
+                InputProps={{
+                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+                }}
+              />
               <FormControl sx={{ minWidth: 120 }}>
                 <InputLabel>Month</InputLabel>
                 <Select 
@@ -4642,7 +4665,9 @@ function App() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {cashRewards.map((reward) => (
+                    {cashRewards
+                      .filter(r => !rewardSearchQuery || r.memberName?.toLowerCase().includes(rewardSearchQuery.toLowerCase()) || r.memberId?.toLowerCase().includes(rewardSearchQuery.toLowerCase()))
+                      .map((reward) => (
                       <TableRow key={reward.memberId}>
                         <TableCell>{reward.memberId}</TableCell>
                         <TableCell>{reward.memberName}</TableCell>
