@@ -27,7 +27,7 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Batch number is required' });
     }
 
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = process.env.FRONTEND_URL_PROD || process.env.FRONTEND_URL || 'https://chamarait22113122.github.io/Megakem-Loyalty-app';
     const generatedQRs = [];
 
     for (const productId of productIds) {
@@ -37,8 +37,8 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
       // Create unique QR ID
       const qrId = `${product.productNo}-${batchNo}-${packageNo || 'STD'}-${Date.now()}`;
       
-      // Create QR link
-      const qrLink = customLink || `${baseUrl}/product/${product.productNo}?batch=${batchNo}&package=${packageNo}`;
+      // Create QR link without path to prevent 404s on GitHub Pages
+      const qrLink = customLink || `${baseUrl}/?p=${product.productNo}&b=${batchNo}&pkg=${packageNo}`;
 
       // Generate QR code as data URL
       const qrDataUrl = await QRCode.toDataURL(qrLink, {
@@ -290,7 +290,7 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       });
     }
 
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = process.env.FRONTEND_URL_PROD || process.env.FRONTEND_URL || 'https://chamarait22113122.github.io/Megakem-Loyalty-app';
     const qrRecords = [];
 
     // Generate in chunks with the database to avoid memory issues and long transactions
@@ -298,8 +298,8 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       const pNo = `${packageNoPrefix}${i}`;
       const qrId = `${product.productNo}-${batchNo}-${pNo}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       
-      // The user wants the link and batch info in the QR
-      const qrLink = customLink || `${baseUrl}/scan?p=${product.productNo}&b=${batchNo}&pkg=${pNo}`;
+      // The user wants the link and batch info in the QR without triggering 404s
+      const qrLink = customLink || `${baseUrl}/?p=${product.productNo}&b=${batchNo}&pkg=${pNo}`;
       
       // Pipe delimited data as secondary info or for the scanner app
       const pipeData = `${product.productNo}|${product.name}|${batchNo}|${pNo}|${product.packSize || 'N/A'}`;

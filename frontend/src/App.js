@@ -448,34 +448,37 @@ function App() {
   // Handle QR code URL parameters on initial load
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const batchParam = params.get('batch') || params.get('batchNo');
+    const batchParam = params.get('batch') || params.get('batchNo') || params.get('b');
+    const productParam = params.get('p') || params.get('product') || params.get('code');
+    const pkgParam = params.get('pkg') || params.get('package');
     
-    if (batchParam) {
-      console.log('Detected batch parameter:', batchParam);
+    if (batchParam || productParam) {
+      console.log('Detected QR parameters:', { batchParam, productParam, pkgParam });
       
-      // Parse the batch format: "MLSP 001 050525 001 001"
-      // Components: Product Code, Material Batch No, Date, Pack Size, Pack No
-      const parts = batchParam.trim().split(/\s+/);
-      
-      if (parts.length === 5) {
-        const [productCode, materialBatch, dateCode, packSize, packNo] = parts;
+      let parsedData = {
+        productCode: productParam || '',
+        batchNo: batchParam || '',
+        bagNo: pkgParam || '',
+        fullBatch: batchParam || ''
+      };
+
+      // Support for the old 5-part batch format "MLSP 001 050525 001 001"
+      if (batchParam && batchParam.trim().split(/\s+/).length === 5) {
+        const parts = batchParam.trim().split(/\s+/);
+        const [pCode, materialBatch, dateCode, packSize, packNo] = parts;
         
-        const parsedData = {
-          productCode,        // "MLSP" - for product matching
-          materialBatch,      // "001"
-          dateCode,           // "050525" - date
-          packSize: extractPackSize(packSize),  // "001" -> "1kg" - quantity
-          bagNo: packNo,      // "001" - bag/pack number
-          fullBatch: batchParam // Full string for display
+        parsedData = {
+          productCode: productParam || pCode,
+          materialBatch,
+          dateCode,
+          packSize: extractPackSize(packSize),
+          bagNo: pkgParam || packNo,
+          fullBatch: batchParam
         };
-        
-        console.log('Parsed batch data:', parsedData);
-        setPendingScan(parsedData);
-      } else {
-        console.warn('Unexpected batch format, expected 5 parts, got:', parts.length);
-        // Fallback for other formats
-        setPendingScan({ batchNo: batchParam, fullBatch: batchParam });
       }
+      
+      console.log('Parsed QR data:', parsedData);
+      setPendingScan(parsedData);
     }
   }, []);
 
