@@ -107,6 +107,7 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/members', require('./routes/members'));
 app.use('/api/loyalty', require('./routes/loyalty'));
 app.use('/api/cash-rewards', require('./routes/cashRewards'));
+app.use('/api/qr-codes', require('./routes/qrCode'));
 
 // Health check
 app.get('/api/health', (req, res) => {

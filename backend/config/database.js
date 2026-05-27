@@ -3,8 +3,13 @@ const dns = require('dns');
 
 // Override DNS resolver to use Google's public DNS (8.8.8.8)
 // This fixes querySrv ECONNREFUSED errors caused by local DNS blocking SRV lookups
-dns.setDefaultResultOrder('ipv4first');
-dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+try {
+  dns.setDefaultResultOrder('ipv4first');
+  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+  console.log('🌐 DNS configured (8.8.8.8, 8.8.4.4, 1.1.1.1)');
+} catch (err) {
+  console.warn('⚠️  Could not set custom DNS servers:', err.message);
+}
 
 let mongoServer = null;
 
@@ -20,6 +25,7 @@ const connectDB = async () => {
       connectTimeoutMS: 4000,
       retryWrites: true,
       retryReads: true,
+      family: 4, // Force IPv4
     });
     console.log(`📦 MongoDB Connected: ${conn.connection.host}`);
     
