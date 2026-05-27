@@ -38,7 +38,7 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
       const qrId = `${product.productNo}-${batchNo}-${packageNo || 'STD'}-${Date.now()}`;
       
       // Create QR link without path to prevent 404s on GitHub Pages
-      const qrLink = customLink || `${baseUrl}/?p=${product.productNo}&b=${batchNo}&pkg=${packageNo}`;
+      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(batchNo)}&pkg=${encodeURIComponent(packageNo || '')}`;
 
       // Generate QR code as data URL
       const qrDataUrl = await QRCode.toDataURL(qrLink, {
@@ -299,7 +299,7 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       const qrId = `${product.productNo}-${batchNo}-${pNo}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       
       // The user wants the link and batch info in the QR without triggering 404s
-      const qrLink = customLink || `${baseUrl}/?p=${product.productNo}&b=${batchNo}&pkg=${pNo}`;
+      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(batchNo)}&pkg=${encodeURIComponent(pNo)}`;
       
       // Pipe delimited data as secondary info or for the scanner app
       const pipeData = `${product.productNo}|${product.name}|${batchNo}|${pNo}|${product.packSize || 'N/A'}`;
