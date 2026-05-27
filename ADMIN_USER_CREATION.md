@@ -219,3 +219,4 @@ After creating a user, they can:
 **You can now create users from the admin panel!** 🎉
 
 Access it at: http://localhost:3001 → Admin → Users → Add User
+mongodb+srv://bitumixlive_db_user:nMQtuDk7tt6dAMWj@megakemloyalty.1fcr9nr.mongodb.net/

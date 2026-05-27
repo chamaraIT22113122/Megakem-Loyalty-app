@@ -5,3 +5,7 @@ npm-debug.log
 *.log
 dist/
 build/
+db-data/
+backups/
+test-connection.js
+*.txt

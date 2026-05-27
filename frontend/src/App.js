@@ -1,11 +1,11 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI } from './services/api';
-import megakemLogo from './assets/Megakem Logo.png';
-import megakemBrandLogo from './assets/Megakem Brand Logo-01.png';
+import megakemLogo from './assets/MegakemLogo.png';
+import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 
 
 const getTheme = () => createTheme({
@@ -293,6 +293,7 @@ function App() {
   });
   const scannerRef = useRef(null);
   const pollIntervalRef = useRef(null);
+  const scanErrorCountRef = useRef(0);
 
   // Load applicator info from localStorage on mount
   useEffect(() => {
@@ -505,20 +506,29 @@ function App() {
       const response = await scansAPI.getLive(); 
       const scans = response.data.data;
       
+      // Reset error counter on success
+      scanErrorCountRef.current = 0;
+      
       // Recalculate prices for scans with price = 0 using current product catalog
       const scansWithUpdatedPrices = recalculateScanPrices(scans, products);
       setScanHistory(scansWithUpdatedPrices);
       setLastUpdateTime(new Date());
     }
-    catch (error) { console.error('Error fetching scans:', error); }
+    catch (error) {
+      scanErrorCountRef.current += 1;
+      // Only log the first occurrence and every 5th after that to avoid console spam
+      if (scanErrorCountRef.current === 1 || scanErrorCountRef.current % 5 === 0) {
+        console.warn(`Error fetching scans (attempt ${scanErrorCountRef.current}):`, error.message || error);
+      }
+    }
   };
 
   useEffect(() => {
     if (!user) return;
     // Fetch scans immediately
     refreshScanHistory();
-    // Set up polling to refresh every 3 seconds
-    pollIntervalRef.current = setInterval(refreshScanHistory, 3000);
+    // Set up polling to refresh every 30 seconds (reduced from 3s to prevent server flood)
+    pollIntervalRef.current = setInterval(refreshScanHistory, 30000);
     return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
   }, [user]);
 

@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const Member = require('../models/Member');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { protect } = require('../middleware/auth');
+const { logAction } = require('../middleware/audit');
 
 // @route   GET /api/members
 // @desc    Get all members (customers and applicators)
@@ -164,6 +165,13 @@ router.post('/sync-from-scans', protect, async (req, res) => {
       }
     }
 
+    // Audit Log
+    await logAction(req, 'SYNC_MEMBERS', 'MEMBERS', { 
+      totalScans: allScans.length,
+      createdCount: created,
+      updatedCount: updated
+    });
+
     res.json({
       success: true,
       message: `Synced ${memberMap.size} members from ${allScans.length} scans`,
@@ -313,6 +321,14 @@ router.put('/:id/points', protect, [
     // Update tier based on new points
     member.updateTier(tierThresholds);
     await member.save();
+
+    // Audit Log
+    await logAction(req, 'UPDATE_MEMBER_POINTS', 'MEMBERS', { 
+      memberId: member._id, 
+      memberCode: member.memberId,
+      points, 
+      operation 
+    });
 
     res.json({
       success: true,

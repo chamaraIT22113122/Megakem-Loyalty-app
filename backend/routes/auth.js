@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
+const { logAction } = require('../middleware/audit');
 
 // Generate JWT Token
 const generateToken = (id, expiresIn = null) => {
@@ -73,6 +74,13 @@ router.post('/register', [
 
     const token = generateToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
+
+    // Audit Log
+    req.user = user;
+    await logAction(req, 'REGISTER_USER', 'AUTH', { 
+      userId: user._id, 
+      email: user.email 
+    });
 
     res.status(201).json({
       success: true,
@@ -257,6 +265,14 @@ router.post('/admin/login', [
 
     const token = generateToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
+
+    // Audit Log
+    req.user = user;
+    await logAction(req, 'ADMIN_LOGIN', 'AUTH', { 
+      userId: user._id, 
+      email: user.email, 
+      role: user.role 
+    });
 
     res.json({
       success: true,
@@ -505,6 +521,9 @@ router.put('/change-password', protect, [
     user.password = newPassword;
     await user.save();
 
+    // Audit Log
+    await logAction(req, 'CHANGE_PASSWORD', 'AUTH', { userId: user._id });
+
     res.json({
       success: true,
       message: 'Password changed successfully'
@@ -605,6 +624,13 @@ router.post('/users', protect, async (req, res) => {
     const user = await User.create(userData);
 
     console.log('✅ User created successfully:', user.username);
+
+    // Audit Log
+    await logAction(req, 'CREATE_USER', 'USERS', { 
+      createdUserId: user._id, 
+      email: user.email, 
+      role: user.role 
+    });
 
     res.status(201).json({
       success: true,

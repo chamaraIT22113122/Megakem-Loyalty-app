@@ -7,6 +7,9 @@ const fs = require('fs').promises;
 const path = require('path');
 const connectDB = require('./config/database');
 const User = require('./models/User');
+const Product = require('./models/Product');
+const { performBackup } = require('./scripts/autoBackup');
+const { restoreBackup } = require('./scripts/restoreBackup');
 
 // Load environment variables
 dotenv.config();
@@ -16,63 +19,54 @@ const app = express();
 
 // Initialize database and admin user
 const initializeApp = async () => {
-  await connectDB();
-  
   try {
-    // Ensure admin user exists
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@megakem.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123456!';
+    const conn = await connectDB();
+    if (!conn) return;
     
-    const adminExists = await User.findOne({ email: adminEmail });
-    if (!adminExists) {
-      await User.create({
-        username: 'admin',
-        email: adminEmail,
-        password: adminPassword,
-        role: 'admin',
-        isActive: true
-      });
-      console.log('✅ Admin user created automatically');
-      console.log(`📝 Admin login: ${adminEmail} | Password: ${adminPassword}`);
-      console.log('⚠️  IMPORTANT: Change admin password after first login!');
-    } else {
-      console.log(`📝 Admin login: ${adminEmail}`);
+    try {
+      // Check if products exist in database
+      const productCount = await Product.countDocuments();
+      if (productCount === 0) {
+        console.log('💡 Database is empty. Automatically restoring data from backup...');
+        await restoreBackup(mongoose.connection);
+      } else {
+        console.log('📊 Existing database records found. Skipping automatic backup restore.');
+      }
+    } catch (restoreError) {
+      console.error('⚠️  Error checking/restoring backup:', restoreError.message);
+    }
+    
+    try {
+      // Ensure admin user exists
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@megakem.com';
+      const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123456!';
+      
+      const adminExists = await User.findOne({ email: adminEmail });
+      if (!adminExists) {
+        await User.create({
+          username: 'admin',
+          email: adminEmail,
+          password: adminPassword,
+          role: 'admin',
+          isActive: true
+        });
+        console.log('✅ Admin user created automatically');
+        console.log(`📝 Admin login: ${adminEmail} | Password: ${adminPassword}`);
+        console.log('⚠️  IMPORTANT: Change admin password after first login!');
+      } else {
+        console.log(`📝 Admin login: ${adminEmail}`);
+      }
+    } catch (error) {
+      console.error('⚠️  Error with admin user:', error.message);
     }
   } catch (error) {
-    console.error('⚠️  Error with admin user:', error.message);
-  }
-};
-
-initializeApp();
-
-// Backup function
-const backupDatabase = async () => {
-  try {
-    const backupDir = path.join(__dirname, 'backups');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupPath = path.join(backupDir, `backup-${timestamp}`);
-    await fs.mkdir(backupPath, { recursive: true });
-
-    const db = mongoose.connection.db;
-    const collections = await db.listCollections().toArray();
-
-    for (const coll of collections) {
-      const collection = db.collection(coll.name);
-      const data = await collection.find({}).toArray();
-      const filePath = path.join(backupPath, `${coll.name}.json`);
-      await fs.writeFile(filePath, JSON.stringify(data, null, 2));
-    }
-
-    console.log(`✅ Database backup completed: ${backupPath}`);
-  } catch (error) {
-    console.error('❌ Error during backup:', error.message);
+    console.warn('⚠️  Database not available, continuing without database');
   }
 };
 
 // Schedule daily backup at midnight (0 0 * * *)
 cron.schedule('0 0 * * *', () => {
-  console.log('🔄 Starting scheduled database backup...');
-  backupDatabase();
+  performBackup();
 });
 
 // Middleware
@@ -142,8 +136,14 @@ app.use((req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 API available at http://localhost:${PORT}/api`);
-});
+const startServer = async () => {
+  await initializeApp();
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📡 API available at http://localhost:${PORT}/api`);
+  });
+};
+
+startServer();
+// Trigger restart and verify database persistence

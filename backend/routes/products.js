@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
 const { protect, authorize } = require('../middleware/auth');
+const { logAction } = require('../middleware/audit');
 
 // @route   GET /api/products
 // @desc    Get all products
@@ -75,6 +76,13 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
   try {
     const product = await Product.create(req.body);
 
+    // Audit Log
+    await logAction(req, 'CREATE_PRODUCT', 'PRODUCTS', { 
+      productId: product._id, 
+      productName: product.name,
+      productNo: product.productNo 
+    });
+
     res.status(201).json({
       success: true,
       data: product
@@ -105,6 +113,12 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
       });
     }
 
+    // Audit Log
+    await logAction(req, 'UPDATE_PRODUCT', 'PRODUCTS', { 
+      productId: product._id, 
+      updates: req.body 
+    });
+
     res.json({
       success: true,
       data: product
@@ -131,7 +145,16 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
       });
     }
 
+    const productData = { 
+      productId: product._id, 
+      productName: product.name,
+      productNo: product.productNo 
+    };
+
     await product.deleteOne();
+
+    // Audit Log
+    await logAction(req, 'DELETE_PRODUCT', 'PRODUCTS', productData);
 
     res.json({
       success: true,

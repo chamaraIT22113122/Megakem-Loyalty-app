@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
+const dns = require('dns');
 require('dotenv').config();
+
+// Override DNS resolver to use Google's public DNS (8.8.8.8)
+// This fixes querySrv ECONNREFUSED errors caused by local DNS blocking SRV lookups
+dns.setDefaultResultOrder('ipv4first');
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 const seedProducts = async () => {
   try {
