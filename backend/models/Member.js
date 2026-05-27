@@ -16,6 +16,17 @@ const memberSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  whatsappNumber: {
+    type: String,
+    trim: true
+  },
+  nic: {
+    type: String,
+    trim: true
+  },
+  birthday: {
+    type: Date
+  },
   role: {
     type: String,
     required: true,

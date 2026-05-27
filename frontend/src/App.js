@@ -239,6 +239,11 @@ function App() {
   const [userStats, setUserStats] = useState(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
+  const [coAdminSearchQuery, setCoAdminSearchQuery] = useState('');
+  const [rewardSearchQuery, setRewardSearchQuery] = useState('');
+  const [applicatorSearchQuery, setApplicatorSearchQuery] = useState('');
+  const [applicatorTypeFilter, setApplicatorTypeFilter] = useState('all');
+  const [qrCodeSearchQuery, setQrCodeSearchQuery] = useState('');
   const [cashRewards, setCashRewards] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -270,6 +275,22 @@ function App() {
   const [applicatorInfo, setApplicatorInfo] = useState([]);
   const [applicatorDialog, setApplicatorDialog] = useState({ open: false, data: null });
   const [applicatorFormData, setApplicatorFormData] = useState({
+    name: '',
+    memberId: '',
+    phoneNumber: '',
+    whatsappNumber: '',
+    nic: '',
+    birthday: '',
+    location: '',
+    equipment: '',
+    equipmentBrand: '',
+    purchaseDate: '',
+    condition: 'good',
+    notes: ''
+  });
+  
+  const [hardwareDialog, setHardwareDialog] = useState({ open: false, data: null });
+  const [hardwareFormData, setHardwareFormData] = useState({
     name: '',
     memberId: '',
     phoneNumber: '',
@@ -306,6 +327,9 @@ function App() {
           name: m.memberName,
           memberId: m.memberId,
           phoneNumber: m.phone || '',
+          whatsappNumber: m.whatsappNumber || '',
+          nic: m.nic || '',
+          birthday: m.birthday ? new Date(m.birthday).toISOString().split('T')[0] : '',
           location: m.location || '',
           equipment: m.equipment || '',
           equipmentBrand: m.equipmentBrand || '',
@@ -4908,11 +4932,14 @@ function App() {
                       ['Applicator & Hardware Information Report'],
                       ['Generated:', new Date().toLocaleString()],
                       [],
-                      ['Name', 'Member ID', 'Phone Number', 'Location', 'Equipment Type', 'Equipment Brand', 'Purchase Date', 'Condition', 'Notes'],
+                      ['Name', 'Member ID', 'Phone Number', 'Whatsapp Number', 'NIC', 'Birthday', 'Location', 'Equipment Type', 'Equipment Brand', 'Purchase Date', 'Condition', 'Notes'],
                       ...applicatorInfo.map(a => [
                         a.name,
                         a.memberId,
                         a.phoneNumber || '',
+                        a.whatsappNumber || '',
+                        a.nic || '',
+                        a.birthday || '',
                         a.location || '',
                         a.equipment || '',
                         a.equipmentBrand || '',
@@ -4924,8 +4951,8 @@ function App() {
                     
                     const ws = XLSX.utils.aoa_to_sheet(wsData);
                     ws['!cols'] = [
-                      { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 15 },
-                      { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 30 }
+                      { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
+                      { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 30 }
                     ];
                     
                     XLSX.utils.book_append_sheet(wb, ws, 'Applicator Info');
@@ -4961,8 +4988,11 @@ function App() {
                       name: '',
                       memberId: '',
                       phoneNumber: '',
+                      whatsappNumber: '',
+                      nic: '',
+                      birthday: '',
                       location: '',
-                      equipment: '',
+                      equipment: 'Applicator',
                       equipmentBrand: '',
                       purchaseDate: '',
                       condition: 'good',
@@ -4970,8 +5000,30 @@ function App() {
                     });
                     setApplicatorDialog({ open: true, data: null });
                   }}
+                  sx={{ mr: 1 }}
                 >
-                  Applicator & Hardware Info
+                  Add Applicator
+                </Button>
+                <Button
+                  variant='contained'
+                  color='secondary'
+                  startIcon={<Add />}
+                  onClick={() => {
+                    setHardwareFormData({
+                      name: '',
+                      memberId: '',
+                      phoneNumber: '',
+                      location: '',
+                      equipment: 'Hardware',
+                      equipmentBrand: '',
+                      purchaseDate: '',
+                      condition: 'good',
+                      notes: ''
+                    });
+                    setHardwareDialog({ open: true, data: null });
+                  }}
+                >
+                  Add Hardware
                 </Button>
               </Box>
             </Box>
@@ -4983,7 +5035,7 @@ function App() {
                   <CardContent>
                     <Typography variant='caption' color='text.secondary'>Total Applicators</Typography>
                     <Typography variant='h4' fontWeight={700} color='primary.main'>
-                      {applicatorInfo.length}
+                      {applicatorInfo.filter(a => a.equipment !== 'Hardware').length}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -4991,9 +5043,9 @@ function App() {
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
                   <CardContent>
-                    <Typography variant='caption' color='text.secondary'>Equipment Tracked</Typography>
+                    <Typography variant='caption' color='text.secondary'>Total Hardwares</Typography>
                     <Typography variant='h4' fontWeight={700} color='success.main'>
-                      {applicatorInfo.filter(a => a.equipment).length}
+                      {applicatorInfo.filter(a => a.equipment === 'Hardware').length}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -5001,7 +5053,7 @@ function App() {
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
                   <CardContent>
-                    <Typography variant='caption' color='text.secondary'>Good Condition</Typography>
+                    <Typography variant='caption' color='text.secondary'>Good Condition (Applicators & Hardwares)</Typography>
                     <Typography variant='h4' fontWeight={700} color='info.main'>
                       {applicatorInfo.filter(a => a.condition === 'good').length}
                     </Typography>
@@ -5011,7 +5063,7 @@ function App() {
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
                   <CardContent>
-                    <Typography variant='caption' color='text.secondary'>Needs Attention</Typography>
+                    <Typography variant='caption' color='text.secondary'>Needs Attention (Applicators & Hardwares)</Typography>
                     <Typography variant='h4' fontWeight={700} color='warning.main'>
                       {applicatorInfo.filter(a => a.condition === 'fair' || a.condition === 'poor').length}
                     </Typography>
@@ -5019,6 +5071,39 @@ function App() {
                 </Card>
               </Grid>
             </Grid>
+
+            {/* Filter Controls */}
+            <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              <TextField 
+                size='small' 
+                placeholder='Search by Name, ID, Phone...' 
+                value={applicatorSearchQuery}
+                onChange={(e) => setApplicatorSearchQuery(e.target.value)}
+                sx={{ flexGrow: 1, minWidth: 200 }}
+                InputProps={{
+                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+                }}
+              />
+              <FormControl size='small' sx={{ minWidth: 150 }}>
+                <InputLabel>Type</InputLabel>
+                <Select value={applicatorTypeFilter} onChange={(e) => setApplicatorTypeFilter(e.target.value)} label='Type'>
+                  <MenuItem value='all'>All Types</MenuItem>
+                  <MenuItem value='Applicator'>Applicator</MenuItem>
+                  <MenuItem value='Hardware'>Hardware</MenuItem>
+                </Select>
+              </FormControl>
+              {(applicatorSearchQuery || applicatorTypeFilter !== 'all') && (
+                <Button 
+                  size='small' 
+                  onClick={() => { 
+                    setApplicatorSearchQuery(''); 
+                    setApplicatorTypeFilter('all');
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </Box>
 
             {/* Applicator List Table */}
             <Card>
@@ -5030,27 +5115,45 @@ function App() {
                         <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Member ID</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>NIC</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {applicatorInfo.length === 0 ? (
+                      {applicatorInfo.filter(a => {
+                        const matchesSearch = !applicatorSearchQuery || 
+                          a.name?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
+                          a.memberId?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
+                          a.phoneNumber?.includes(applicatorSearchQuery) || 
+                          a.nic?.toLowerCase().includes(applicatorSearchQuery.toLowerCase());
+                        const matchesType = applicatorTypeFilter === 'all' || 
+                          (applicatorTypeFilter === 'Hardware' ? a.equipment === 'Hardware' : a.equipment !== 'Hardware');
+                        return matchesSearch && matchesType;
+                      }).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} align='center'>
+                          <TableCell colSpan={8} align='center'>
                             <Box sx={{ py: 4 }}>
                               <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                               <Typography variant='body1' color='text.secondary'>
-                                No applicator information added yet
-                              </Typography>
-                              <Typography variant='body2' color='text.secondary'>
-                                Click "Applicator & Hardware Info" to get started
+                                No information found
                               </Typography>
                             </Box>
                           </TableCell>
                         </TableRow>
                       ) : (
-                        applicatorInfo.map((applicator, index) => (
+                        applicatorInfo.filter(a => {
+                          const matchesSearch = !applicatorSearchQuery || 
+                            a.name?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
+                            a.memberId?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
+                            a.phoneNumber?.includes(applicatorSearchQuery) || 
+                            a.nic?.toLowerCase().includes(applicatorSearchQuery.toLowerCase());
+                          const matchesType = applicatorTypeFilter === 'all' || 
+                            (applicatorTypeFilter === 'Hardware' ? a.equipment === 'Hardware' : a.equipment !== 'Hardware');
+                          return matchesSearch && matchesType;
+                        }).map((applicator, index) => (
                           <TableRow key={index} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
                             <TableCell>
                               <Typography variant='body2' fontWeight={600}>
@@ -5061,6 +5164,15 @@ function App() {
                               <Chip label={applicator.memberId} size='small' color='primary' />
                             </TableCell>
                             <TableCell>{applicator.phoneNumber || '-'}</TableCell>
+                            <TableCell>{applicator.whatsappNumber || '-'}</TableCell>
+                            <TableCell>{applicator.nic || '-'}</TableCell>
+                            <TableCell>
+                              {applicator.equipment === 'Hardware' ? (
+                                <Chip label='Hardware' size='small' color='secondary' />
+                              ) : (
+                                <Chip label='Applicator' size='small' color='info' />
+                              )}
+                            </TableCell>
                             <TableCell>{applicator.location || '-'}</TableCell>
                             <TableCell>
                               <Box sx={{ display: 'flex', gap: 1 }}>
@@ -5069,8 +5181,13 @@ function App() {
                                     size='small' 
                                     color='primary'
                                     onClick={() => {
-                                      setApplicatorFormData(applicator);
-                                      setApplicatorDialog({ open: true, data: applicator });
+                                      if (applicator.equipment === 'Hardware') {
+                                        setHardwareFormData(applicator);
+                                        setHardwareDialog({ open: true, data: applicator });
+                                      } else {
+                                        setApplicatorFormData(applicator);
+                                        setApplicatorDialog({ open: true, data: applicator });
+                                      }
                                     }}
                                   >
                                     <Edit />
@@ -7598,7 +7715,7 @@ function App() {
         </DialogActions>
       </Dialog>
       
-      {/* Applicator & Hardware Info Dialog */}
+      {/* Applicator Info Dialog */}
       <Dialog 
         open={applicatorDialog.open} 
         onClose={() => setApplicatorDialog({ open: false, data: null })} 
@@ -7632,9 +7749,35 @@ function App() {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label='Phone Number'
+                label='Contact Number'
                 value={applicatorFormData.phoneNumber}
                 onChange={(e) => setApplicatorFormData({ ...applicatorFormData, phoneNumber: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Whatsapp Number'
+                value={applicatorFormData.whatsappNumber}
+                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, whatsappNumber: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='NIC'
+                value={applicatorFormData.nic}
+                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, nic: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                type='date'
+                label='Birthday'
+                InputLabelProps={{ shrink: true }}
+                value={applicatorFormData.birthday}
+                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, birthday: e.target.value })}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -7674,30 +7817,19 @@ function App() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
-                <InputLabel>Hardware for Applicator</InputLabel>
+                <InputLabel>Condition</InputLabel>
                 <Select
-                  value={applicatorFormData.equipment}
-                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, equipment: e.target.value })}
-                  label='Hardware for Applicator'
+                  value={applicatorFormData.condition || 'good'}
+                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, condition: e.target.value })}
+                  label='Condition'
                 >
-                  <MenuItem value=''>None</MenuItem>
-                  <MenuItem value='Hardware'>Hardware</MenuItem>
-                  <MenuItem value='Applicator'>Applicator</MenuItem>
+                  <MenuItem value='good'>Good Condition</MenuItem>
+                  <MenuItem value='fair'>Fair (Needs minor attention)</MenuItem>
+                  <MenuItem value='poor'>Poor (Needs immediate attention)</MenuItem>
                 </Select>
               </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label='Notes'
-                value={applicatorFormData.notes}
-                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, notes: e.target.value })}
-                multiline
-                rows={3}
-                helperText='Additional notes about the applicator or hardware'
-              />
             </Grid>
           </Grid>
         </DialogContent>
@@ -7721,12 +7853,12 @@ function App() {
                   memberName: applicatorFormData.name,
                   memberId: applicatorFormData.memberId.toUpperCase().trim(),
                   phone: applicatorFormData.phoneNumber,
+                  whatsappNumber: applicatorFormData.whatsappNumber,
+                  nic: applicatorFormData.nic,
+                  birthday: applicatorFormData.birthday || null,
                   location: applicatorFormData.location,
-                  equipment: applicatorFormData.equipment,
-                  equipmentBrand: applicatorFormData.equipmentBrand,
-                  purchaseDate: applicatorFormData.purchaseDate || null,
                   condition: applicatorFormData.condition || 'good',
-                  notes: applicatorFormData.notes,
+                  equipment: 'Applicator',
                   role: 'applicator'
                 };
 
@@ -7750,6 +7882,162 @@ function App() {
             disabled={!applicatorFormData.name || !applicatorFormData.memberId}
           >
             {applicatorDialog.data ? 'Update' : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Hardware Info Dialog */}
+      <Dialog 
+        open={hardwareDialog.open} 
+        onClose={() => setHardwareDialog({ open: false, data: null })} 
+        maxWidth='md' 
+        fullWidth
+      >
+        <DialogTitle>
+          {hardwareDialog.data ? 'Edit Hardware Information' : 'Add Hardware Information'}
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Name'
+                value={hardwareFormData.name}
+                onChange={(e) => setHardwareFormData({ ...hardwareFormData, name: e.target.value })}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Member ID'
+                value={hardwareFormData.memberId}
+                onChange={(e) => setHardwareFormData({ ...hardwareFormData, memberId: e.target.value.toUpperCase() })}
+                required
+                helperText='Must match existing member ID'
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Phone Number'
+                value={hardwareFormData.phoneNumber}
+                onChange={(e) => setHardwareFormData({ ...hardwareFormData, phoneNumber: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Location</InputLabel>
+                <Select
+                  value={hardwareFormData.location}
+                  onChange={(e) => setHardwareFormData({ ...hardwareFormData, location: e.target.value })}
+                  label='Location'
+                >
+                  <MenuItem value=''>Select Location</MenuItem>
+                  <MenuItem value='Colombo'>Colombo</MenuItem>
+                  <MenuItem value='Gampaha'>Gampaha</MenuItem>
+                  <MenuItem value='Kalutara'>Kalutara</MenuItem>
+                  <MenuItem value='Kandy'>Kandy</MenuItem>
+                  <MenuItem value='Matale'>Matale</MenuItem>
+                  <MenuItem value='Nuwara Eliya'>Nuwara Eliya</MenuItem>
+                  <MenuItem value='Galle'>Galle</MenuItem>
+                  <MenuItem value='Matara'>Matara</MenuItem>
+                  <MenuItem value='Hambantota'>Hambantota</MenuItem>
+                  <MenuItem value='Jaffna'>Jaffna</MenuItem>
+                  <MenuItem value='Kilinochchi'>Kilinochchi</MenuItem>
+                  <MenuItem value='Mannar'>Mannar</MenuItem>
+                  <MenuItem value='Vavuniya'>Vavuniya</MenuItem>
+                  <MenuItem value='Mullaitivu'>Mullaitivu</MenuItem>
+                  <MenuItem value='Batticaloa'>Batticaloa</MenuItem>
+                  <MenuItem value='Ampara'>Ampara</MenuItem>
+                  <MenuItem value='Trincomalee'>Trincomalee</MenuItem>
+                  <MenuItem value='Kurunegala'>Kurunegala</MenuItem>
+                  <MenuItem value='Puttalam'>Puttalam</MenuItem>
+                  <MenuItem value='Anuradhapura'>Anuradhapura</MenuItem>
+                  <MenuItem value='Polonnaruwa'>Polonnaruwa</MenuItem>
+                  <MenuItem value='Badulla'>Badulla</MenuItem>
+                  <MenuItem value='Monaragala'>Monaragala</MenuItem>
+                  <MenuItem value='Ratnapura'>Ratnapura</MenuItem>
+                  <MenuItem value='Kegalle'>Kegalle</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Hardware for Applicator</InputLabel>
+                <Select
+                  value={hardwareFormData.equipment}
+                  onChange={(e) => setHardwareFormData({ ...hardwareFormData, equipment: e.target.value })}
+                  label='Hardware for Applicator'
+                >
+                  <MenuItem value=''>None</MenuItem>
+                  <MenuItem value='Hardware'>Hardware</MenuItem>
+                  <MenuItem value='Applicator'>Applicator</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label='Notes'
+                value={hardwareFormData.notes}
+                onChange={(e) => setHardwareFormData({ ...hardwareFormData, notes: e.target.value })}
+                multiline
+                rows={3}
+                helperText='Additional notes about the applicator or hardware'
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button 
+            onClick={() => setHardwareDialog({ open: false, data: null })}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant='contained'
+            onClick={async () => {
+              if (!hardwareFormData.name || !hardwareFormData.memberId) {
+                showNotification('Please fill in required fields', 'error');
+                return;
+              }
+              
+              setLoading(true);
+              try {
+                const backendPayload = {
+                  memberName: hardwareFormData.name,
+                  memberId: hardwareFormData.memberId.toUpperCase().trim(),
+                  phone: hardwareFormData.phoneNumber,
+                  location: hardwareFormData.location,
+                  equipment: hardwareFormData.equipment,
+                  equipmentBrand: hardwareFormData.equipmentBrand,
+                  purchaseDate: hardwareFormData.purchaseDate || null,
+                  condition: hardwareFormData.condition || 'good',
+                  notes: hardwareFormData.notes,
+                  role: 'applicator'
+                };
+
+                if (hardwareDialog.data && hardwareDialog.data._id) {
+                  await membersAPI.update(hardwareDialog.data._id, backendPayload);
+                  showNotification('Hardware info updated successfully', 'success');
+                } else {
+                  await membersAPI.create(backendPayload);
+                  showNotification('Hardware info added successfully', 'success');
+                }
+                
+                await loadAdminData();
+                setHardwareDialog({ open: false, data: null });
+              } catch (error) {
+                console.error('Error saving hardware:', error);
+                showNotification(error.response?.data?.message || 'Failed to save hardware information', 'error');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={!hardwareFormData.name || !hardwareFormData.memberId}
+          >
+            {hardwareDialog.data ? 'Update' : 'Add'}
           </Button>
         </DialogActions>
       </Dialog>
