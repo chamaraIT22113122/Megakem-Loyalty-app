@@ -46,6 +46,7 @@ import {
 } from '@mui/icons-material';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import api from '../services/api';
 
 const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts }) => {
   const [loading, setLoading] = useState(false);
@@ -102,34 +103,20 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setLoading(true);
       
       // Fetch QR codes
-      const qrResponse = await fetch('/api/qr-codes', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (qrResponse.ok) {
-        const data = await qrResponse.json();
-        setQRCodes(data.data || []);
-      }
+      const qrResponse = await api.get('/qr-codes');
+      setQRCodes(qrResponse.data.data || []);
       
       // Fetch batch summary
-      const batchResponse = await fetch('/api/qr-codes/batches/summary', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (batchResponse.ok) {
-        setBatchSummary(await batchResponse.json());
-      }
+      const batchResponse = await api.get('/qr-codes/batches/summary');
+      setBatchSummary(batchResponse.data);
       
       // Fetch products if not provided
       if (!initialProducts || initialProducts.length === 0) {
-        const productsResponse = await fetch('/api/products', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (productsResponse.ok) {
-          const data = await productsResponse.json();
-          setProducts(data.data || []);
-        }
+        const productsResponse = await api.get('/products');
+        setProducts(productsResponse.data.data || []);
       }
     } catch (error) {
-      onShowNotification('Error loading data: ' + error.message, 'error');
+      onShowNotification('Error loading data: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
       setLoading(false);
     }
@@ -143,40 +130,27 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
     try {
       setLoading(true);
-      const response = await fetch('/api/qr-codes/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          productIds: selectedProducts,
-          batchNo,
-          packageNo,
-          manufactureDate: manufactureDate ? new Date(manufactureDate).toISOString() : null,
-          expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
-          customLink,
-          printerModel,
-          printSettings: {
-            size: printSize,
-            layout,
-            dpi
-          }
-        })
+      const response = await api.post('/qr-codes/generate', {
+        productIds: selectedProducts,
+        batchNo,
+        packageNo,
+        manufactureDate: manufactureDate ? new Date(manufactureDate).toISOString() : null,
+        expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
+        customLink,
+        printerModel,
+        printSettings: {
+          size: printSize,
+          layout,
+          dpi
+        }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        onShowNotification(`Generated ${data.count} QR codes`, 'success');
-        setOpenGenerateDialog(false);
-        resetForm();
-        loadData();
-      } else {
-        const error = await response.json();
-        onShowNotification(error.error || 'Failed to generate QR codes', 'error');
-      }
+      onShowNotification(`Generated ${response.data.count} QR codes`, 'success');
+      setOpenGenerateDialog(false);
+      resetForm();
+      loadData();
     } catch (error) {
-      onShowNotification('Error: ' + error.message, 'error');
+      onShowNotification('Error: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
       setLoading(false);
     }
@@ -190,43 +164,30 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
     try {
       setLoading(true);
-      const response = await fetch('/api/qr-codes/bulk/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          productId: selectedProduct,
-          quantity: parseInt(quantity),
-          packageNoPrefix,
-          startNo: parseInt(startNo),
-          endNo: parseInt(endNo),
-          batchNo,
-          manufactureDate: manufactureDate ? new Date(manufactureDate).toISOString() : null,
-          expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
-          customLink,
-          printerModel,
-          printSettings: {
-            size: printSize,
-            layout,
-            dpi
-          }
-        })
+      const response = await api.post('/qr-codes/bulk/generate', {
+        productId: selectedProduct,
+        quantity: parseInt(quantity),
+        packageNoPrefix,
+        startNo: parseInt(startNo),
+        endNo: parseInt(endNo),
+        batchNo,
+        manufactureDate: manufactureDate ? new Date(manufactureDate).toISOString() : null,
+        expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
+        customLink,
+        printerModel,
+        printSettings: {
+          size: printSize,
+          layout,
+          dpi
+        }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        onShowNotification(`Generated ${data.count} QR codes in bulk`, 'success');
-        setOpenBulkDialog(false);
-        resetForm();
-        loadData();
-      } else {
-        const error = await response.json();
-        onShowNotification(error.error || 'Failed to generate QR codes', 'error');
-      }
+      onShowNotification(`Generated ${response.data.count} QR codes in bulk`, 'success');
+      setOpenBulkDialog(false);
+      resetForm();
+      loadData();
     } catch (error) {
-      onShowNotification('Error: ' + error.message, 'error');
+      onShowNotification('Error: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
       setLoading(false);
     }
@@ -235,26 +196,16 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const markAsPrinted = async (qrIds) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/qr-codes/mark-printed', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          qrIds,
-          printerModel
-        })
+      const response = await api.put('/qr-codes/mark-printed', {
+        qrIds,
+        printerModel
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        onShowNotification(`Marked ${data.updated} QR codes as printed`, 'success');
-        setSelectedForPrint([]);
-        loadData();
-      }
+      onShowNotification(`Marked ${response.data.updated} QR codes as printed`, 'success');
+      setSelectedForPrint([]);
+      loadData();
     } catch (error) {
-      onShowNotification('Error marking as printed: ' + error.message, 'error');
+      onShowNotification('Error marking as printed: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
       setLoading(false);
     }
@@ -264,22 +215,14 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     if (window.confirm('Are you sure you want to delete these QR codes?')) {
       try {
         setLoading(true);
-        const response = await fetch('/api/qr-codes', {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({ qrIds })
+        const response = await api.delete('/qr-codes', {
+          data: { qrIds }
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          onShowNotification(`Deleted ${data.deleted} QR codes`, 'success');
-          loadData();
-        }
+        onShowNotification(`Deleted ${response.data.deleted} QR codes`, 'success');
+        loadData();
       } catch (error) {
-        onShowNotification('Error deleting QR codes: ' + error.message, 'error');
+        onShowNotification('Error deleting QR codes: ' + (error.response?.data?.error || error.message), 'error');
       } finally {
         setLoading(false);
       }
