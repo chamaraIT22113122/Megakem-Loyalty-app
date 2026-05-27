@@ -840,14 +840,26 @@ function App() {
     }
     if (cart.length === 0) return showNotification('List is empty', 'error');
     if (!memberId.trim()) return showNotification(role === 'customer' ? 'Please enter Phone Number' : 'Please enter Member ID', 'error');
+    
+    let finalMemberName = memberName;
+    let finalLocation = location;
+
     if (role === 'customer') {
       if (!memberName.trim()) return showNotification('Please enter Name', 'error');
       if (!/^\d{10}$/.test(memberId)) return showNotification('Phone number must be exactly 10 digits', 'error');
+    } else if (role === 'applicator') {
+      const applicator = applicatorInfo.find(a => a.memberId.toUpperCase() === memberId.toUpperCase());
+      if (!applicator) {
+        return showNotification(`Applicator ID ${memberId} is not registered. Please register in Applicator & Hardware Info first.`, 'error', 5000);
+      }
+      finalMemberName = applicator.name || memberId.toUpperCase();
+      finalLocation = location || applicator.location || '';
     }
+
     setLoading(true);
     try {
       const scansData = cart.map(item => ({ 
-        memberName: memberName || (role === 'customer' ? `CUS-${memberId}` : memberId.toUpperCase()), 
+        memberName: finalMemberName || (role === 'customer' ? `CUS-${memberId}` : memberId.toUpperCase()), 
         memberId: role === 'customer' ? `CUS-${memberId}` : memberId.toUpperCase(), 
         phone: role === 'customer' ? memberId : '',
         role, 
@@ -857,7 +869,7 @@ function App() {
         bagNo: item.bag, 
         qty: item.qty,
         price: item.price || 0,
-        location: location || '' 
+        location: finalLocation || '' 
       }));
       const response = await scansAPI.createBatch(scansData);
       
