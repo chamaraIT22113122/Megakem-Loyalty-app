@@ -978,6 +978,42 @@ function App() {
     if (!adminAuth) return;
     try {
       console.log('🔄 Loading admin data...');
+      
+      // Auto-migrate local storage data to MongoDB
+      const localAppInfo = localStorage.getItem('applicatorInfo');
+      if (localAppInfo) {
+        try {
+          const parsed = JSON.parse(localAppInfo);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            console.log('📦 Auto-migrating local storage applicators to MongoDB...', parsed);
+            await Promise.all(parsed.map(async (app) => {
+              try {
+                await membersAPI.create({
+                  memberName: app.name,
+                  memberId: app.memberId.toUpperCase().trim(),
+                  phone: app.phoneNumber,
+                  location: app.location,
+                  equipment: app.equipment,
+                  equipmentBrand: app.equipmentBrand,
+                  purchaseDate: app.purchaseDate || null,
+                  condition: app.condition || 'good',
+                  notes: app.notes,
+                  role: 'applicator'
+                });
+              } catch (err) {
+                console.warn(`Applicator migration skipped/exists for ${app.memberId}:`, err.message);
+              }
+            }));
+            localStorage.removeItem('applicatorInfo');
+            showNotification('Migrated applicator data from local storage to database!', 'success');
+          } else {
+            localStorage.removeItem('applicatorInfo');
+          }
+        } catch (e) {
+          console.error('Error migrating local applicator data:', e);
+        }
+      }
+
       const [statsRes, scansRes, usersRes, productsRes, membersRes, loyaltyConfigRes] = await Promise.all([
         scansAPI.getStats(),
         scansAPI.getLive(),
