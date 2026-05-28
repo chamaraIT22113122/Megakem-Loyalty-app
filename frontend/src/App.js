@@ -2547,7 +2547,7 @@ function App() {
                     }}>
                       <Grid container spacing={4} alignItems="center">
                         {/* Profile Info */}
-                        <Grid item xs={12} md={3}>
+                        <Grid item xs={12} md={4.5} lg={3.5}>
                           <Box sx={{ textAlign: 'center', color: 'white' }}>
                             <Avatar sx={{ 
                               width: 120, 
@@ -2561,27 +2561,27 @@ function App() {
                             }}>
                               {currentMember.memberName?.[0]?.toUpperCase() || currentMember.memberId?.[0] || 'M'}
                             </Avatar>
-                            <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>
+                            <Typography variant="h5" fontWeight={700} sx={{ mb: 1, wordBreak: 'break-word', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
                               {currentMember.memberName || currentMember.memberId}
                             </Typography>
-                            <Typography variant="h6" sx={{ opacity: 0.9, mb: 1 }}>
+                            <Typography variant="body1" sx={{ opacity: 0.9, mb: 1, fontWeight: 600 }}>
                               {currentMember.memberId}
                             </Typography>
                             {currentMember.phone && (
-                              <Typography variant="body1" sx={{ opacity: 0.85, mb: 2 }}>
+                              <Typography variant="body2" sx={{ opacity: 0.85, mb: 2 }}>
                                 📞 {currentMember.phone}
                               </Typography>
                             )}
-                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
+                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                                <Chip 
                                  label={currentMember.role === 'applicator' ? 'Applicator' : 'Customer'}
                                  sx={{ 
                                    bgcolor: 'secondary.main',
                                    color: 'white',
                                    fontWeight: 700,
-                                   fontSize: '0.95rem',
-                                   px: 2,
-                                   py: 2.5,
+                                   fontSize: '0.85rem',
+                                   px: 1,
+                                   py: 1.5,
                                    boxShadow: 2
                                  }}
                                />
@@ -2594,9 +2594,9 @@ function App() {
                                      currentMember.tier === 'silver' ? '#C0C0C0' : '#CD7F32',
                                    color: currentMember.tier === 'platinum' || currentMember.tier === 'gold' || currentMember.tier === 'silver' ? 'black' : 'white',
                                    fontWeight: 800,
-                                   fontSize: '0.95rem',
-                                   px: 2,
-                                   py: 2.5,
+                                   fontSize: '0.85rem',
+                                   px: 1,
+                                   py: 1.5,
                                    boxShadow: 2
                                  }}
                                />
@@ -2615,7 +2615,7 @@ function App() {
                         </Grid>
 
                         {/* Stats Cards */}
-                        <Grid item xs={12} md={9}>
+                        <Grid item xs={12} md={7.5} lg={8.5}>
                           <Grid container spacing={3}>
                             <Grid item xs={12} sm={4}>
                               <Box sx={{ 
@@ -2639,7 +2639,7 @@ function App() {
                                 }}>
                                   <Typography variant="h4">📊</Typography>
                                 </Box>
-                                <Typography variant="h2" fontWeight={700} color="primary.main" sx={{ mb: 1 }}>
+                                <Typography variant="h3" fontWeight={800} color="primary.main" sx={{ mb: 1, fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' } }}>
                                   {totalScans}
                                 </Typography>
                                 <Typography variant="body1" color="text.secondary" fontWeight={600}>
@@ -2669,7 +2669,7 @@ function App() {
                                 }}>
                                   <Typography variant="h4">💰</Typography>
                                 </Box>
-                                <Typography variant="h4" fontWeight={700} color="success.main" sx={{ mb: 1 }}>
+                                <Typography variant="h4" fontWeight={800} color="success.main" sx={{ mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem', lg: '2rem' } }}>
                                   Rs. {totalAmount.toLocaleString()}
                                 </Typography>
                                 <Typography variant="body1" color="text.secondary" fontWeight={600}>
@@ -2699,7 +2699,7 @@ function App() {
                                 }}>
                                   <EmojiEvents sx={{ fontSize: '2rem', color: 'warning.main' }} />
                                 </Box>
-                                <Typography variant="h2" fontWeight={700} color="warning.main" sx={{ mb: 1 }}>
+                                <Typography variant="h3" fontWeight={800} color="warning.main" sx={{ mb: 1, fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' } }}>
                                   {totalPoints.toLocaleString()}
                                 </Typography>
                                 <Typography variant="body1" color="text.secondary" fontWeight={600}>
