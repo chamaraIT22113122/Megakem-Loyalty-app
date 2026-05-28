@@ -296,7 +296,7 @@ function App() {
     phoneNumber: '',
     whatsappNumber: '',
     City: '',
-    equipment: '',
+    equipment: 'Hardware',
     equipmentBrand: '',
     purchaseDate: '',
     condition: 'good',
@@ -7855,6 +7855,20 @@ function App() {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Hardware for Applicator</InputLabel>
+                <Select
+                  value={applicatorFormData.equipment}
+                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, equipment: e.target.value })}
+                  label='Hardware for Applicator'
+                >
+                  <MenuItem value=''>None</MenuItem>
+                  <MenuItem value='Hardware'>Hardware</MenuItem>
+                  <MenuItem value='Applicator'>Applicator</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -7883,7 +7897,7 @@ function App() {
                   birthday: applicatorFormData.birthday || null,
                   location: applicatorFormData.location,
                   condition: applicatorFormData.condition || 'good',
-                  equipment: 'Applicator',
+                  equipment: applicatorFormData.equipment || 'Applicator',
                   role: 'applicator'
                 };
 
@@ -7983,20 +7997,6 @@ function App() {
                   <MenuItem value='Monaragala'>Monaragala</MenuItem>
                   <MenuItem value='Ratnapura'>Ratnapura</MenuItem>
                   <MenuItem value='Kegalle'>Kegalle</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Hardware for Applicator</InputLabel>
-                <Select
-                  value={hardwareFormData.equipment}
-                  onChange={(e) => setHardwareFormData({ ...hardwareFormData, equipment: e.target.value })}
-                  label='Hardware for Applicator'
-                >
-                  <MenuItem value=''>None</MenuItem>
-                  <MenuItem value='Hardware'>Hardware</MenuItem>
-                  <MenuItem value='Applicator'>Applicator</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
