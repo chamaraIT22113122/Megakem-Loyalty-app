@@ -17,11 +17,13 @@ dotenv.config();
 // Initialize Express
 const app = express();
 
-// Initialize database and admin user
 const initializeApp = async () => {
   try {
     const conn = await connectDB();
-    if (!conn) return;
+    if (!conn) {
+      console.error('❌ FATAL: Database connection failed. Server cannot run without a database.');
+      process.exit(1);
+    }
     
     try {
       // Check if products exist in database
@@ -60,7 +62,8 @@ const initializeApp = async () => {
       console.error('⚠️  Error with admin user:', error.message);
     }
   } catch (error) {
-    console.warn('⚠️  Database not available, continuing without database');
+    console.error('❌ FATAL: Database initialization failed:', error.message);
+    process.exit(1);
   }
 };
 
