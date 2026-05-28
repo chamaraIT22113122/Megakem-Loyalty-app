@@ -5184,24 +5184,22 @@ function App() {
 
             {/* Applicator List Table */}
             <Card>
-              <CardContent>
-                <TableContainer>
-                  <Table>
+              <CardContent sx={{ p: 1 }}>
+                <TableContainer component={Paper} sx={{ overflowX: 'auto', boxShadow: 'none', border: '1px solid', borderColor: 'divider' }}>
+                  <Table size="small">
                     <TableHead>
                       <TableRow sx={{ bgcolor: 'grey.100' }}>
                         {applicatorTypeFilter === 'Hardware' ? (
                           <>
                             <TableCell sx={{ fontWeight: 700 }}>Hardware Name</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Hardware ID</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>Address</TableCell>
+                            <TableCell sx={{ fontWeight: 700, maxWidth: 200 }}>Address</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Contact No</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Contact Person</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>Person Mobile</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Zone</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>Notes</TableCell>
+                            <TableCell sx={{ fontWeight: 700, maxWidth: 150 }}>Notes</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                           </>
                         ) : (
@@ -5212,10 +5210,9 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>NIC</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Birthday</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Zone</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>Notes</TableCell>
+                            <TableCell sx={{ fontWeight: 700, maxWidth: 150 }}>Notes</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                           </>
                         )}
@@ -5233,7 +5230,7 @@ function App() {
                         return matchesSearch && matchesType;
                       }).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 12 : 11} align='center'>
+                          <TableCell colSpan={10} align='center'>
                             <Box sx={{ py: 4 }}>
                               <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                               <Typography variant='body1' color='text.secondary'>
@@ -5257,47 +5254,55 @@ function App() {
                             {applicatorTypeFilter === 'Hardware' ? (
                               <>
                                 <TableCell>
-                                  <Typography variant='body2' fontWeight={600}>
+                                  <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
                                     {applicator.name}
                                   </Typography>
                                 </TableCell>
                                 <TableCell>
                                   <Chip label={applicator.memberId} size='small' color='primary' />
                                 </TableCell>
-                                <TableCell>{applicator.hardwareAddress || '-'}</TableCell>
-                                <TableCell>{applicator.phoneNumber || '-'}</TableCell>
-                                <TableCell>{applicator.whatsappNumber || '-'}</TableCell>
-                                <TableCell>{applicator.contactPersonName || '-'}</TableCell>
-                                <TableCell>{applicator.contactPersonMobile || '-'}</TableCell>
-                                <TableCell><Chip label='Hardware' size='small' color='secondary' /></TableCell>
+                                <TableCell sx={{ maxWidth: 200, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
+                                  {applicator.hardwareAddress || '-'}
+                                </TableCell>
+                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.phoneNumber || '-'}</TableCell>
+                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.whatsappNumber || '-'}</TableCell>
+                                <TableCell>
+                                  {applicator.contactPersonName ? (
+                                    <Box>
+                                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{applicator.contactPersonName}</Typography>
+                                      {applicator.contactPersonMobile && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          {applicator.contactPersonMobile}
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  ) : '-'}
+                                </TableCell>
                                 <TableCell>{applicator.location || '-'}</TableCell>
                                 <TableCell>{applicator.zone || '-'}</TableCell>
-                                <TableCell>{applicator.notes || '-'}</TableCell>
+                                <TableCell sx={{ maxWidth: 150, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
+                                  {applicator.notes || '-'}
+                                </TableCell>
                               </>
                             ) : (
                               <>
                                 <TableCell>
-                                  <Typography variant='body2' fontWeight={600}>
+                                  <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
                                     {applicator.name}
                                   </Typography>
                                 </TableCell>
                                 <TableCell>
                                   <Chip label={applicator.memberId} size='small' color='primary' />
                                 </TableCell>
-                                <TableCell>{applicator.phoneNumber || '-'}</TableCell>
-                                <TableCell>{applicator.whatsappNumber || '-'}</TableCell>
-                                <TableCell>{applicator.nic || '-'}</TableCell>
-                                <TableCell>{applicator.birthday || '-'}</TableCell>
-                                <TableCell>
-                                  {applicator.equipment === 'Hardware' ? (
-                                    <Chip label='Hardware' size='small' color='secondary' />
-                                  ) : (
-                                    <Chip label='Applicator' size='small' color='info' />
-                                  )}
-                                </TableCell>
+                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.phoneNumber || '-'}</TableCell>
+                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.whatsappNumber || '-'}</TableCell>
+                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.nic || '-'}</TableCell>
+                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.birthday || '-'}</TableCell>
                                 <TableCell>{applicator.location || '-'}</TableCell>
                                 <TableCell>{applicator.zone || '-'}</TableCell>
-                                <TableCell>{applicator.notes || '-'}</TableCell>
+                                <TableCell sx={{ maxWidth: 150, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
+                                  {applicator.notes || '-'}
+                                </TableCell>
                               </>
                             )}
                             <TableCell>
