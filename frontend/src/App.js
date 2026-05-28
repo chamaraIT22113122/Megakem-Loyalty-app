@@ -294,6 +294,7 @@ function App() {
     name: '',
     memberId: '',
     phoneNumber: '',
+    whatsappNumber: '',
     City: '',
     equipment: '',
     equipmentBrand: '',
@@ -5044,6 +5045,7 @@ function App() {
                       name: '',
                       memberId: '',
                       phoneNumber: '',
+                      whatsappNumber: '',
                       City: '',
                       equipment: 'Hardware',
                       equipmentBrand: '',
@@ -7940,6 +7942,14 @@ function App() {
               />
             </Grid>
             <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Whatsapp Number'
+                value={hardwareFormData.whatsappNumber}
+                onChange={(e) => setHardwareFormData({ ...hardwareFormData, whatsappNumber: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
                 <InputLabel>City</InputLabel>
                 <Select
@@ -8024,6 +8034,7 @@ function App() {
                   memberName: hardwareFormData.name,
                   memberId: generatedHardwareId,
                   phone: hardwareFormData.phoneNumber,
+                  whatsappNumber: hardwareFormData.whatsappNumber,
                   location: hardwareFormData.location,
                   equipment: hardwareFormData.equipment,
                   equipmentBrand: hardwareFormData.equipmentBrand,
