@@ -17,7 +17,7 @@ router.get('/', protect, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const isCoAdmin = req.user.role === 'co-admin';
     const hasUsersPerm = req.user.permissions?.canManageUsers === true;
-    const hasProductsPerm = req.user.permissions?.canManageProducts === true;
+    const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
 
     let allowed = false;
     if (isAdmin) {
@@ -25,7 +25,7 @@ router.get('/', protect, async (req, res) => {
     } else if (isCoAdmin) {
       if (hasUsersPerm) {
         allowed = true;
-      } else if (hasProductsPerm && role === 'applicator') {
+      } else if (hasApplicatorsPerm && role === 'applicator') {
         allowed = true;
       }
     } else if (role === 'applicator') {
@@ -267,9 +267,9 @@ router.get('/:id', protect, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const isCoAdmin = req.user.role === 'co-admin';
     const hasUsersPerm = req.user.permissions?.canManageUsers === true;
-    const hasProductsPerm = req.user.permissions?.canManageProducts === true;
+    const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
 
-    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasProductsPerm))) {
+    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm))) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -284,8 +284,8 @@ router.get('/:id', protect, async (req, res) => {
       });
     }
 
-    // If co-admin only has products permission, they can only view applicators
-    if (isCoAdmin && !hasUsersPerm && hasProductsPerm && member.role !== 'applicator') {
+    // If co-admin only has applicators permission, they can only view applicators
+    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. You can only view applicator details.'
@@ -402,9 +402,9 @@ router.post('/', protect, [
     const isAdmin = req.user.role === 'admin';
     const isCoAdmin = req.user.role === 'co-admin';
     const hasUsersPerm = req.user.permissions?.canManageUsers === true;
-    const hasProductsPerm = req.user.permissions?.canManageProducts === true;
+    const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
 
-    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasProductsPerm))) {
+    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm))) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -441,7 +441,7 @@ router.post('/', protect, [
       notes
     } = req.body;
 
-    if (isCoAdmin && !hasUsersPerm && hasProductsPerm && role !== 'applicator') {
+    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && role !== 'applicator') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. You can only manage applicator accounts.'
@@ -450,7 +450,7 @@ router.post('/', protect, [
 
     let member = await Member.findOne({ memberId: memberId.toUpperCase().trim() });
     if (member) {
-      if (isCoAdmin && !hasUsersPerm && hasProductsPerm && member.role !== 'applicator') {
+      if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator') {
         return res.status(403).json({
           success: false,
           message: 'Access denied. You can only manage applicator accounts.'
@@ -541,9 +541,9 @@ router.put('/:id', protect, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const isCoAdmin = req.user.role === 'co-admin';
     const hasUsersPerm = req.user.permissions?.canManageUsers === true;
-    const hasProductsPerm = req.user.permissions?.canManageProducts === true;
+    const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
 
-    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasProductsPerm))) {
+    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm))) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -558,7 +558,7 @@ router.put('/:id', protect, async (req, res) => {
       });
     }
 
-    if (isCoAdmin && !hasUsersPerm && hasProductsPerm && member.role !== 'applicator') {
+    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. You can only manage applicator accounts.'
@@ -643,9 +643,9 @@ router.delete('/:id', protect, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const isCoAdmin = req.user.role === 'co-admin';
     const hasUsersPerm = req.user.permissions?.canManageUsers === true;
-    const hasProductsPerm = req.user.permissions?.canManageProducts === true;
+    const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
 
-    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasProductsPerm))) {
+    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm))) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -660,7 +660,7 @@ router.delete('/:id', protect, async (req, res) => {
       });
     }
 
-    if (isCoAdmin && !hasUsersPerm && hasProductsPerm && member.role !== 'applicator') {
+    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. You can only delete applicator accounts.'

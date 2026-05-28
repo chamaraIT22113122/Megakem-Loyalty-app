@@ -260,7 +260,7 @@ function App() {
   const [expandedCardDialog, setExpandedCardDialog] = useState({ open: false, type: null, data: [] });
   const [notificationPrefs, setNotificationPrefs] = useState({ email: true, push: true, autoRefresh: true, soundEnabled: false });
   const [activityLog, setActivityLog] = useState([]);
-  const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true, canManageQRCodes: true });
+  const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true, canManageQRCodes: true, canManageApplicators: true });
   const [backupPasswordDialog, setBackupPasswordDialog] = useState({ open: false, password: '' });
   const [restorePasswordDialog, setRestorePasswordDialog] = useState({ open: false, password: '', file: null, backupData: null });
   
@@ -1318,7 +1318,7 @@ function App() {
         if (adminTab === 'rewards' && !hasPermission('canExport')) return false;
         if (adminTab === 'products' && !hasPermission('canManageProducts')) return false;
         if (adminTab === 'qr-codes' && !hasPermission('canManageQRCodes')) return false;
-        if (adminTab === 'applicator' && !hasPermission('canManageProducts')) return false;
+        if (adminTab === 'applicator' && !hasPermission('canManageApplicators')) return false;
         return true;
       };
 
@@ -1602,7 +1602,8 @@ function App() {
           canExport: permissions?.canExport === true,
           canManageUsers: permissions?.canManageUsers === true,
           canManageProducts: permissions?.canManageProducts === true,
-          canManageQRCodes: permissions?.canManageQRCodes === true
+          canManageQRCodes: permissions?.canManageQRCodes === true,
+          canManageApplicators: permissions?.canManageApplicators === true
         }
       };
 
@@ -3173,7 +3174,7 @@ function App() {
               {hasPermission('canExport') && <Tab icon={<CardGiftcard />} label='Cash Rewards' value='rewards' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
-              {hasPermission('canManageProducts') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
+              {hasPermission('canManageApplicators') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
               <Tab icon={<Settings />} label='Profile' value='profile' />
             </Tabs>
           </Paper>
@@ -4469,7 +4470,8 @@ function App() {
                       canExport: false, 
                       canManageUsers: false, 
                       canManageProducts: false,
-                      canManageQRCodes: false
+                      canManageQRCodes: false,
+                      canManageApplicators: false
                     } 
                   } 
                 })}
@@ -4519,6 +4521,7 @@ function App() {
                           <Chip label='Users' size='small' color='warning' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Products' size='small' color='success' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='QR' size='small' color='secondary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Applicators' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                         </>
                       ) : (
                         <>
@@ -4528,6 +4531,7 @@ function App() {
                           {u.permissions?.canManageUsers === true && <Chip label='Users' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageProducts === true && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageQRCodes === true && <Chip label='QR' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageApplicators === true && <Chip label='Applicators' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                         </>
                       )}
                     </Box>
@@ -4556,7 +4560,8 @@ function App() {
                               canExport: u.permissions?.canExport === true,
                               canManageUsers: u.permissions?.canManageUsers === true,
                               canManageProducts: u.permissions?.canManageProducts === true,
-                              canManageQRCodes: u.permissions?.canManageQRCodes === true
+                              canManageQRCodes: u.permissions?.canManageQRCodes === true,
+                              canManageApplicators: u.permissions?.canManageApplicators === true
                             }
                           } 
                         })} 
@@ -5728,6 +5733,26 @@ function App() {
                       }));
                     }} 
                     color='secondary' 
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Manage Applicator & Hardware Information</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to add/edit applicator hardware details</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canManageApplicators === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canManageApplicators: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='info' 
                   />
                 </Box>
               </Box>

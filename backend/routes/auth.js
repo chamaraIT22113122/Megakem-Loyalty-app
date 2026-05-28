@@ -624,6 +624,7 @@ router.post('/users', protect, async (req, res) => {
       user.set('permissions.canManageUsers', permissions.canManageUsers === true);
       user.set('permissions.canManageProducts', permissions.canManageProducts === true);
       user.set('permissions.canManageQRCodes', permissions.canManageQRCodes === true);
+      user.set('permissions.canManageApplicators', permissions.canManageApplicators === true);
       user.set('permissions.canPrintQRCodes', permissions.canPrintQRCodes === true);
       user.set('permissions.canViewQRAnalytics', permissions.canViewQRAnalytics === true);
     }
@@ -636,6 +637,7 @@ router.post('/users', protect, async (req, res) => {
       user.set('permissions.canManageUsers', false);
       user.set('permissions.canManageProducts', false);
       user.set('permissions.canManageQRCodes', true);
+      user.set('permissions.canManageApplicators', false);
       user.set('permissions.canPrintQRCodes', true);
       user.set('permissions.canViewQRAnalytics', true);
     }
@@ -710,7 +712,8 @@ router.put('/users/:id', protect, async (req, res) => {
           'permissions.canExport': permissions.canExport === true,
           'permissions.canManageUsers': permissions.canManageUsers === true,
           'permissions.canManageProducts': permissions.canManageProducts === true,
-          'permissions.canManageQRCodes': permissions.canManageQRCodes === true
+          'permissions.canManageQRCodes': permissions.canManageQRCodes === true,
+          'permissions.canManageApplicators': permissions.canManageApplicators === true
         })
       }
     };
