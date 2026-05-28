@@ -91,6 +91,10 @@ const memberSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  connectedHardware: {
+    type: String,
+    trim: true
+  },
   // Monthly purchase tracking for cash rewards
   monthlyPurchases: [{
     year: {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -286,7 +286,8 @@ function App() {
     equipmentBrand: '',
     purchaseDate: '',
     condition: 'good',
-    notes: ''
+    notes: '',
+    connectedHardware: ''
   });
   
   const [hardwareDialog, setHardwareDialog] = useState({ open: false, data: null });
@@ -344,7 +345,8 @@ function App() {
           equipmentBrand: m.equipmentBrand || '',
           purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
           condition: m.condition || 'good',
-          notes: m.notes || ''
+          notes: m.notes || '',
+          connectedHardware: m.connectedHardware || ''
         }));
         setApplicatorInfo(mapped);
       } catch (error) {
@@ -5049,7 +5051,8 @@ function App() {
                       equipmentBrand: '',
                       purchaseDate: '',
                       condition: 'good',
-                      notes: ''
+                      notes: '',
+                      connectedHardware: ''
                     });
                     setApplicatorDialog({ open: true, data: null });
                   }}
@@ -5210,6 +5213,7 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>NIC</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Birthday</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Connected Hardware</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Zone</TableCell>
                             <TableCell sx={{ fontWeight: 700, maxWidth: 150 }}>Notes</TableCell>
@@ -5230,7 +5234,7 @@ function App() {
                         return matchesSearch && matchesType;
                       }).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={10} align='center'>
+                          <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 10 : 11} align='center'>
                             <Box sx={{ py: 4 }}>
                               <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                               <Typography variant='body1' color='text.secondary'>
@@ -5298,6 +5302,17 @@ function App() {
                                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.whatsappNumber || '-'}</TableCell>
                                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.nic || '-'}</TableCell>
                                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.birthday || '-'}</TableCell>
+                                <TableCell>
+                                  {applicator.connectedHardware ? (
+                                    <Chip 
+                                      label={applicator.connectedHardware} 
+                                      size='small' 
+                                      color='info' 
+                                      variant='outlined' 
+                                      sx={{ fontWeight: 500 }}
+                                    />
+                                  ) : '-'}
+                                </TableCell>
                                 <TableCell>{applicator.location || '-'}</TableCell>
                                 <TableCell>{applicator.zone || '-'}</TableCell>
                                 <TableCell sx={{ maxWidth: 150, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
@@ -7975,6 +7990,23 @@ function App() {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <Autocomplete
+                fullWidth
+                options={applicatorInfo.filter(a => a.equipment === 'Hardware').map(h => h.name)}
+                value={applicatorFormData.connectedHardware || null}
+                onChange={(event, newValue) => {
+                  setApplicatorFormData({ ...applicatorFormData, connectedHardware: newValue || '' });
+                }}
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    label="Connected Hardware Store" 
+                    placeholder="Search & select hardware..." 
+                  />
+                )}
+              />
+            </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -8026,7 +8058,8 @@ function App() {
                   notes: applicatorFormData.notes || '',
                   condition: applicatorFormData.condition || 'good',
                   equipment: applicatorFormData.equipment || 'Applicator',
-                  role: 'applicator'
+                  role: 'applicator',
+                  connectedHardware: applicatorFormData.connectedHardware || ''
                 };
 
                 if (applicatorDialog.data && applicatorDialog.data._id) {
