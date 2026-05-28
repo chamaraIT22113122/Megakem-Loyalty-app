@@ -7873,7 +7873,7 @@ function App() {
                   whatsappNumber: applicatorFormData.whatsappNumber,
                   nic: applicatorFormData.nic,
                   birthday: applicatorFormData.birthday || null,
-                  City: applicatorFormData.location,
+                  location: applicatorFormData.location,
                   condition: applicatorFormData.condition || 'good',
                   equipment: 'Applicator',
                   role: 'applicator'
@@ -8018,7 +8018,7 @@ function App() {
                   memberName: hardwareFormData.name,
                   memberId: generatedHardwareId,
                   phone: hardwareFormData.phoneNumber,
-                  City: hardwareFormData.location,
+                  location: hardwareFormData.location,
                   equipment: hardwareFormData.equipment,
                   equipmentBrand: hardwareFormData.equipmentBrand,
                   purchaseDate: hardwareFormData.purchaseDate || null,

@@ -423,7 +423,10 @@ router.post('/', protect, [
     const { 
       memberId, 
       memberName, 
-      phone, 
+      phone,
+      whatsappNumber,
+      nic,
+      birthday,
       role = 'applicator', 
       location, 
       points = 0,
@@ -451,6 +454,9 @@ router.post('/', protect, [
       }
       member.memberName = memberName;
       if (phone !== undefined) member.phone = phone;
+      if (whatsappNumber !== undefined) member.whatsappNumber = whatsappNumber;
+      if (nic !== undefined) member.nic = nic;
+      if (birthday !== undefined) member.birthday = birthday || null;
       if (role !== undefined) member.role = role;
       if (location !== undefined) member.location = location;
       if (equipment !== undefined) member.equipment = equipment;
@@ -481,6 +487,9 @@ router.post('/', protect, [
       memberId: memberId.toUpperCase().trim(),
       memberName,
       phone,
+      whatsappNumber,
+      nic,
+      birthday: birthday || null,
       role,
       location,
       points,
@@ -551,6 +560,8 @@ router.put('/:id', protect, async (req, res) => {
     const fieldsToUpdate = [
       'memberName',
       'phone',
+      'whatsappNumber',
+      'nic',
       'role',
       'location',
       'points',
@@ -568,6 +579,10 @@ router.put('/:id', protect, async (req, res) => {
 
     if (req.body.purchaseDate !== undefined) {
       member.purchaseDate = req.body.purchaseDate || null;
+    }
+
+    if (req.body.birthday !== undefined) {
+      member.birthday = req.body.birthday || null;
     }
 
     if (req.body.memberId !== undefined) {
