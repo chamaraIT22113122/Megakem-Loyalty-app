@@ -24,6 +24,25 @@ const loyaltyConfigSchema = new mongoose.Schema({
       min: 0
     }
   },
+  // Tier names
+  tierNames: {
+    bronze: {
+      type: String,
+      default: 'Bronze'
+    },
+    silver: {
+      type: String,
+      default: 'Silver'
+    },
+    gold: {
+      type: String,
+      default: 'Gold'
+    },
+    platinum: {
+      type: String,
+      default: 'Platinum'
+    }
+  },
   // Points calculation method
   pointsCalculation: {
     method: {
@@ -41,6 +60,39 @@ const loyaltyConfigSchema = new mongoose.Schema({
       default: 0.1, // 10% bonus for applicators
       min: 0,
       max: 1
+    }
+  },
+  // Cash reward tiers
+  cashRewardTiers: {
+    tier1: {
+      type: Number,
+      default: 4.5,
+      min: 0,
+      max: 100
+    },
+    tier2: {
+      type: Number,
+      default: 5.0,
+      min: 0,
+      max: 100
+    },
+    tier3: {
+      type: Number,
+      default: 5.5,
+      min: 0,
+      max: 100
+    },
+    tier4: {
+      type: Number,
+      default: 6.0,
+      min: 0,
+      max: 100
+    },
+    tier5: {
+      type: Number,
+      default: 6.5,
+      min: 0,
+      max: 100
     }
   }
 }, {

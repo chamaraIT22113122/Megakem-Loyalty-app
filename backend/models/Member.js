@@ -197,7 +197,7 @@ memberSchema.methods.addMonthlyPurchase = function(purchaseValue, year, month) {
 };
 
 // Method to calculate cash reward for a specific month
-memberSchema.methods.calculateCashReward = function(year, month) {
+memberSchema.methods.calculateCashReward = function(year, month, customTiers) {
   const purchase = this.monthlyPurchases.find(
     p => p.year === year && p.month === month
   );
@@ -208,12 +208,18 @@ memberSchema.methods.calculateCashReward = function(year, month) {
 
   // Tiered cash reward calculation
   // Each tier processes a range of the total amount
+  const tier1Rate = (customTiers && customTiers.tier1 !== undefined) ? (Number(customTiers.tier1) / 100) : 0.045;
+  const tier2Rate = (customTiers && customTiers.tier2 !== undefined) ? (Number(customTiers.tier2) / 100) : 0.05;
+  const tier3Rate = (customTiers && customTiers.tier3 !== undefined) ? (Number(customTiers.tier3) / 100) : 0.055;
+  const tier4Rate = (customTiers && customTiers.tier4 !== undefined) ? (Number(customTiers.tier4) / 100) : 0.06;
+  const tier5Rate = (customTiers && customTiers.tier5 !== undefined) ? (Number(customTiers.tier5) / 100) : 0.065;
+
   const tiers = [
-    { min: 0, max: 250000, rate: 0.045 },         // 4.50% - First Rs. 250,000
-    { min: 250000, max: 500000, rate: 0.05 },     // 5.00% - Next Rs. 250,000
-    { min: 500000, max: 750000, rate: 0.055 },    // 5.50% - Next Rs. 250,000
-    { min: 750000, max: 1000000, rate: 0.06 },    // 6.00% - Next Rs. 250,000
-    { min: 1000000, max: Infinity, rate: 0.065 }  // 6.50% - Above Rs. 1,000,000
+    { min: 0, max: 250000, rate: tier1Rate },         // First Rs. 250,000
+    { min: 250000, max: 500000, rate: tier2Rate },     // Next Rs. 250,000
+    { min: 500000, max: 750000, rate: tier3Rate },    // Next Rs. 250,000
+    { min: 750000, max: 1000000, rate: tier4Rate },    // Next Rs. 250,000
+    { min: 1000000, max: Infinity, rate: tier5Rate }  // Above Rs. 1,000,000
   ];
 
   let remaining = purchase.totalPurchaseValue;

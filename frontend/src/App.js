@@ -218,6 +218,12 @@ function App() {
   const [loyaltyConfig, setLoyaltyConfig] = useState(null);
   const [products, setProducts] = useState([]);
   const [loyaltyConfigDialog, setLoyaltyConfigDialog] = useState({ open: false });
+  const [loyaltyConfigTab, setLoyaltyConfigTab] = useState(0);
+  const getTierDisplayName = (tierId) => {
+    if (!tierId) return 'Bronze';
+    const cleanId = tierId.toLowerCase();
+    return loyaltyConfig?.tierNames?.[cleanId] || (cleanId.charAt(0).toUpperCase() + cleanId.slice(1));
+  };
   const [productPointsDialog, setProductPointsDialog] = useState({ open: false, product: null });
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({ username: '', email: '' });
@@ -1699,12 +1705,15 @@ function App() {
     setLoading(true);
     try {
       const response = await loyaltyAPI.updateConfig({
-        tierThresholds: loyaltyConfig.tierThresholds
+        tierThresholds: loyaltyConfig.tierThresholds,
+        tierNames: loyaltyConfig.tierNames,
+        pointsCalculation: loyaltyConfig.pointsCalculation,
+        cashRewardTiers: loyaltyConfig.cashRewardTiers
       });
       
       setLoyaltyConfig(response.data.data);
-      showNotification('Tier thresholds updated successfully!', 'success');
-      addToActivityLog('Loyalty Config Updated', 'Updated tier thresholds', 'info');
+      showNotification('Loyalty and Tier configurations updated successfully!', 'success');
+      addToActivityLog('Loyalty Config Updated', 'Updated all tier names, thresholds & reward rules', 'info');
       setLoyaltyConfigDialog({ open: false });
     } catch (error) {
       showNotification(error.response?.data?.message || 'Failed to update configuration', 'error');
@@ -2289,18 +2298,23 @@ function App() {
             </Box>
           </Card>
           {memberHistory.length > 0 && (() => {
+            const pointsDivisor = loyaltyConfig?.pointsCalculation?.priceDivisor || 1000;
+            const applicatorBonusRate = loyaltyConfig?.pointsCalculation?.applicatorBonus || 0.1;
+            const thresholds = loyaltyConfig?.tierThresholds || { bronze: 0, silver: 2000, gold: 5000, platinum: 10000 };
+            const names = loyaltyConfig?.tierNames || { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum' };
+
             const totalPoints = memberHistory.reduce((total, scan) => {
-              const basePoints = Math.floor((scan.price || 0) / 1000);
-              const bonusPoints = scan.role === 'applicator' ? Math.floor(basePoints * 0.1) : 0;
+              const basePoints = Math.floor((scan.price || 0) / pointsDivisor);
+              const bonusPoints = scan.role === 'applicator' ? Math.floor(basePoints * applicatorBonusRate) : 0;
               return total + basePoints + bonusPoints;
             }, 0);
             
             // Calculate tier and progress
             const tierThresholds = [
-              { name: 'Bronze', min: 0, max: 500, color: '#CD7F32' },
-              { name: 'Silver', min: 500, max: 1500, color: '#C0C0C0' },
-              { name: 'Gold', min: 1500, max: 3000, color: '#FFD700' },
-              { name: 'Platinum', min: 3000, max: Infinity, color: '#E5E4E2' }
+              { name: names.bronze || 'Bronze', min: thresholds.bronze || 0, max: thresholds.silver || 2000, color: '#CD7F32' },
+              { name: names.silver || 'Silver', min: thresholds.silver || 2000, max: thresholds.gold || 5000, color: '#C0C0C0' },
+              { name: names.gold || 'Gold', min: thresholds.gold || 5000, max: thresholds.platinum || 10000, color: '#FFD700' },
+              { name: names.platinum || 'Platinum', min: thresholds.platinum || 10000, max: Infinity, color: '#E5E4E2' }
             ];
             
             const currentTier = tierThresholds.find(tier => totalPoints >= tier.min && totalPoints < tier.max) || tierThresholds[tierThresholds.length - 1];
@@ -2312,7 +2326,9 @@ function App() {
             memberHistory.forEach(scan => {
               const month = new Date(scan.timestamp).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
               if (!monthlyData[month]) monthlyData[month] = 0;
-              const scanPoints = Math.floor((scan.price || 0) / 1000) + (scan.role === 'applicator' ? Math.floor(Math.floor((scan.price || 0) / 1000) * 0.1) : 0);
+              const basePoints = Math.floor((scan.price || 0) / pointsDivisor);
+              const bonusPoints = scan.role === 'applicator' ? Math.floor(basePoints * applicatorBonusRate) : 0;
+              const scanPoints = basePoints + bonusPoints;
               monthlyData[month] += scanPoints;
             });
             const months = Object.keys(monthlyData).slice(-6);
@@ -2554,18 +2570,35 @@ function App() {
                                 📞 {currentMember.phone}
                               </Typography>
                             )}
-                            <Chip 
-                              label={currentMember.role === 'applicator' ? 'Applicator' : 'Customer'}
-                              sx={{ 
-                                bgcolor: 'secondary.main',
-                                color: 'white',
-                                fontWeight: 700,
-                                fontSize: '1.1rem',
-                                px: 3,
-                                py: 3,
-                                boxShadow: 2
-                              }}
-                            />
+                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
+                               <Chip 
+                                 label={currentMember.role === 'applicator' ? 'Applicator' : 'Customer'}
+                                 sx={{ 
+                                   bgcolor: 'secondary.main',
+                                   color: 'white',
+                                   fontWeight: 700,
+                                   fontSize: '0.95rem',
+                                   px: 2,
+                                   py: 2.5,
+                                   boxShadow: 2
+                                 }}
+                               />
+                               <Chip 
+                                 label={getTierDisplayName(currentMember.tier)}
+                                 sx={{ 
+                                   bgcolor: 
+                                     currentMember.tier === 'platinum' ? '#E5E4E2' :
+                                     currentMember.tier === 'gold' ? '#FFD700' :
+                                     currentMember.tier === 'silver' ? '#C0C0C0' : '#CD7F32',
+                                   color: currentMember.tier === 'platinum' || currentMember.tier === 'gold' || currentMember.tier === 'silver' ? 'black' : 'white',
+                                   fontWeight: 800,
+                                   fontSize: '0.95rem',
+                                   px: 2,
+                                   py: 2.5,
+                                   boxShadow: 2
+                                 }}
+                               />
+                             </Box>
                             {currentMember.location && (
                               <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
                                 <Typography variant="body2" sx={{ opacity: 0.7, mb: 0.5 }}>
@@ -4304,17 +4337,37 @@ function App() {
           </Box>}
 
           {adminTab === 'members' && <Box>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant='h6' sx={{ fontWeight: 700 }}>MEMBERS & LOYALTY</Typography>
-              <Typography variant='body2' color='text.secondary'>
-                {(() => {
-                  // Calculate stats based on members who have scans
-                  const membersWithScans = members.filter(m => scanHistory.some(s => s.memberId === m.memberId));
-                  const applicatorsCount = membersWithScans.filter(m => m.role === 'applicator').length;
-                  const customersCount = membersWithScans.filter(m => m.role === 'customer').length;
-                  return `Total: ${membersWithScans.length} | Applicators: ${applicatorsCount} | Customers: ${customersCount}`;
-                })()}
-              </Typography>
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              <Box>
+                <Typography variant='h6' sx={{ fontWeight: 700 }}>MEMBERS & LOYALTY</Typography>
+                <Typography variant='body2' color='text.secondary'>
+                  {(() => {
+                    // Calculate stats based on members who have scans
+                    const membersWithScans = members.filter(m => scanHistory.some(s => s.memberId === m.memberId));
+                    const applicatorsCount = membersWithScans.filter(m => m.role === 'applicator').length;
+                    const customersCount = membersWithScans.filter(m => m.role === 'customer').length;
+                    return `Total: ${membersWithScans.length} | Applicators: ${applicatorsCount} | Customers: ${customersCount}`;
+                  })()}
+                </Typography>
+              </Box>
+              <Button
+                variant='contained'
+                startIcon={<Settings />}
+                onClick={() => {
+                  setLoyaltyConfigTab(0);
+                  setLoyaltyConfigDialog({ open: true });
+                }}
+                sx={{
+                  background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)',
+                  boxShadow: '0 4px 14px 0 rgba(0,51,102,0.25)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #001a33 0%, #003366 100%)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+              >
+                Loyalty & Tier Config
+              </Button>
             </Box>
             <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
               <TextField 
@@ -4354,6 +4407,7 @@ function App() {
                     <TableCell><strong>Member ID</strong></TableCell>
                     <TableCell><strong>Name</strong></TableCell>
                     <TableCell><strong>Role</strong></TableCell>
+                    <TableCell><strong>Tier</strong></TableCell>
                     <TableCell><strong>Total Scans</strong></TableCell>
                     <TableCell><strong>Total Amount (Rs.)</strong></TableCell>
                     <TableCell><strong>Total Points</strong></TableCell>
@@ -4376,7 +4430,7 @@ function App() {
                     if (filteredMembers.length === 0) {
                       return (
                         <TableRow>
-                          <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                          <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                             <Typography variant='body1' color='text.secondary'>
                               {members.length === 0 
                                 ? 'No members found. Members are created automatically when they scan products.'
@@ -4410,6 +4464,21 @@ function App() {
                               size='small' 
                               color={m.role === 'applicator' ? 'warning' : 'info'}
                               sx={{ fontWeight: 600 }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={getTierDisplayName(m.tier)} 
+                              size='small' 
+                              sx={{ 
+                                fontWeight: 800,
+                                bgcolor: 
+                                  m.tier === 'platinum' ? '#E5E4E2' :
+                                  m.tier === 'gold' ? '#FFD700' :
+                                  m.tier === 'silver' ? '#C0C0C0' : '#CD7F32',
+                                color: m.tier === 'platinum' || m.tier === 'gold' || m.tier === 'silver' ? 'black' : 'white',
+                                boxShadow: 1
+                              }}
                             />
                           </TableCell>
                           <TableCell>
@@ -5801,7 +5870,7 @@ function App() {
                       sx={{ fontWeight: 700 }}
                     />
                     <Chip 
-                      label={`Tier: ${pointsDialog.user.tier ? pointsDialog.user.tier.charAt(0).toUpperCase() + pointsDialog.user.tier.slice(1) : 'Bronze'}`} 
+                      label={`Tier: ${getTierDisplayName(pointsDialog.user.tier)}`} 
                       color={
                         pointsDialog.user.tier === 'platinum' ? 'success' :
                         pointsDialog.user.tier === 'gold' ? 'warning' :
@@ -5872,134 +5941,356 @@ function App() {
           </Dialog>
 
           <Dialog open={loyaltyConfigDialog.open} onClose={() => setLoyaltyConfigDialog({ open: false })} maxWidth='md' fullWidth>
-            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
               <Settings color='primary' />
-              Configure Cash Reward Tiers
+              Loyalty Settings & Tier Configuration
             </DialogTitle>
             <DialogContent>
-              <Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>
-                Set the cash reward percentage for each monthly purchase tier. Rewards are calculated cumulatively based on total monthly purchases.
-              </Typography>
               {loyaltyConfig && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <TextField
-                    fullWidth
-                    label='Tier 1: Rs. 0 - 250,000'
-                    type='number'
-                    value={loyaltyConfig.cashRewardTiers?.tier1 || 4.5}
-                    onChange={(e) => setLoyaltyConfig({
-                      ...loyaltyConfig,
-                      cashRewardTiers: {
-                        ...loyaltyConfig.cashRewardTiers,
-                        tier1: parseFloat(e.target.value) || 0
-                      }
-                    })}
-                    inputProps={{ min: 0, max: 100, step: 0.1 }}
-                    InputProps={{
-                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                    }}
-                    helperText='Percentage rate for first Rs. 250,000 (default: 4.5%)'
-                  />
-                  <TextField
-                    fullWidth
-                    label='Tier 2: Rs. 250,001 - 500,000'
-                    type='number'
-                    value={loyaltyConfig.cashRewardTiers?.tier2 || 5.0}
-                    onChange={(e) => setLoyaltyConfig({
-                      ...loyaltyConfig,
-                      cashRewardTiers: {
-                        ...loyaltyConfig.cashRewardTiers,
-                        tier2: parseFloat(e.target.value) || 0
-                      }
-                    })}
-                    inputProps={{ min: 0, max: 100, step: 0.1 }}
-                    InputProps={{
-                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                    }}
-                    helperText='Percentage rate for next Rs. 250,000 (default: 5.0%)'
-                  />
-                  <TextField
-                    fullWidth
-                    label='Tier 3: Rs. 500,001 - 750,000'
-                    type='number'
-                    value={loyaltyConfig.cashRewardTiers?.tier3 || 5.5}
-                    onChange={(e) => setLoyaltyConfig({
-                      ...loyaltyConfig,
-                      cashRewardTiers: {
-                        ...loyaltyConfig.cashRewardTiers,
-                        tier3: parseFloat(e.target.value) || 0
-                      }
-                    })}
-                    inputProps={{ min: 0, max: 100, step: 0.1 }}
-                    InputProps={{
-                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                    }}
-                    helperText='Percentage rate for next Rs. 250,000 (default: 5.5%)'
-                  />
-                  <TextField
-                    fullWidth
-                    label='Tier 4: Rs. 750,001 - 1,000,000'
-                    type='number'
-                    value={loyaltyConfig.cashRewardTiers?.tier4 || 6.0}
-                    onChange={(e) => setLoyaltyConfig({
-                      ...loyaltyConfig,
-                      cashRewardTiers: {
-                        ...loyaltyConfig.cashRewardTiers,
-                        tier4: parseFloat(e.target.value) || 0
-                      }
-                    })}
-                    inputProps={{ min: 0, max: 100, step: 0.1 }}
-                    InputProps={{
-                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                    }}
-                    helperText='Percentage rate for next Rs. 250,000 (default: 6.0%)'
-                  />
-                  <TextField
-                    fullWidth
-                    label='Tier 5: Above Rs. 1,000,000'
-                    type='number'
-                    value={loyaltyConfig.cashRewardTiers?.tier5 || 6.5}
-                    onChange={(e) => setLoyaltyConfig({
-                      ...loyaltyConfig,
-                      cashRewardTiers: {
-                        ...loyaltyConfig.cashRewardTiers,
-                        tier5: parseFloat(e.target.value) || 0
-                      }
-                    })}
-                    inputProps={{ min: 0, max: 100, step: 0.1 }}
-                    InputProps={{
-                      endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                    }}
-                    helperText='Percentage rate for purchases above Rs. 1,000,000 (default: 6.5%)'
-                  />
-                  <Box sx={{ p: 2, bgcolor: 'success.lighter', borderRadius: 1, mt: 1 }}>
-                    <Typography variant='body2' fontWeight={600} gutterBottom>Example Calculation:</Typography>
-                    <Typography variant='caption' color='text.secondary' display='block'>
-                      For Rs. 600,000 monthly purchase:
-                    </Typography>
-                    <Typography variant='caption' color='text.secondary' display='block'>
-                      • First Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier1 || 4.5}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100).toLocaleString()}
-                    </Typography>
-                    <Typography variant='caption' color='text.secondary' display='block'>
-                      • Next Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier2 || 5.0}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100).toLocaleString()}
-                    </Typography>
-                    <Typography variant='caption' color='text.secondary' display='block'>
-                      • Balance Rs. 100,000 at {loyaltyConfig.cashRewardTiers?.tier3 || 5.5}% = Rs. {(100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100).toLocaleString()}
-                    </Typography>
-                    <Typography variant='caption' fontWeight={700} color='success.main' display='block' sx={{ mt: 1 }}>
-                      Total Reward = Rs. {((250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100) + (250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100) + (100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100)).toLocaleString()}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
-                    <Typography variant='caption' color='text.secondary'>
-                      <strong>Note:</strong> Percentage rates should typically increase with higher tiers to incentivize larger purchases. Changes will apply to new calculations only.
-                    </Typography>
-                  </Box>
-                </Box>
+                <>
+                  <Tabs 
+                    value={loyaltyConfigTab} 
+                    onChange={(e, newVal) => setLoyaltyConfigTab(newVal)} 
+                    sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
+                    variant="fullWidth"
+                    textColor="primary"
+                    indicatorColor="primary"
+                  >
+                    <Tab label="🏆 Membership Tiers & Gaps" />
+                    <Tab label="⚙️ Calculation Rules" />
+                    <Tab label="💰 Monthly Cash Rewards" />
+                  </Tabs>
+
+                  {/* Tab 0: Membership Tiers & Gaps */}
+                  {loyaltyConfigTab === 0 && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <Typography variant='body2' color='text.secondary'>
+                        Customize the display names and minimum points thresholds (gaps) for membership tiers. Members are dynamically re-classified when points change.
+                      </Typography>
+                      <Grid container spacing={3}>
+                        {/* Bronze */}
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Bronze Tier Custom Name"
+                            value={loyaltyConfig.tierNames?.bronze || 'Bronze'}
+                            onChange={(e) => setLoyaltyConfig({
+                              ...loyaltyConfig,
+                              tierNames: { ...loyaltyConfig.tierNames, bronze: e.target.value }
+                            })}
+                            helperText="Name of baseline membership tier"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Bronze Minimum Points threshold"
+                            type="number"
+                            value={0}
+                            disabled
+                            helperText="Bronze tier always starts at 0 points"
+                          />
+                        </Grid>
+
+                        {/* Silver */}
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Silver Tier Custom Name"
+                            value={loyaltyConfig.tierNames?.silver || 'Silver'}
+                            onChange={(e) => setLoyaltyConfig({
+                              ...loyaltyConfig,
+                              tierNames: { ...loyaltyConfig.tierNames, silver: e.target.value }
+                            })}
+                            helperText="Name of second tier level"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Silver Minimum Points Threshold (Gap)"
+                            type="number"
+                            value={loyaltyConfig.tierThresholds?.silver || 2000}
+                            onChange={(e) => setLoyaltyConfig({
+                              ...loyaltyConfig,
+                              tierThresholds: { ...loyaltyConfig.tierThresholds, silver: parseInt(e.target.value) || 0 }
+                            })}
+                            inputProps={{ min: 1 }}
+                            helperText="Points gap needed to enter Silver level"
+                          />
+                        </Grid>
+
+                        {/* Gold */}
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Gold Tier Custom Name"
+                            value={loyaltyConfig.tierNames?.gold || 'Gold'}
+                            onChange={(e) => setLoyaltyConfig({
+                              ...loyaltyConfig,
+                              tierNames: { ...loyaltyConfig.tierNames, gold: e.target.value }
+                            })}
+                            helperText="Name of third tier level"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Gold Minimum Points Threshold (Gap)"
+                            type="number"
+                            value={loyaltyConfig.tierThresholds?.gold || 5000}
+                            onChange={(e) => setLoyaltyConfig({
+                              ...loyaltyConfig,
+                              tierThresholds: { ...loyaltyConfig.tierThresholds, gold: parseInt(e.target.value) || 0 }
+                            })}
+                            inputProps={{ min: 1 }}
+                            helperText="Points gap needed to enter Gold level"
+                          />
+                        </Grid>
+
+                        {/* Platinum */}
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Platinum Tier Custom Name"
+                            value={loyaltyConfig.tierNames?.platinum || 'Platinum'}
+                            onChange={(e) => setLoyaltyConfig({
+                              ...loyaltyConfig,
+                              tierNames: { ...loyaltyConfig.tierNames, platinum: e.target.value }
+                            })}
+                            helperText="Name of highest elite level"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Platinum Minimum Points Threshold (Gap)"
+                            type="number"
+                            value={loyaltyConfig.tierThresholds?.platinum || 10000}
+                            onChange={(e) => setLoyaltyConfig({
+                              ...loyaltyConfig,
+                              tierThresholds: { ...loyaltyConfig.tierThresholds, platinum: parseInt(e.target.value) || 0 }
+                            })}
+                            inputProps={{ min: 1 }}
+                            helperText="Points gap needed to enter Platinum level"
+                          />
+                        </Grid>
+                      </Grid>
+
+                      <Box sx={{ p: 2, bgcolor: 'primary.lighter', borderRadius: 2 }}>
+                        <Typography variant="subtitle2" color="primary.dark" fontWeight={700} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          ✨ Dynamic Gaps Configuration Overview:
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" display="block">
+                          • <strong>{loyaltyConfig.tierNames?.bronze || 'Bronze'} Range</strong>: 0 to {((loyaltyConfig.tierThresholds?.silver || 2000) - 1).toLocaleString()} points
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" display="block">
+                          • <strong>{loyaltyConfig.tierNames?.silver || 'Silver'} Range</strong>: {(loyaltyConfig.tierThresholds?.silver || 2000).toLocaleString()} to {((loyaltyConfig.tierThresholds?.gold || 5000) - 1).toLocaleString()} points (Gap of {((loyaltyConfig.tierThresholds?.gold || 5000) - (loyaltyConfig.tierThresholds?.silver || 2000)).toLocaleString()} points)
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" display="block">
+                          • <strong>{loyaltyConfig.tierNames?.gold || 'Gold'} Range</strong>: {(loyaltyConfig.tierThresholds?.gold || 5000).toLocaleString()} to {((loyaltyConfig.tierThresholds?.platinum || 10000) - 1).toLocaleString()} points (Gap of {((loyaltyConfig.tierThresholds?.platinum || 10000) - (loyaltyConfig.tierThresholds?.gold || 5000)).toLocaleString()} points)
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" display="block">
+                          • <strong>{loyaltyConfig.tierNames?.platinum || 'Platinum'} Range</strong>: Above {(loyaltyConfig.tierThresholds?.platinum || 10000).toLocaleString()} points
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Tab 1: Points Calculation Rules */}
+                  {loyaltyConfigTab === 1 && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <Typography variant='body2' color='text.secondary'>
+                        Configure how points are calculated from scan invoice values.
+                      </Typography>
+                      
+                      <FormControl fullWidth>
+                        <InputLabel>Calculation Method</InputLabel>
+                        <Select
+                          value={loyaltyConfig.pointsCalculation?.method || 'price_based'}
+                          label="Calculation Method"
+                          onChange={(e) => setLoyaltyConfig({
+                            ...loyaltyConfig,
+                            pointsCalculation: { ...loyaltyConfig.pointsCalculation, method: e.target.value }
+                          })}
+                        >
+                          <MenuItem value="price_based">Price Based (Points = Price / Divisor)</MenuItem>
+                          <MenuItem value="product_based">Product Based (Points defined per Product)</MenuItem>
+                          <MenuItem value="fixed">Fixed Points per scan</MenuItem>
+                        </Select>
+                      </FormControl>
+
+                      {loyaltyConfig.pointsCalculation?.method === 'price_based' && (
+                        <TextField
+                          fullWidth
+                          label="Price Divisor (LKR per Point)"
+                          type="number"
+                          value={loyaltyConfig.pointsCalculation?.priceDivisor || 1000}
+                          onChange={(e) => setLoyaltyConfig({
+                            ...loyaltyConfig,
+                            pointsCalculation: { ...loyaltyConfig.pointsCalculation, priceDivisor: parseFloat(e.target.value) || 1000 }
+                          })}
+                          inputProps={{ min: 1 }}
+                          helperText="Number of LKR spent to earn 1 loyalty point (default: Rs. 1000 = 1 Point)"
+                        />
+                      )}
+
+                      <TextField
+                        fullWidth
+                        label="Applicator Bonus Multiplier"
+                        type="number"
+                        value={Math.round((loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1) * 100)}
+                        onChange={(e) => setLoyaltyConfig({
+                          ...loyaltyConfig,
+                          pointsCalculation: { 
+                            ...loyaltyConfig.pointsCalculation, 
+                            applicatorBonus: parseFloat(e.target.value) / 100 || 0 
+                          }
+                        })}
+                        inputProps={{ min: 0, max: 100 }}
+                        InputProps={{
+                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                        }}
+                        helperText="Percentage bonus points granted to members registered as applicators (default: 10% bonus)"
+                      />
+
+                      <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 2 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          <strong>Calculation Example:</strong> For a purchase of Rs. 15,000 using Price-Based method (Divisor = 1,000):
+                          <br />• Base points: 15,000 / 1,000 = <strong>15 points</strong>
+                          <br />• Applicator bonus: 15 * {Math.round((loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1) * 100)}% = <strong>{(15 * (loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1)).toFixed(1)} points</strong>
+                          <br />• Total points credited: <strong>{Math.floor(15 + (15 * (loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1)))} points</strong>
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Tab 2: Monthly Cash Rewards */}
+                  {loyaltyConfigTab === 2 && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Typography variant='body2' color='text.secondary'>
+                        Set the cash reward percentage for each monthly purchase tier. Rewards are calculated cumulatively based on total monthly purchases.
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        label='Tier 1: Rs. 0 - 250,000'
+                        type='number'
+                        value={loyaltyConfig.cashRewardTiers?.tier1 || 4.5}
+                        onChange={(e) => setLoyaltyConfig({
+                          ...loyaltyConfig,
+                          cashRewardTiers: {
+                            ...loyaltyConfig.cashRewardTiers,
+                            tier1: parseFloat(e.target.value) || 0
+                          }
+                        })}
+                        inputProps={{ min: 0, max: 100, step: 0.1 }}
+                        InputProps={{
+                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                        }}
+                        helperText='Percentage rate for first Rs. 250,000 (default: 4.5%)'
+                      />
+                      <TextField
+                        fullWidth
+                        label='Tier 2: Rs. 250,001 - 500,000'
+                        type='number'
+                        value={loyaltyConfig.cashRewardTiers?.tier2 || 5.0}
+                        onChange={(e) => setLoyaltyConfig({
+                          ...loyaltyConfig,
+                          cashRewardTiers: {
+                            ...loyaltyConfig.cashRewardTiers,
+                            tier2: parseFloat(e.target.value) || 0
+                          }
+                        })}
+                        inputProps={{ min: 0, max: 100, step: 0.1 }}
+                        InputProps={{
+                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                        }}
+                        helperText='Percentage rate for next Rs. 250,000 (default: 5.0%)'
+                      />
+                      <TextField
+                        fullWidth
+                        label='Tier 3: Rs. 500,001 - 750,000'
+                        type='number'
+                        value={loyaltyConfig.cashRewardTiers?.tier3 || 5.5}
+                        onChange={(e) => setLoyaltyConfig({
+                          ...loyaltyConfig,
+                          cashRewardTiers: {
+                            ...loyaltyConfig.cashRewardTiers,
+                            tier3: parseFloat(e.target.value) || 0
+                          }
+                        })}
+                        inputProps={{ min: 0, max: 100, step: 0.1 }}
+                        InputProps={{
+                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                        }}
+                        helperText='Percentage rate for next Rs. 250,000 (default: 5.5%)'
+                      />
+                      <TextField
+                        fullWidth
+                        label='Tier 4: Rs. 750,001 - 1,000,000'
+                        type='number'
+                        value={loyaltyConfig.cashRewardTiers?.tier4 || 6.0}
+                        onChange={(e) => setLoyaltyConfig({
+                          ...loyaltyConfig,
+                          cashRewardTiers: {
+                            ...loyaltyConfig.cashRewardTiers,
+                            tier4: parseFloat(e.target.value) || 0
+                          }
+                        })}
+                        inputProps={{ min: 0, max: 100, step: 0.1 }}
+                        InputProps={{
+                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                        }}
+                        helperText='Percentage rate for next Rs. 250,000 (default: 6.0%)'
+                      />
+                      <TextField
+                        fullWidth
+                        label='Tier 5: Above Rs. 1,000,000'
+                        type='number'
+                        value={loyaltyConfig.cashRewardTiers?.tier5 || 6.5}
+                        onChange={(e) => setLoyaltyConfig({
+                          ...loyaltyConfig,
+                          cashRewardTiers: {
+                            ...loyaltyConfig.cashRewardTiers,
+                            tier5: parseFloat(e.target.value) || 0
+                          }
+                        })}
+                        inputProps={{ min: 0, max: 100, step: 0.1 }}
+                        InputProps={{
+                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                        }}
+                        helperText='Percentage rate for purchases above Rs. 1,000,000 (default: 6.5%)'
+                      />
+                      <Box sx={{ p: 2, bgcolor: 'success.lighter', borderRadius: 1, mt: 1 }}>
+                        <Typography variant='body2' fontWeight={600} gutterBottom>Example Calculation:</Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>
+                          For Rs. 600,000 monthly purchase:
+                        </Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>
+                          • First Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier1 || 4.5}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100).toLocaleString()}
+                        </Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>
+                          • Next Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier2 || 5.0}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100).toLocaleString()}
+                        </Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>
+                          • Balance Rs. 100,000 at {loyaltyConfig.cashRewardTiers?.tier3 || 5.5}% = Rs. {(100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100).toLocaleString()}
+                        </Typography>
+                        <Typography variant='caption' fontWeight={700} color='success.main' display='block' sx={{ mt: 1 }}>
+                          Total Reward = Rs. {((250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100) + (250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100) + (100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100)).toLocaleString()}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
+                        <Typography variant='caption' color='text.secondary'>
+                          <strong>Note:</strong> Percentage rates should typically increase with higher tiers to incentivize larger purchases. Changes will apply to new calculations only.
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+                </>
               )}
             </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setLoyaltyConfigDialog({ open: false })}>
+            <DialogActions sx={{ px: 3, pb: 3 }}>
+              <Button onClick={() => setLoyaltyConfigDialog({ open: false })} variant="outlined">
                 Cancel
               </Button>
               <Button 

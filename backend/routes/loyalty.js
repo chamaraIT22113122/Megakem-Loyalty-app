@@ -38,6 +38,10 @@ router.put('/config', protect, [
   body('tierThresholds.silver').optional().isInt({ min: 0 }),
   body('tierThresholds.gold').optional().isInt({ min: 0 }),
   body('tierThresholds.platinum').optional().isInt({ min: 0 }),
+  body('tierNames.bronze').optional().isString().trim().notEmpty(),
+  body('tierNames.silver').optional().isString().trim().notEmpty(),
+  body('tierNames.gold').optional().isString().trim().notEmpty(),
+  body('tierNames.platinum').optional().isString().trim().notEmpty(),
   body('pointsCalculation.method').optional().isIn(['price_based', 'product_based', 'fixed']),
   body('pointsCalculation.priceDivisor').optional().isFloat({ min: 1 }),
   body('pointsCalculation.applicatorBonus').optional().isFloat({ min: 0, max: 1 })
@@ -65,8 +69,16 @@ router.put('/config', protect, [
       config.tierThresholds = { ...config.tierThresholds, ...req.body.tierThresholds };
     }
     
+    if (req.body.tierNames) {
+      config.tierNames = { ...config.tierNames, ...req.body.tierNames };
+    }
+    
     if (req.body.pointsCalculation) {
       config.pointsCalculation = { ...config.pointsCalculation, ...req.body.pointsCalculation };
+    }
+    
+    if (req.body.cashRewardTiers) {
+      config.cashRewardTiers = { ...config.cashRewardTiers, ...req.body.cashRewardTiers };
     }
 
     await config.save();

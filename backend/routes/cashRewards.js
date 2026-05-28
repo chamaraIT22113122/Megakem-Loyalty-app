@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Member = require('../models/Member');
 const Scan = require('../models/Scan');
+const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { protect, authorize, hasPermission } = require('../middleware/auth');
 
 // @route   GET /api/cash-rewards/:memberId
@@ -29,9 +30,10 @@ router.get('/:memberId', protect, async (req, res) => {
         parseInt(month)
       );
       
+      const config = await LoyaltyConfig.getConfig();
       // Update member's monthly purchase
       member.addMonthlyPurchase(purchaseValue, parseInt(year), parseInt(month));
-      const cashReward = member.calculateCashReward(parseInt(year), parseInt(month));
+      const cashReward = member.calculateCashReward(parseInt(year), parseInt(month), config.cashRewardTiers);
       await member.save();
 
       const purchase = member.monthlyPurchases.find(
@@ -86,6 +88,7 @@ router.get('/', protect, hasPermission('canExport'), async (req, res) => {
     const members = await Member.find(query);
 
     const results = [];
+    const config = await LoyaltyConfig.getConfig();
 
     for (const member of members) {
       if (year && month) {
@@ -97,7 +100,7 @@ router.get('/', protect, hasPermission('canExport'), async (req, res) => {
         );
         
         member.addMonthlyPurchase(purchaseValue, parseInt(year), parseInt(month));
-        const cashReward = member.calculateCashReward(parseInt(year), parseInt(month));
+        const cashReward = member.calculateCashReward(parseInt(year), parseInt(month), config.cashRewardTiers);
         await member.save();
 
         const purchase = member.monthlyPurchases.find(
@@ -173,9 +176,10 @@ router.post('/calculate/:memberId', protect, hasPermission('canExport'), async (
       parseInt(month)
     );
 
+    const config = await LoyaltyConfig.getConfig();
     // Update member's monthly purchase
     member.addMonthlyPurchase(purchaseValue, parseInt(year), parseInt(month));
-    const cashReward = member.calculateCashReward(parseInt(year), parseInt(month));
+    const cashReward = member.calculateCashReward(parseInt(year), parseInt(month), config.cashRewardTiers);
     await member.save();
 
     const purchase = member.monthlyPurchases.find(
@@ -192,7 +196,7 @@ router.post('/calculate/:memberId', protect, hasPermission('canExport'), async (
         totalPurchaseValue: purchase ? purchase.totalPurchaseValue : 0,
         cashReward: cashReward,
         rewardCalculated: purchase ? purchase.rewardCalculated : false,
-        breakdown: calculateRewardBreakdown(purchase ? purchase.totalPurchaseValue : 0)
+        breakdown: calculateRewardBreakdown(purchase ? purchase.totalPurchaseValue : 0, config.cashRewardTiers)
       }
     });
   } catch (error) {
@@ -286,13 +290,19 @@ async function calculateMonthlyPurchaseValue(memberId, year, month) {
 }
 
 // Helper function to calculate reward breakdown
-function calculateRewardBreakdown(totalPurchaseValue) {
+function calculateRewardBreakdown(totalPurchaseValue, configTiers) {
+  const tier1Rate = (configTiers && configTiers.tier1 !== undefined) ? (Number(configTiers.tier1) / 100) : 0.045;
+  const tier2Rate = (configTiers && configTiers.tier2 !== undefined) ? (Number(configTiers.tier2) / 100) : 0.05;
+  const tier3Rate = (configTiers && configTiers.tier3 !== undefined) ? (Number(configTiers.tier3) / 100) : 0.055;
+  const tier4Rate = (configTiers && configTiers.tier4 !== undefined) ? (Number(configTiers.tier4) / 100) : 0.06;
+  const tier5Rate = (configTiers && configTiers.tier5 !== undefined) ? (Number(configTiers.tier5) / 100) : 0.065;
+
   const tiers = [
-    { min: 0, max: 250000, rate: 0.045, label: '0 - 250,000' },
-    { min: 250000, max: 500000, rate: 0.05, label: '250,001 - 500,000' },
-    { min: 500000, max: 750000, rate: 0.055, label: '500,001 - 750,000' },
-    { min: 750000, max: 1000000, rate: 0.06, label: '750,001 - 1,000,000' },
-    { min: 1000000, max: Infinity, rate: 0.065, label: 'Above 1,000,000' }
+    { min: 0, max: 250000, rate: tier1Rate, label: '0 - 250,000' },
+    { min: 250000, max: 500000, rate: tier2Rate, label: '250,001 - 500,000' },
+    { min: 500000, max: 750000, rate: tier3Rate, label: '500,001 - 750,000' },
+    { min: 750000, max: 1000000, rate: tier4Rate, label: '750,001 - 1,000,000' },
+    { min: 1000000, max: Infinity, rate: tier5Rate, label: 'Above 1,000,000' }
   ];
 
   let remaining = totalPurchaseValue;
