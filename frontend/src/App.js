@@ -5192,6 +5192,7 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Contact Person</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Person Mobile</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Zone</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
@@ -5223,7 +5224,7 @@ function App() {
                         return matchesSearch && matchesType;
                       }).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} align='center'>
+                          <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 10 : 9} align='center'>
                             <Box sx={{ py: 4 }}>
                               <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                               <Typography variant='body1' color='text.secondary'>
@@ -5256,6 +5257,7 @@ function App() {
                                 <TableCell>{applicator.whatsappNumber || '-'}</TableCell>
                                 <TableCell>{applicator.contactPersonName || '-'}</TableCell>
                                 <TableCell>{applicator.contactPersonMobile || '-'}</TableCell>
+                                <TableCell><Chip label='Hardware' size='small' color='secondary' /></TableCell>
                                 <TableCell>{applicator.location || '-'}</TableCell>
                                 <TableCell>{applicator.zone || '-'}</TableCell>
                               </>
