@@ -7915,20 +7915,7 @@ function App() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Hardware for Applicator</InputLabel>
-                <Select
-                  value={applicatorFormData.equipment}
-                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, equipment: e.target.value })}
-                  label='Hardware for Applicator'
-                >
-                  <MenuItem value=''>None</MenuItem>
-                  <MenuItem value='Hardware'>Hardware</MenuItem>
-                  <MenuItem value='Applicator'>Applicator</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+
           </Grid>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
