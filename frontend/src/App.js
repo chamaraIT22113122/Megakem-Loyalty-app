@@ -242,7 +242,7 @@ function App() {
   const [coAdminSearchQuery, setCoAdminSearchQuery] = useState('');
   const [rewardSearchQuery, setRewardSearchQuery] = useState('');
   const [applicatorSearchQuery, setApplicatorSearchQuery] = useState('');
-  const [applicatorTypeFilter, setApplicatorTypeFilter] = useState('all');
+  const [applicatorTypeFilter, setApplicatorTypeFilter] = useState('Applicator');
   const [qrCodeSearchQuery, setQrCodeSearchQuery] = useState('');
   const [cashRewards, setCashRewards] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -296,6 +296,10 @@ function App() {
     phoneNumber: '',
     whatsappNumber: '',
     City: '',
+    hardwareAddress: '',
+    contactPersonName: '',
+    contactPersonMobile: '',
+    zone: '',
     equipment: 'Hardware',
     equipmentBrand: '',
     purchaseDate: '',
@@ -332,6 +336,10 @@ function App() {
           nic: m.nic || '',
           birthday: m.birthday ? new Date(m.birthday).toISOString().split('T')[0] : '',
           location: m.location || '',
+          hardwareAddress: m.hardwareAddress || '',
+          contactPersonName: m.contactPersonName || '',
+          contactPersonMobile: m.contactPersonMobile || '',
+          zone: m.zone || '',
           equipment: m.equipment || '',
           equipmentBrand: m.equipmentBrand || '',
           purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
@@ -1093,6 +1101,10 @@ function App() {
         nic: m.nic || '',
         birthday: m.birthday ? new Date(m.birthday).toISOString().split('T')[0] : '',
         location: m.location || '',
+        hardwareAddress: m.hardwareAddress || '',
+        contactPersonName: m.contactPersonName || '',
+        contactPersonMobile: m.contactPersonMobile || '',
+        zone: m.zone || '',
         equipment: m.equipment || '',
         equipmentBrand: m.equipmentBrand || '',
         purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
@@ -1136,6 +1148,10 @@ function App() {
         nic: m.nic || '',
         birthday: m.birthday ? new Date(m.birthday).toISOString().split('T')[0] : '',
         location: m.location || '',
+        hardwareAddress: m.hardwareAddress || '',
+        contactPersonName: m.contactPersonName || '',
+        contactPersonMobile: m.contactPersonMobile || '',
+        zone: m.zone || '',
         equipment: m.equipment || '',
         equipmentBrand: m.equipmentBrand || '',
         purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
@@ -5047,6 +5063,10 @@ function App() {
                       phoneNumber: '',
                       whatsappNumber: '',
                       City: '',
+                      hardwareAddress: '',
+                      contactPersonName: '',
+                      contactPersonMobile: '',
+                      zone: '',
                       equipment: 'Hardware',
                       equipmentBrand: '',
                       purchaseDate: '',
@@ -5117,20 +5137,25 @@ function App() {
                   startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
                 }}
               />
-              <FormControl size='small' sx={{ minWidth: 150 }}>
-                <InputLabel>Type</InputLabel>
-                <Select value={applicatorTypeFilter} onChange={(e) => setApplicatorTypeFilter(e.target.value)} label='Type'>
-                  <MenuItem value='all'>All Types</MenuItem>
-                  <MenuItem value='Applicator'>Applicator</MenuItem>
-                  <MenuItem value='Hardware'>Hardware</MenuItem>
-                </Select>
-              </FormControl>
-              {(applicatorSearchQuery || applicatorTypeFilter !== 'all') && (
+              <ToggleButtonGroup
+                color="primary"
+                value={applicatorTypeFilter}
+                exclusive
+                onChange={(e, newValue) => {
+                  if (newValue !== null) {
+                    setApplicatorTypeFilter(newValue);
+                  }
+                }}
+                size="small"
+              >
+                <ToggleButton value="Applicator">Applicators</ToggleButton>
+                <ToggleButton value="Hardware">Hardwares</ToggleButton>
+              </ToggleButtonGroup>
+              {applicatorSearchQuery && (
                 <Button 
                   size='small' 
                   onClick={() => { 
                     setApplicatorSearchQuery(''); 
-                    setApplicatorTypeFilter('all');
                   }}
                 >
                   Clear Filters
@@ -5145,14 +5170,30 @@ function App() {
                   <Table>
                     <TableHead>
                       <TableRow sx={{ bgcolor: 'grey.100' }}>
-                        <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Member ID</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>NIC</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
+                        {applicatorTypeFilter === 'Hardware' ? (
+                          <>
+                            <TableCell sx={{ fontWeight: 700 }}>Hardware Name</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Address</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Contact No</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Contact Person</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Person Mobile</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Zone</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
+                          </>
+                        ) : (
+                          <>
+                            <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Member ID</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>NIC</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
+                          </>
+                        )}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -5167,7 +5208,7 @@ function App() {
                         return matchesSearch && matchesType;
                       }).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} align='center'>
+                          <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 9 : 8} align='center'>
                             <Box sx={{ py: 4 }}>
                               <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                               <Typography variant='body1' color='text.secondary'>
@@ -5188,25 +5229,44 @@ function App() {
                           return matchesSearch && matchesType;
                         }).map((applicator, index) => (
                           <TableRow key={index} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                            <TableCell>
-                              <Typography variant='body2' fontWeight={600}>
-                                {applicator.name}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip label={applicator.memberId} size='small' color='primary' />
-                            </TableCell>
-                            <TableCell>{applicator.phoneNumber || '-'}</TableCell>
-                            <TableCell>{applicator.whatsappNumber || '-'}</TableCell>
-                            <TableCell>{applicator.nic || '-'}</TableCell>
-                            <TableCell>
-                              {applicator.equipment === 'Hardware' ? (
-                                <Chip label='Hardware' size='small' color='secondary' />
-                              ) : (
-                                <Chip label='Applicator' size='small' color='info' />
-                              )}
-                            </TableCell>
-                            <TableCell>{applicator.location || '-'}</TableCell>
+                            {applicatorTypeFilter === 'Hardware' ? (
+                              <>
+                                <TableCell>
+                                  <Typography variant='body2' fontWeight={600}>
+                                    {applicator.name}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>{applicator.hardwareAddress || '-'}</TableCell>
+                                <TableCell>{applicator.phoneNumber || '-'}</TableCell>
+                                <TableCell>{applicator.whatsappNumber || '-'}</TableCell>
+                                <TableCell>{applicator.contactPersonName || '-'}</TableCell>
+                                <TableCell>{applicator.contactPersonMobile || '-'}</TableCell>
+                                <TableCell>{applicator.location || '-'}</TableCell>
+                                <TableCell>{applicator.zone || '-'}</TableCell>
+                              </>
+                            ) : (
+                              <>
+                                <TableCell>
+                                  <Typography variant='body2' fontWeight={600}>
+                                    {applicator.name}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Chip label={applicator.memberId} size='small' color='primary' />
+                                </TableCell>
+                                <TableCell>{applicator.phoneNumber || '-'}</TableCell>
+                                <TableCell>{applicator.whatsappNumber || '-'}</TableCell>
+                                <TableCell>{applicator.nic || '-'}</TableCell>
+                                <TableCell>
+                                  {applicator.equipment === 'Hardware' ? (
+                                    <Chip label='Hardware' size='small' color='secondary' />
+                                  ) : (
+                                    <Chip label='Applicator' size='small' color='info' />
+                                  )}
+                                </TableCell>
+                                <TableCell>{applicator.location || '-'}</TableCell>
+                              </>
+                            )}
                             <TableCell>
                               <Box sx={{ display: 'flex', gap: 1 }}>
                                 <Tooltip title='Edit'>
@@ -7940,17 +8000,25 @@ function App() {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label='Name'
+                label='Hardware Name'
                 value={hardwareFormData.name}
                 onChange={(e) => setHardwareFormData({ ...hardwareFormData, name: e.target.value })}
                 required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Hardware Address'
+                value={hardwareFormData.hardwareAddress}
+                onChange={(e) => setHardwareFormData({ ...hardwareFormData, hardwareAddress: e.target.value })}
               />
             </Grid>
 
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label='Phone Number'
+                label='Hardware Contact No'
                 value={hardwareFormData.phoneNumber}
                 onChange={(e) => setHardwareFormData({ ...hardwareFormData, phoneNumber: e.target.value })}
               />
@@ -7963,6 +8031,24 @@ function App() {
                 onChange={(e) => setHardwareFormData({ ...hardwareFormData, whatsappNumber: e.target.value })}
               />
             </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Contact Persons Name'
+                value={hardwareFormData.contactPersonName}
+                onChange={(e) => setHardwareFormData({ ...hardwareFormData, contactPersonName: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Contact Persons Mobile No'
+                value={hardwareFormData.contactPersonMobile}
+                onChange={(e) => setHardwareFormData({ ...hardwareFormData, contactPersonMobile: e.target.value })}
+              />
+            </Grid>
+
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
                 <InputLabel>City</InputLabel>
@@ -8000,6 +8086,14 @@ function App() {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Zone'
+                value={hardwareFormData.zone}
+                onChange={(e) => setHardwareFormData({ ...hardwareFormData, zone: e.target.value })}
+              />
+            </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -8036,6 +8130,10 @@ function App() {
                   phone: hardwareFormData.phoneNumber,
                   whatsappNumber: hardwareFormData.whatsappNumber,
                   location: hardwareFormData.location,
+                  hardwareAddress: hardwareFormData.hardwareAddress,
+                  contactPersonName: hardwareFormData.contactPersonName,
+                  contactPersonMobile: hardwareFormData.contactPersonMobile,
+                  zone: hardwareFormData.zone,
                   equipment: hardwareFormData.equipment,
                   equipmentBrand: hardwareFormData.equipmentBrand,
                   purchaseDate: hardwareFormData.purchaseDate || null,

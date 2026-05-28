@@ -52,6 +52,22 @@ const memberSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  hardwareAddress: {
+    type: String,
+    trim: true
+  },
+  contactPersonName: {
+    type: String,
+    trim: true
+  },
+  contactPersonMobile: {
+    type: String,
+    trim: true
+  },
+  zone: {
+    type: String,
+    trim: true
+  },
   lastScanDate: {
     type: Date
   },
