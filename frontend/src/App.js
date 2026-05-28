@@ -8087,12 +8087,20 @@ function App() {
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label='Zone'
-                value={hardwareFormData.zone}
-                onChange={(e) => setHardwareFormData({ ...hardwareFormData, zone: e.target.value })}
-              />
+              <FormControl fullWidth>
+                <InputLabel>Zone</InputLabel>
+                <Select
+                  value={hardwareFormData.zone || ''}
+                  label="Zone"
+                  onChange={(e) => setHardwareFormData({ ...hardwareFormData, zone: e.target.value })}
+                >
+                  <MenuItem value='Zone 01'>Zone 01</MenuItem>
+                  <MenuItem value='Zone 02'>Zone 02</MenuItem>
+                  <MenuItem value='Zone 03'>Zone 03</MenuItem>
+                  <MenuItem value='Zone 04'>Zone 04</MenuItem>
+                  <MenuItem value='Zone 05'>Zone 05</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12}>
               <TextField
