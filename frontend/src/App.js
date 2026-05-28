@@ -5189,6 +5189,7 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>NIC</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Birthday</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
@@ -5208,7 +5209,7 @@ function App() {
                         return matchesSearch && matchesType;
                       }).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 9 : 8} align='center'>
+                          <TableCell colSpan={9} align='center'>
                             <Box sx={{ py: 4 }}>
                               <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                               <Typography variant='body1' color='text.secondary'>
@@ -5257,6 +5258,7 @@ function App() {
                                 <TableCell>{applicator.phoneNumber || '-'}</TableCell>
                                 <TableCell>{applicator.whatsappNumber || '-'}</TableCell>
                                 <TableCell>{applicator.nic || '-'}</TableCell>
+                                <TableCell>{applicator.birthday || '-'}</TableCell>
                                 <TableCell>
                                   {applicator.equipment === 'Hardware' ? (
                                     <Chip label='Hardware' size='small' color='secondary' />
