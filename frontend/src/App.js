@@ -5187,6 +5187,7 @@ function App() {
                         {applicatorTypeFilter === 'Hardware' ? (
                           <>
                             <TableCell sx={{ fontWeight: 700 }}>Hardware Name</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Hardware ID</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Address</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Contact No</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Whatsapp</TableCell>
@@ -5227,7 +5228,7 @@ function App() {
                         return matchesSearch && matchesType;
                       }).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={11} align='center'>
+                          <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 12 : 11} align='center'>
                             <Box sx={{ py: 4 }}>
                               <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                               <Typography variant='body1' color='text.secondary'>
@@ -5254,6 +5255,9 @@ function App() {
                                   <Typography variant='body2' fontWeight={600}>
                                     {applicator.name}
                                   </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Chip label={applicator.memberId} size='small' color='primary' />
                                 </TableCell>
                                 <TableCell>{applicator.hardwareAddress || '-'}</TableCell>
                                 <TableCell>{applicator.phoneNumber || '-'}</TableCell>
