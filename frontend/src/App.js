@@ -2152,6 +2152,7 @@ function App() {
                 </Box>
               </CardActionArea>
             </Card></Grid>
+            {/* Customer card hidden for future use:
             <Grid item xs={12}><Card sx={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0fff4 100%)', border: '2px solid', borderColor: 'secondary.main', overflow: 'hidden', position: 'relative', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', '@media (hover: hover)': { '&:hover': { transform: 'translateY(-8px) scale(1.02)', boxShadow: '0 20px 40px rgba(164,210,51,0.25)' } }, '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '5px', background: 'linear-gradient(90deg, #A4D233 0%, #00B4D8 50%, #003366 100%)' } }}>
               <CardActionArea onClick={() => { setRole('customer'); setView('cart'); }} sx={{ p: { xs: 2, sm: 3.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -2161,6 +2162,7 @@ function App() {
                 </Box>
               </CardActionArea>
             </Card></Grid>
+            */}
           </Grid>
           <Box sx={{ mt: 4, textAlign: 'center' }}>
             <Button 
