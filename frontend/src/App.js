@@ -7903,20 +7903,7 @@ function App() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Condition</InputLabel>
-                <Select
-                  value={applicatorFormData.condition || 'good'}
-                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, condition: e.target.value })}
-                  label='Condition'
-                >
-                  <MenuItem value='good'>Good Condition</MenuItem>
-                  <MenuItem value='fair'>Fair (Needs minor attention)</MenuItem>
-                  <MenuItem value='poor'>Poor (Needs immediate attention)</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+
 
           </Grid>
         </DialogContent>
