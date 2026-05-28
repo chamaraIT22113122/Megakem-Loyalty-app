@@ -5114,7 +5114,7 @@ function App() {
                         if (a.equipment === 'Hardware') {
                           return !!(a.name && a.hardwareAddress && a.phoneNumber && a.whatsappNumber && a.contactPersonName && a.contactPersonMobile && a.location && a.zone);
                         }
-                        return !!(a.name && a.phoneNumber && a.whatsappNumber && a.nic && a.birthday && a.location);
+                        return !!(a.name && a.phoneNumber && a.whatsappNumber && a.nic && a.birthday && a.location && a.zone);
                       }).length}
                     </Typography>
                   </CardContent>
@@ -5131,7 +5131,7 @@ function App() {
                         if (a.equipment === 'Hardware') {
                           return !a.name || !a.hardwareAddress || !a.phoneNumber || !a.whatsappNumber || !a.contactPersonName || !a.contactPersonMobile || !a.location || !a.zone;
                         }
-                        return !a.name || !a.phoneNumber || !a.whatsappNumber || !a.nic || !a.birthday || !a.location;
+                        return !a.name || !a.phoneNumber || !a.whatsappNumber || !a.nic || !a.birthday || !a.location || !a.zone;
                       }).length}
                     </Typography>
                   </CardContent>
