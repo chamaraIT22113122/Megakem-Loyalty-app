@@ -5195,6 +5195,7 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Zone</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Notes</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                           </>
                         ) : (
@@ -5207,6 +5208,8 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>Birthday</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Zone</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Notes</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                           </>
                         )}
@@ -5224,7 +5227,7 @@ function App() {
                         return matchesSearch && matchesType;
                       }).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 10 : 9} align='center'>
+                          <TableCell colSpan={11} align='center'>
                             <Box sx={{ py: 4 }}>
                               <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                               <Typography variant='body1' color='text.secondary'>
@@ -5260,6 +5263,7 @@ function App() {
                                 <TableCell><Chip label='Hardware' size='small' color='secondary' /></TableCell>
                                 <TableCell>{applicator.location || '-'}</TableCell>
                                 <TableCell>{applicator.zone || '-'}</TableCell>
+                                <TableCell>{applicator.notes || '-'}</TableCell>
                               </>
                             ) : (
                               <>
@@ -5283,6 +5287,8 @@ function App() {
                                   )}
                                 </TableCell>
                                 <TableCell>{applicator.location || '-'}</TableCell>
+                                <TableCell>{applicator.zone || '-'}</TableCell>
+                                <TableCell>{applicator.notes || '-'}</TableCell>
                               </>
                             )}
                             <TableCell>
@@ -7919,6 +7925,32 @@ function App() {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Zone</InputLabel>
+                <Select
+                  value={applicatorFormData.zone || ''}
+                  label="Zone"
+                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, zone: e.target.value })}
+                >
+                  <MenuItem value='Zone 01'>Zone 01</MenuItem>
+                  <MenuItem value='Zone 02'>Zone 02</MenuItem>
+                  <MenuItem value='Zone 03'>Zone 03</MenuItem>
+                  <MenuItem value='Zone 04'>Zone 04</MenuItem>
+                  <MenuItem value='Zone 05'>Zone 05</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label='Notes'
+                multiline
+                rows={3}
+                value={applicatorFormData.notes || ''}
+                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, notes: e.target.value })}
+              />
+            </Grid>
 
 
           </Grid>
@@ -7948,6 +7980,8 @@ function App() {
                   nic: applicatorFormData.nic,
                   birthday: applicatorFormData.birthday || null,
                   location: applicatorFormData.location,
+                  zone: applicatorFormData.zone || null,
+                  notes: applicatorFormData.notes || '',
                   condition: applicatorFormData.condition || 'good',
                   equipment: applicatorFormData.equipment || 'Applicator',
                   role: 'applicator'
