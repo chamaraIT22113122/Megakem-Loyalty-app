@@ -7975,7 +7975,15 @@ function App() {
               
               setLoading(true);
               try {
-                const generatedMemberId = applicatorDialog.data ? applicatorDialog.data.memberId : 'MA' + Math.floor(1000 + Math.random() * 9000).toString();
+                let newMemberId;
+                if (applicatorDialog.data) {
+                  newMemberId = applicatorDialog.data.memberId;
+                } else {
+                  do {
+                    newMemberId = 'MA' + Math.floor(1000 + Math.random() * 9000).toString();
+                  } while (applicatorInfo.some(a => a.memberId === newMemberId));
+                }
+                const generatedMemberId = newMemberId;
                 const backendPayload = {
                   memberName: applicatorFormData.name,
                   memberId: generatedMemberId,
@@ -8161,7 +8169,15 @@ function App() {
               
               setLoading(true);
               try {
-                const generatedHardwareId = hardwareDialog.data ? hardwareDialog.data.memberId : 'MH' + Math.floor(1000 + Math.random() * 9000).toString();
+                let newHardwareId;
+                if (hardwareDialog.data) {
+                  newHardwareId = hardwareDialog.data.memberId;
+                } else {
+                  do {
+                    newHardwareId = 'MH' + Math.floor(1000 + Math.random() * 9000).toString();
+                  } while (applicatorInfo.some(a => a.memberId === newHardwareId));
+                }
+                const generatedHardwareId = newHardwareId;
                 const backendPayload = {
                   memberName: hardwareFormData.name,
                   memberId: generatedHardwareId,
