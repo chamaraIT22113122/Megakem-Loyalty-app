@@ -5106,9 +5106,14 @@ function App() {
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
                   <CardContent>
-                    <Typography variant='caption' color='text.secondary'>Good Condition (Applicators & Hardwares)</Typography>
+                    <Typography variant='caption' color='text.secondary'>Complete Profiles (Applicators & Hardwares)</Typography>
                     <Typography variant='h4' fontWeight={700} color='info.main'>
-                      {applicatorInfo.filter(a => a.condition === 'good').length}
+                      {applicatorInfo.filter(a => {
+                        if (a.equipment === 'Hardware') {
+                          return !!(a.name && a.hardwareAddress && a.phoneNumber && a.whatsappNumber && a.contactPersonName && a.contactPersonMobile && a.location && a.zone);
+                        }
+                        return !!(a.name && a.phoneNumber && a.whatsappNumber && a.nic && a.birthday && a.location);
+                      }).length}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -5116,9 +5121,14 @@ function App() {
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
                   <CardContent>
-                    <Typography variant='caption' color='text.secondary'>Needs Attention (Applicators & Hardwares)</Typography>
+                    <Typography variant='caption' color='text.secondary'>Incomplete Profiles (Needs Attention)</Typography>
                     <Typography variant='h4' fontWeight={700} color='warning.main'>
-                      {applicatorInfo.filter(a => a.condition === 'fair' || a.condition === 'poor').length}
+                      {applicatorInfo.filter(a => {
+                        if (a.equipment === 'Hardware') {
+                          return !a.name || !a.hardwareAddress || !a.phoneNumber || !a.whatsappNumber || !a.contactPersonName || !a.contactPersonMobile || !a.location || !a.zone;
+                        }
+                        return !a.name || !a.phoneNumber || !a.whatsappNumber || !a.nic || !a.birthday || !a.location;
+                      }).length}
                     </Typography>
                   </CardContent>
                 </Card>
