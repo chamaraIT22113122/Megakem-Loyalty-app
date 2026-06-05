@@ -1120,30 +1120,82 @@ function App() {
       try {
         data = JSON.parse(qrString);
       } catch {
-        // Parse batch number - supports two formats:
-        // New format: "MKL46_001_050525_001" (underscore-separated)
-        // Old format: "MKL46 001 050525 001 001" (space-separated)
-        
-        let parts = qrString.trim().split('_');
-        let productCode, materialBatch, dateCode, packSize, packNo;
-        
-        if (parts.length === 4) {
-          // New underscore format: MKL46_001_050525_001
-          [productCode, materialBatch, dateCode, packNo] = parts;
-          packSize = null; // Will get from product category
-        } else {
-          // Try space-separated format
-          parts = qrString.trim().split(/\s+/);
-          if (parts.length === 5) {
-            // Old 5-part format: MLSP 001 050525 001 001
-            [productCode, materialBatch, dateCode, packSize, packNo] = parts;
-          } else if (parts.length === 4) {
-            // New space format: MKL46 001 050525 001
+        let productCode = '';
+        let batchNo = '';
+        let bagNo = '';
+        let packSize = null;
+        let materialBatch = '';
+        let dateCode = '';
+        let packNo = '';
+
+        const cleanString = qrString.trim();
+
+        if (cleanString.startsWith('http://') || cleanString.startsWith('https://') || cleanString.includes('?p=')) {
+          try {
+            const urlObj = new URL(cleanString);
+            productCode = urlObj.searchParams.get('p') || urlObj.searchParams.get('product') || urlObj.searchParams.get('code') || '';
+            batchNo = urlObj.searchParams.get('b') || urlObj.searchParams.get('batch') || urlObj.searchParams.get('batchNo') || '';
+            bagNo = urlObj.searchParams.get('pkg') || urlObj.searchParams.get('package') || '';
+          } catch (urlErr) {
+            const searchPart = cleanString.includes('?') ? cleanString.split('?')[1] : cleanString;
+            const params = new URLSearchParams(searchPart);
+            productCode = params.get('p') || params.get('product') || params.get('code') || '';
+            batchNo = params.get('b') || params.get('batch') || params.get('batchNo') || '';
+            bagNo = params.get('pkg') || params.get('package') || '';
+          }
+          packNo = bagNo;
+          
+          // Try to extract materialBatch, dateCode, and packNo from batchNo URL parameter if it matches standard formats
+          if (batchNo) {
+            let parts = batchNo.trim().split('_');
+            if (parts.length === 4) {
+              [, materialBatch, dateCode, packNo] = parts;
+            } else {
+              parts = batchNo.trim().split(/\s+/);
+              if (parts.length === 5) {
+                [, materialBatch, dateCode, packSize, packNo] = parts;
+                packSize = extractPackSize(packSize);
+              } else if (parts.length === 4) {
+                [, materialBatch, dateCode, packNo] = parts;
+              }
+            }
+          }
+        } else if (cleanString.includes('|')) {
+          // Pipe delimited format: PRODUCT_NO|PRODUCT_NAME|BATCH_NO|BAG_NO|QUANTITY
+          const fields = cleanString.split('|');
+          if (fields.length >= 5) {
+            productCode = fields[0];
+            batchNo = fields[2];
+            bagNo = fields[3];
+            packSize = fields[4];
+            packNo = bagNo;
+          }
+        }
+
+        // Fallback: If not parsed yet (not URL, not pipe format), parse as a raw batch code string
+        if (!productCode) {
+          batchNo = cleanString;
+          let parts = cleanString.split('_');
+          
+          if (parts.length === 4) {
+            // New underscore format: MKL46_001_050525_001
             [productCode, materialBatch, dateCode, packNo] = parts;
             packSize = null;
           } else {
-            throw new Error('Invalid batch format');
+            // Try space-separated format
+            parts = cleanString.split(/\s+/);
+            if (parts.length === 5) {
+              // Old 5-part format: MLSP 001 050525 001 001
+              [productCode, materialBatch, dateCode, packSize, packNo] = parts;
+            } else if (parts.length === 4) {
+              // New space format: MKL46 001 050525 001
+              [productCode, materialBatch, dateCode, packNo] = parts;
+              packSize = null;
+            } else {
+              throw new Error('Invalid batch format');
+            }
           }
+          bagNo = packNo;
         }
         
         // If products not loaded yet, load them
@@ -1186,14 +1238,14 @@ function App() {
           console.log('   Pack Size:', product.category || 'N/A');
           console.log('   Price: Rs.', product.price?.toLocaleString() || '0');
           
-          // Use pack size from batch if available, otherwise from product
-          const finalPackSize = packSize ? extractPackSize(packSize) : (product.category || '1kg');
+          // Use pack size from batch/fields if available, otherwise from product
+          const finalPackSize = packSize ? packSize : (product.category || '1kg');
           
           data = {
             id: product.productNo,
             name: product.name,
-            batch: qrString,
-            bag: packNo || '001',
+            batch: batchNo || qrString,
+            bag: bagNo || packNo || '001',
             qty: finalPackSize,
             price: product.price || 0
           };
@@ -1207,10 +1259,10 @@ function App() {
           // Show unknown item but don't stop - let user see what was scanned
           data = {
             name: `Unknown Item (${productCode})`,
-            batch: qrString,
-            bag: packNo || 'N/A',
+            batch: batchNo || qrString,
+            bag: bagNo || packNo || 'N/A',
             id: productCode,
-            qty: packSize ? extractPackSize(packSize) : '1kg',
+            qty: packSize ? packSize : '1kg',
             price: 0
           };
           
