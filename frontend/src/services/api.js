@@ -150,4 +150,9 @@ export const cashRewardsAPI = {
   markAsPaid: (memberId, data) => api.put(`/cash-rewards/mark-paid/${memberId}`, data),
 };
 
+// QR Codes API
+export const qrCodesAPI = {
+  recordScan: (scanData) => api.post('/qr-codes/record-scan', scanData),
+};
+
 export default api;

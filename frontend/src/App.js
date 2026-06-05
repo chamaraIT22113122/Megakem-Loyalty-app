@@ -3,7 +3,7 @@ import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent,
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
-import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI } from './services/api';
+import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI } from './services/api';
 import QRCodeManager from './components/QRCodeManager';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
@@ -173,7 +173,339 @@ const loadScript = (src) => new Promise((resolve, reject) => {
   document.head.appendChild(script);
 });
 
+// ─── Sri Lanka Zone Map Component ────────────────────────────────────────────
+const ZoneSLMap = ({ members }) => {
+  const [hoveredZone, setHoveredZone] = useState(null);
+
+  const zones = {
+    1: { name: 'Zone 1', color: '#c1c1c1', glow: '#c1c1c1', textColor: '#333', districts: ['Colombo', 'Gampaha'], pulse: 'slPulse1' },
+    2: { name: 'Zone 2', color: '#05c3f5', glow: '#05c3f5', textColor: '#003', districts: ['Jaffna', 'Kilinochchi', 'Mullaitivu', 'Mannar', 'Vavuniya', 'Trincomalee'], pulse: 'slPulse2' },
+    3: { name: 'Zone 3', color: '#bfd741', glow: '#bfd741', textColor: '#2a4000', districts: ['Kandy', 'Kegalle', 'Nuwara Eliya', 'Ratnapura', 'Badulla', 'Moneragala', 'Ampara'], pulse: 'slPulse3' },
+    4: { name: 'Zone 4', color: '#19326a', glow: '#4a72d4', textColor: '#fff', districts: ['Anuradhapura', 'Puttalam', 'Polonnaruwa', 'Matale', 'Batticaloa'], pulse: 'slPulse4' },
+    5: { name: 'Zone 5', color: '#0196d8', glow: '#0196d8', textColor: '#fff', districts: ['Kalutara', 'Galle', 'Matara', 'Hambantota'], pulse: 'slPulse5' },
+  };
+
+  // Calculate members per zone from location field
+  const zoneStats = {};
+  Object.entries(zones).forEach(([key, zone]) => {
+    const zm = members.filter(m => {
+      const loc = (m.location || m.City || m.zone || '').toLowerCase();
+      return zone.districts.some(d => loc.includes(d.toLowerCase()));
+    });
+    zoneStats[key] = {
+      applicators: zm.filter(m => m.role === 'applicator').length,
+      hardwares: zm.filter(m => m.role === 'customer').length,
+      total: zm.length,
+    };
+  });
+
+  // SVG zone paths (viewBox 0 0 210 355)
+  const paths = [
+    // Zone 4 – Dark Navy – North Central + East (drawn first, below)
+    { zone: '4', d: 'M50,42 L62,60 L85,72 L108,74 L130,65 L144,50 L162,60 L170,102 L168,152 L160,182 L144,195 L122,192 L98,195 L75,184 L58,166 L42,134 L40,98 L44,70 Z' },
+    // Zone 2 – Cyan – Northern peninsula
+    { zone: '2', d: 'M52,22 L65,8 L98,4 L128,8 L146,28 L144,50 L130,65 L108,74 L85,72 L62,60 L50,42 L44,22 Z' },
+    // Zone 2 – Mannar island
+    { zone: '2', d: 'M27,58 L46,50 L52,68 L37,76 L25,66 Z' },
+    // Zone 3 – Yellow-Green – Central highlands
+    { zone: '3', d: 'M58,166 L75,184 L98,195 L122,192 L144,195 L160,182 L170,200 L175,248 L162,276 L140,283 L115,277 L90,270 L68,260 L52,240 L50,218 L55,194 L50,174 L58,166 Z' },
+    // Zone 1 – Gray – Western urban strip
+    { zone: '1', d: 'M26,178 L50,174 L55,194 L52,218 L46,238 L26,242 L18,222 L18,198 Z' },
+    // Zone 5 – Medium Blue – Southern coast
+    { zone: '5', d: 'M26,242 L46,238 L52,240 L68,260 L90,270 L115,277 L140,283 L162,276 L175,298 L158,326 L128,340 L100,343 L74,336 L54,315 L37,290 L24,266 Z' },
+  ];
+
+  // Zone label positions
+  const labels = [
+    { zone: '2', x: 96, y: 30, sub: 'Jaffna · Trincomalee' },
+    { zone: '4', x: 107, y: 125, sub: 'Anuradhapura · Polonnaruwa' },
+    { zone: '1', x: 34, y: 209, sub: 'Colombo · Gampaha' },
+    { zone: '3', x: 115, y: 228, sub: 'Kandy · Ratnapura' },
+    { zone: '5', x: 100, y: 305, sub: 'Galle · Hambantota' },
+  ];
+
+  return (
+    <Card sx={{
+      background: 'linear-gradient(135deg, #06101f 0%, #0d1b33 60%, #081524 100%)',
+      border: '1px solid rgba(1,150,216,0.12)',
+      borderRadius: 3,
+      overflow: 'hidden',
+      position: 'relative',
+    }}>
+      {/* Ambient glow blobs */}
+      <Box sx={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse at 25% 55%, rgba(1,150,216,0.07) 0%, transparent 65%), radial-gradient(ellipse at 75% 30%, rgba(5,195,245,0.05) 0%, transparent 55%)',
+      }} />
+
+      <style>{`
+        @keyframes slPulse1{0%,100%{filter:drop-shadow(0 0 5px #c1c1c1)}50%{filter:drop-shadow(0 0 14px #c1c1c1) brightness(1.1)}}
+        @keyframes slPulse2{0%,100%{filter:drop-shadow(0 0 6px #05c3f5)}50%{filter:drop-shadow(0 0 18px #05c3f5) brightness(1.12)}}
+        @keyframes slPulse3{0%,100%{filter:drop-shadow(0 0 6px #bfd741)}50%{filter:drop-shadow(0 0 18px #bfd741) brightness(1.1)}}
+        @keyframes slPulse4{0%,100%{filter:drop-shadow(0 0 5px #4a72d4)}50%{filter:drop-shadow(0 0 14px #4a72d4) brightness(1.15)}}
+        @keyframes slPulse5{0%,100%{filter:drop-shadow(0 0 6px #0196d8)}50%{filter:drop-shadow(0 0 16px #0196d8) brightness(1.12)}}
+        @keyframes slFadeIn{from{opacity:0;transform:scale(0.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+        @keyframes slStatIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes slDotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+        @keyframes slShimmer{0%{background-position:200% center}100%{background-position:-200% center}}
+      `}</style>
+
+      <CardContent sx={{ p: { xs: 2, sm: 3 }, position: 'relative', zIndex: 1 }}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+          <Box sx={{
+            width: 38, height: 38, borderRadius: '10px',
+            background: 'linear-gradient(135deg, #0196d8, #05c3f5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(1,150,216,0.4)',
+            fontSize: '1.1rem'
+          }}>🗺️</Box>
+          <Box>
+            <Typography variant='h6' fontWeight={800} sx={{ color: 'white', lineHeight: 1.1 }}>
+              Sri Lanka — Zone Distribution
+            </Typography>
+            <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.45)' }}>
+              Hover a zone to see applicator & hardware breakdown
+            </Typography>
+          </Box>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: { xs: 2, lg: 4 }, flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center' }}>
+
+          {/* ── SVG MAP ── */}
+          <Box sx={{ position: 'relative', animation: 'slFadeIn 1s ease-out both' }}>
+            <svg
+              viewBox="0 0 210 355"
+              width="260"
+              style={{ overflow: 'visible', filter: 'drop-shadow(0 12px 40px rgba(0,0,0,0.55))' }}
+            >
+              {paths.map((p, i) => {
+                const z = zones[p.zone];
+                const isHovered = hoveredZone === p.zone;
+                const isDimmed = hoveredZone && !isHovered;
+                return (
+                  <path
+                    key={i}
+                    d={p.d}
+                    fill={z.color}
+                    stroke={z.color === '#19326a' ? '#1a2d50' : 'rgba(0,0,0,0.35)'}
+                    strokeWidth="1.8"
+                    style={{
+                      animation: `${z.pulse} ${2.8 + i * 0.3}s ease-in-out infinite ${i * 0.4}s`,
+                      cursor: 'pointer',
+                      opacity: isDimmed ? 0.38 : 1,
+                      transition: 'opacity 0.3s ease, transform 0.3s ease',
+                      transformOrigin: 'center',
+                      transform: isHovered ? 'scale(1.015)' : 'scale(1)',
+                    }}
+                    onMouseEnter={() => setHoveredZone(p.zone)}
+                    onMouseLeave={() => setHoveredZone(null)}
+                  />
+                );
+              })}
+
+              {/* Zone labels */}
+              {labels.map((l, i) => {
+                const z = zones[l.zone];
+                const isHovered = hoveredZone === l.zone;
+                return (
+                  <g key={i} style={{ pointerEvents: 'none' }}>
+                    <text
+                      x={l.x} y={l.y}
+                      textAnchor="middle"
+                      fontSize={isHovered ? '9.5' : '8.5'}
+                      fill={z.textColor === '#fff' ? 'rgba(255,255,255,0.92)' : z.textColor}
+                      fontWeight="800"
+                      fontFamily="system-ui,sans-serif"
+                      style={{ transition: 'font-size 0.2s', letterSpacing: '0.3px' }}
+                    >
+                      {z.name}
+                    </text>
+                    <text
+                      x={l.x} y={l.y + 9}
+                      textAnchor="middle"
+                      fontSize="5.5"
+                      fill={z.textColor === '#fff' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)'}
+                      fontFamily="system-ui,sans-serif"
+                    >
+                      {l.sub}
+                    </text>
+                    {/* Member count badge */}
+                    <text
+                      x={l.x} y={l.y + 20}
+                      textAnchor="middle"
+                      fontSize="6.5"
+                      fill={z.textColor === '#fff' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)'}
+                      fontWeight="700"
+                      fontFamily="system-ui,sans-serif"
+                    >
+                      {(zoneStats[l.zone]?.applicators || 0) + (zoneStats[l.zone]?.hardwares || 0)} members
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* Hover tooltip */}
+            {hoveredZone && (
+              <Box sx={{
+                position: 'absolute', top: 0, left: '105%',
+                bgcolor: 'rgba(6,16,31,0.97)',
+                border: `2px solid ${zones[hoveredZone].color}`,
+                borderRadius: 2.5, p: 2, minWidth: 170,
+                boxShadow: `0 0 28px ${zones[hoveredZone].glow}44, 0 8px 32px rgba(0,0,0,0.5)`,
+                animation: 'slFadeIn 0.2s ease-out both',
+                zIndex: 10,
+              }}>
+                {/* Zone header */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Box sx={{
+                    width: 10, height: 10, borderRadius: '50%',
+                    bgcolor: zones[hoveredZone].color,
+                    boxShadow: `0 0 10px ${zones[hoveredZone].glow}`,
+                    animation: 'slDotPulse 1s ease-in-out infinite'
+                  }} />
+                  <Typography variant='body2' fontWeight={800} sx={{ color: zones[hoveredZone].color }}>
+                    {zones[hoveredZone].name}
+                  </Typography>
+                </Box>
+                <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: 1.5, lineHeight: 1.4 }}>
+                  {zones[hoveredZone].districts.join(' · ')}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{
+                    flex: 1, p: 1, borderRadius: 1.5, textAlign: 'center',
+                    background: 'rgba(245,87,108,0.12)', border: '1px solid rgba(245,87,108,0.25)'
+                  }}>
+                    <Typography variant='body1' fontWeight={800} color='#f5576c'>{zoneStats[hoveredZone]?.applicators || 0}</Typography>
+                    <Typography variant='caption' color='rgba(255,255,255,0.5)'>Applicators</Typography>
+                  </Box>
+                  <Box sx={{
+                    flex: 1, p: 1, borderRadius: 1.5, textAlign: 'center',
+                    background: 'rgba(5,195,245,0.1)', border: '1px solid rgba(5,195,245,0.25)'
+                  }}>
+                    <Typography variant='body1' fontWeight={800} color='#05c3f5'>{zoneStats[hoveredZone]?.hardwares || 0}</Typography>
+                    <Typography variant='caption' color='rgba(255,255,255,0.5)'>Hardwares</Typography>
+                  </Box>
+                </Box>
+              </Box>
+            )}
+          </Box>
+
+          {/* ── STATS PANEL ── */}
+          <Box sx={{ flex: 1, minWidth: { xs: '100%', sm: 260 } }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.2 }}>
+              {Object.entries(zones).map(([key, zone], idx) => {
+                const isHov = hoveredZone === key;
+                const stats = zoneStats[key] || { applicators: 0, hardwares: 0, total: 0 };
+                return (
+                  <Box
+                    key={key}
+                    onMouseEnter={() => setHoveredZone(key)}
+                    onMouseLeave={() => setHoveredZone(null)}
+                    sx={{
+                      p: 1.5, borderRadius: 2,
+                      background: isHov
+                        ? `linear-gradient(135deg, ${zone.color}35, ${zone.color}15)`
+                        : `linear-gradient(135deg, ${zone.color}14, ${zone.color}06)`,
+                      border: `1.5px solid ${zone.color}${isHov ? '70' : '25'}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.25s ease',
+                      transform: isHov ? 'translateX(6px)' : 'none',
+                      boxShadow: isHov ? `0 4px 20px ${zone.glow}28` : 'none',
+                      display: 'flex', alignItems: 'center', gap: 1.5,
+                      animation: `slStatIn 0.5s ease-out ${idx * 0.1}s both`,
+                    }}
+                  >
+                    {/* Color dot */}
+                    <Box sx={{
+                      width: 11, height: 11, borderRadius: '50%',
+                      bgcolor: zone.color, flexShrink: 0,
+                      boxShadow: `0 0 ${isHov ? 12 : 6}px ${zone.glow}`,
+                      transition: 'box-shadow 0.3s',
+                      animation: `slDotPulse ${2 + idx * 0.5}s ease-in-out infinite`,
+                    }} />
+
+                    {/* Name + districts */}
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <Typography variant='body2' fontWeight={800} color='white' lineHeight={1.1}>
+                        {zone.name}
+                      </Typography>
+                      <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.62rem', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {zone.districts.join(' · ')}
+                      </Typography>
+                    </Box>
+
+                    {/* Stats */}
+                    <Box sx={{ display: 'flex', gap: 1, flexShrink: 0, alignItems: 'center' }}>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant='body2' fontWeight={800} color='#f5576c' lineHeight={1}>{stats.applicators}</Typography>
+                        <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.58rem' }}>Apps</Typography>
+                      </Box>
+                      <Box sx={{ width: '1px', height: 28, bgcolor: 'rgba(255,255,255,0.1)' }} />
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant='body2' fontWeight={800} color='#05c3f5' lineHeight={1}>{stats.hardwares}</Typography>
+                        <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.58rem' }}>HW</Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+
+            {/* ── Total Summary Bar ── */}
+            <Box sx={{
+              mt: 2, p: 2, borderRadius: 2.5,
+              background: 'linear-gradient(135deg, rgba(1,150,216,0.18) 0%, rgba(5,195,245,0.08) 100%)',
+              border: '1.5px solid rgba(1,150,216,0.3)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography sx={{ fontSize: '1.1rem' }}>🇱🇰</Typography>
+                <Typography variant='body2' fontWeight={700} color='white'>Island Total</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2.5 }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant='h6' fontWeight={900} color='#f5576c' lineHeight={1}>
+                    {Object.values(zoneStats).reduce((s, z) => s + (z?.applicators || 0), 0)}
+                  </Typography>
+                  <Typography variant='caption' color='rgba(255,255,255,0.45)'>Applicators</Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant='h6' fontWeight={900} color='#05c3f5' lineHeight={1}>
+                    {Object.values(zoneStats).reduce((s, z) => s + (z?.hardwares || 0), 0)}
+                  </Typography>
+                  <Typography variant='caption' color='rgba(255,255,255,0.45)'>Hardwares</Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Zone legend dots */}
+            <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {Object.entries(zones).map(([key, zone]) => (
+                <Box key={key} sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.5,
+                  px: 1, py: 0.5, borderRadius: 1,
+                  bgcolor: `${zone.color}15`,
+                  border: `1px solid ${zone.color}30`,
+                }}>
+                  <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: zone.color, boxShadow: `0 0 5px ${zone.glow}` }} />
+                  <Typography variant='caption' color='rgba(255,255,255,0.6)' sx={{ fontSize: '0.65rem', fontWeight: 600 }}>
+                    {zone.name}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 function App() {
+
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('user');
     return stored ? JSON.parse(stored) : null;
@@ -536,6 +868,21 @@ function App() {
       
       console.log('Parsed QR data:', parsedData);
       setPendingScan(parsedData);
+
+      // Call backend to record this QR scan event automatically
+      const recordScanEvent = async () => {
+        try {
+          await qrCodesAPI.recordScan({
+            productNo: parsedData.productCode,
+            batchNo: parsedData.fullBatch || parsedData.batchNo,
+            packageNo: parsedData.bagNo
+          });
+          console.log('Automatically recorded QR scan event in backend');
+        } catch (err) {
+          console.warn('Failed to record QR scan event in backend:', err.response?.data?.error || err.message);
+        }
+      };
+      recordScanEvent();
     }
   }, []);
 
@@ -2574,7 +2921,7 @@ function App() {
                             )}
                              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                                <Chip 
-                                 label={currentMember.role === 'applicator' ? 'Applicator' : 'Customer'}
+                                 label={currentMember.role === 'applicator' ? 'Applicator' : 'Hardware'}
                                  sx={{ 
                                    bgcolor: 'secondary.main',
                                    color: 'white',
@@ -3550,10 +3897,10 @@ function App() {
                         {stats.customer}
                       </Typography>
                       <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
-                        Customers
+                        Hardwares
                       </Typography>
                     </Box>
-                    <Tooltip title='Customer scans'>
+                    <Tooltip title='Hardware scans'>
                       <People sx={{ opacity: 0.5, fontSize: '2rem' }} />
                     </Tooltip>
                   </Box>
@@ -3603,7 +3950,12 @@ function App() {
             
             <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><TrendingUp /> Top Products by Scans</Typography><ResponsiveContainer width='100%' height={300}><BarChart data={stats.topProducts?.slice(0, 5).map(p => ({ name: p._id.length > 20 ? p._id.substring(0, 20) + '...' : p._id, scans: p.count }))} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}><CartesianGrid strokeDasharray='3 3' stroke='#f0f0f0' /><XAxis dataKey='name' angle={-45} textAnchor='end' height={100} tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} /><RechartsTooltip contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }} /><Bar dataKey='scans' fill='#003366' radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>User Distribution</Typography><ResponsiveContainer width='100%' height={300}><PieChart><Pie data={[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }]} cx='50%' cy='50%' labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill='#8884d8' dataKey='value'>{[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Customers', value: stats.customer, color: '#00f2fe' }].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><RechartsTooltip /></PieChart></ResponsiveContainer></CardContent></Card></Grid>
+            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>User Distribution</Typography><ResponsiveContainer width='100%' height={300}><PieChart><Pie data={[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Hardwares', value: stats.customer, color: '#00f2fe' }]} cx='50%' cy='50%' labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill='#8884d8' dataKey='value'>{[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Hardwares', value: stats.customer, color: '#00f2fe' }].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><RechartsTooltip /></PieChart></ResponsiveContainer></CardContent></Card></Grid>
+
+            {/* Sri Lanka Zone Distribution Map */}
+            <Grid item xs={12}>
+              <ZoneSLMap members={members} />
+            </Grid>
             
             <Grid item xs={12} md={6}>
               <Card 
@@ -4348,7 +4700,7 @@ function App() {
                     const membersWithScans = members.filter(m => scanHistory.some(s => s.memberId === m.memberId));
                     const applicatorsCount = membersWithScans.filter(m => m.role === 'applicator').length;
                     const customersCount = membersWithScans.filter(m => m.role === 'customer').length;
-                    return `Total: ${membersWithScans.length} | Applicators: ${applicatorsCount} | Customers: ${customersCount}`;
+                    return `Total: ${membersWithScans.length} | Applicators: ${applicatorsCount} | Hardwares: ${customersCount}`;
                   })()}
                 </Typography>
               </Box>
@@ -4382,14 +4734,43 @@ function App() {
                   startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
                 }}
               />
-              <FormControl size='small' sx={{ minWidth: 120 }}>
-                <InputLabel>Role</InputLabel>
-                <Select value={memberRoleFilter} onChange={(e) => setMemberRoleFilter(e.target.value)} label='Role'>
-                  <MenuItem value='all'>All Roles</MenuItem>
-                  <MenuItem value='applicator'>Applicator</MenuItem>
-                  <MenuItem value='customer'>Customer</MenuItem>
-                </Select>
-              </FormControl>
+              <ToggleButtonGroup
+                size='small'
+                value={memberRoleFilter}
+                exclusive
+                onChange={(e, newVal) => {
+                  if (newVal !== null) {
+                    setMemberRoleFilter(newVal);
+                  }
+                }}
+                sx={{
+                  bgcolor: 'background.paper',
+                  boxShadow: '0 2px 8px rgba(0,51,102,0.05)',
+                  borderRadius: '12px',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '& .MuiToggleButton-root': {
+                    px: { xs: 1.5, sm: 2.5 },
+                    py: 0.75,
+                    border: 'none',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    color: 'text.secondary',
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    '&.Mui-selected': {
+                      bgcolor: 'primary.lighter',
+                      color: 'primary.main',
+                      '&:hover': {
+                        bgcolor: 'primary.lighter'
+                      }
+                    }
+                  }
+                }}
+              >
+                <ToggleButton value='all'>All Members</ToggleButton>
+                <ToggleButton value='applicator'>Applicator</ToggleButton>
+                <ToggleButton value='customer'>Hardware</ToggleButton>
+              </ToggleButtonGroup>
               {(memberSearchQuery || memberRoleFilter !== 'all') && (
                 <Button 
                   size='small' 
@@ -4462,7 +4843,7 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Chip 
-                              label={m.role === 'applicator' ? 'Applicator' : 'Customer'} 
+                              label={m.role === 'applicator' ? 'Applicator' : 'Hardware'} 
                               size='small' 
                               color={m.role === 'applicator' ? 'warning' : 'info'}
                               sx={{ fontWeight: 600 }}
@@ -5942,159 +6323,190 @@ function App() {
             </DialogActions>
           </Dialog>
 
-          <Dialog open={loyaltyConfigDialog.open} onClose={() => setLoyaltyConfigDialog({ open: false })} maxWidth='md' fullWidth>
-            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
-              <Settings color='primary' />
-              Loyalty Settings & Tier Configuration
-            </DialogTitle>
-            <DialogContent>
-              {loyaltyConfig && (
+          <Dialog open={loyaltyConfigDialog.open} onClose={() => setLoyaltyConfigDialog({ open: false })} maxWidth='md' fullWidth
+            PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
+          >
+            {/* Premium Header */}
+            <Box sx={{
+              background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)',
+              px: 3, py: 2.5,
+              display: 'flex', alignItems: 'center', gap: 2
+            }}>
+              <Box sx={{
+                width: 44, height: 44, borderRadius: '12px',
+                bgcolor: 'rgba(255,255,255,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Settings sx={{ color: 'white', fontSize: 24 }} />
+              </Box>
+              <Box>
+                <Typography variant='h6' sx={{ color: 'white', fontWeight: 700, lineHeight: 1.2 }}>
+                  Loyalty & Tier Configuration
+                </Typography>
+                <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.75)' }}>
+                  Customize tier names, point gaps & reward rules
+                </Typography>
+              </Box>
+            </Box>
+
+            <DialogContent sx={{ p: 0 }}>
+              {loyaltyConfig ? (
                 <>
-                  <Tabs 
-                    value={loyaltyConfigTab} 
-                    onChange={(e, newVal) => setLoyaltyConfigTab(newVal)} 
-                    sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
+                  <Tabs
+                    value={loyaltyConfigTab}
+                    onChange={(e, newVal) => setLoyaltyConfigTab(newVal)}
+                    sx={{
+                      borderBottom: '2px solid',
+                      borderColor: 'divider',
+                      bgcolor: 'background.paper',
+                      px: 2,
+                      '& .MuiTab-root': {
+                        fontWeight: 600,
+                        fontSize: '0.85rem',
+                        textTransform: 'none',
+                        minHeight: 52,
+                        color: 'text.secondary',
+                        '&.Mui-selected': { color: 'primary.main' }
+                      }
+                    }}
                     variant="fullWidth"
                     textColor="primary"
                     indicatorColor="primary"
                   >
-                    <Tab label="🏆 Membership Tiers & Gaps" />
-                    <Tab label="⚙️ Calculation Rules" />
-                    <Tab label="💰 Monthly Cash Rewards" />
+                    <Tab label="🏆 Tiers & Gaps" />
+                    <Tab label="⚙️ Calculation" />
+                    <Tab label="💰 Cash Rewards" />
                   </Tabs>
+
+                  <Box sx={{ p: 3 }}>
 
                   {/* Tab 0: Membership Tiers & Gaps */}
                   {loyaltyConfigTab === 0 && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <Typography variant='body2' color='text.secondary'>
-                        Customize the display names and minimum points thresholds (gaps) for membership tiers. Members are dynamically re-classified when points change.
-                      </Typography>
-                      <Grid container spacing={3}>
-                        {/* Bronze */}
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Bronze Tier Custom Name"
-                            value={loyaltyConfig.tierNames?.bronze || 'Bronze'}
-                            onChange={(e) => setLoyaltyConfig({
-                              ...loyaltyConfig,
-                              tierNames: { ...loyaltyConfig.tierNames, bronze: e.target.value }
-                            })}
-                            helperText="Name of baseline membership tier"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Bronze Minimum Points threshold"
-                            type="number"
-                            value={0}
-                            disabled
-                            helperText="Bronze tier always starts at 0 points"
-                          />
-                        </Grid>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                      <Box sx={{
+                        p: 1.5, bgcolor: 'primary.lighter', borderRadius: 2,
+                        border: '1px solid', borderColor: 'primary.light'
+                      }}>
+                        <Typography variant='body2' color='primary.dark' fontWeight={500}>
+                          ℹ️ Edit the <strong>display name</strong> and <strong>minimum points threshold</strong> for each tier. Members are automatically re-classified based on their total points.
+                        </Typography>
+                      </Box>
 
-                        {/* Silver */}
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Silver Tier Custom Name"
-                            value={loyaltyConfig.tierNames?.silver || 'Silver'}
-                            onChange={(e) => setLoyaltyConfig({
-                              ...loyaltyConfig,
-                              tierNames: { ...loyaltyConfig.tierNames, silver: e.target.value }
-                            })}
-                            helperText="Name of second tier level"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Silver Minimum Points Threshold (Gap)"
-                            type="number"
-                            value={loyaltyConfig.tierThresholds?.silver || 2000}
-                            onChange={(e) => setLoyaltyConfig({
-                              ...loyaltyConfig,
-                              tierThresholds: { ...loyaltyConfig.tierThresholds, silver: parseInt(e.target.value) || 0 }
-                            })}
-                            inputProps={{ min: 1 }}
-                            helperText="Points gap needed to enter Silver level"
-                          />
-                        </Grid>
+                      {/* Tier Cards */}
+                      {[
+                        { key: 'bronze', label: 'Bronze', color: '#CD7F32', bg: '#FDF3E7', textColor: '#7a4a0e', icon: '🥉', thresholdKey: null, fixed: true },
+                        { key: 'silver', label: 'Silver', color: '#9E9E9E', bg: '#F5F5F5', textColor: '#424242', icon: '🥈', thresholdKey: 'silver' },
+                        { key: 'gold',   label: 'Gold',   color: '#F9A825', bg: '#FFFDE7', textColor: '#6d5400', icon: '🥇', thresholdKey: 'gold' },
+                        { key: 'platinum', label: 'Platinum', color: '#7B68EE', bg: '#EEE8FD', textColor: '#3a2a8a', icon: '👑', thresholdKey: 'platinum' },
+                      ].map((tier) => (
+                        <Paper key={tier.key} elevation={0} sx={{
+                          border: '2px solid',
+                          borderColor: tier.color,
+                          borderRadius: 2.5,
+                          overflow: 'hidden'
+                        }}>
+                          {/* Tier header bar */}
+                          <Box sx={{
+                            bgcolor: tier.color,
+                            px: 2, py: 1,
+                            display: 'flex', alignItems: 'center', gap: 1
+                          }}>
+                            <Typography sx={{ fontSize: '1.2rem' }}>{tier.icon}</Typography>
+                            <Typography variant='subtitle1' fontWeight={800} sx={{ color: 'white', letterSpacing: 0.5 }}>
+                              {loyaltyConfig.tierNames?.[tier.key] || tier.label} Tier
+                            </Typography>
+                            {tier.fixed && (
+                              <Chip label="Base Tier" size='small' sx={{ ml: 'auto', bgcolor: 'rgba(255,255,255,0.3)', color: 'white', fontWeight: 700, fontSize: '0.7rem' }} />
+                            )}
+                          </Box>
 
-                        {/* Gold */}
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Gold Tier Custom Name"
-                            value={loyaltyConfig.tierNames?.gold || 'Gold'}
-                            onChange={(e) => setLoyaltyConfig({
-                              ...loyaltyConfig,
-                              tierNames: { ...loyaltyConfig.tierNames, gold: e.target.value }
-                            })}
-                            helperText="Name of third tier level"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Gold Minimum Points Threshold (Gap)"
-                            type="number"
-                            value={loyaltyConfig.tierThresholds?.gold || 5000}
-                            onChange={(e) => setLoyaltyConfig({
-                              ...loyaltyConfig,
-                              tierThresholds: { ...loyaltyConfig.tierThresholds, gold: parseInt(e.target.value) || 0 }
-                            })}
-                            inputProps={{ min: 1 }}
-                            helperText="Points gap needed to enter Gold level"
-                          />
-                        </Grid>
+                          {/* Tier form fields */}
+                          <Box sx={{ bgcolor: tier.bg, p: 2 }}>
+                            <Grid container spacing={2}>
+                              <Grid item xs={12} sm={tier.fixed ? 12 : 6}>
+                                <TextField
+                                  fullWidth
+                                  size='small'
+                                  label={`${tier.label} Tier Display Name`}
+                                  value={loyaltyConfig.tierNames?.[tier.key] || tier.label}
+                                  onChange={(e) => setLoyaltyConfig({
+                                    ...loyaltyConfig,
+                                    tierNames: { ...loyaltyConfig.tierNames, [tier.key]: e.target.value }
+                                  })}
+                                  placeholder={`e.g. "VIP ${tier.label}"`}
+                                  InputProps={{
+                                    sx: { bgcolor: 'white', borderRadius: 1.5 }
+                                  }}
+                                  helperText={`Custom display name for the ${tier.label} level`}
+                                />
+                              </Grid>
+                              {!tier.fixed && (
+                                <Grid item xs={12} sm={6}>
+                                  <TextField
+                                    fullWidth
+                                    size='small'
+                                    label={`Minimum Points to Reach ${tier.label}`}
+                                    type='number'
+                                    value={loyaltyConfig.tierThresholds?.[tier.thresholdKey] || 0}
+                                    onChange={(e) => setLoyaltyConfig({
+                                      ...loyaltyConfig,
+                                      tierThresholds: { ...loyaltyConfig.tierThresholds, [tier.thresholdKey]: parseInt(e.target.value) || 0 }
+                                    })}
+                                    inputProps={{ min: 1 }}
+                                    InputProps={{
+                                      sx: { bgcolor: 'white', borderRadius: 1.5 },
+                                      endAdornment: <Typography variant='caption' color='text.secondary' sx={{ whiteSpace: 'nowrap' }}>pts</Typography>
+                                    }}
+                                    helperText={`Points threshold to enter ${tier.label} level`}
+                                  />
+                                </Grid>
+                              )}
+                              {tier.fixed && (
+                                <Grid item xs={12}>
+                                  <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(205,127,50,0.1)', borderRadius: 1 }}>
+                                    <Typography variant='caption' sx={{ color: tier.textColor, fontWeight: 600 }}>
+                                      📌 Bronze always starts at 0 points — it's the default entry-level tier.
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+                              )}
+                            </Grid>
+                          </Box>
+                        </Paper>
+                      ))}
 
-                        {/* Platinum */}
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Platinum Tier Custom Name"
-                            value={loyaltyConfig.tierNames?.platinum || 'Platinum'}
-                            onChange={(e) => setLoyaltyConfig({
-                              ...loyaltyConfig,
-                              tierNames: { ...loyaltyConfig.tierNames, platinum: e.target.value }
-                            })}
-                            helperText="Name of highest elite level"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Platinum Minimum Points Threshold (Gap)"
-                            type="number"
-                            value={loyaltyConfig.tierThresholds?.platinum || 10000}
-                            onChange={(e) => setLoyaltyConfig({
-                              ...loyaltyConfig,
-                              tierThresholds: { ...loyaltyConfig.tierThresholds, platinum: parseInt(e.target.value) || 0 }
-                            })}
-                            inputProps={{ min: 1 }}
-                            helperText="Points gap needed to enter Platinum level"
-                          />
-                        </Grid>
-                      </Grid>
-
-                      <Box sx={{ p: 2, bgcolor: 'primary.lighter', borderRadius: 2 }}>
-                        <Typography variant="subtitle2" color="primary.dark" fontWeight={700} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          ✨ Dynamic Gaps Configuration Overview:
+                      {/* Live Gap Overview */}
+                      <Box sx={{
+                        p: 2.5, bgcolor: '#f0f4ff',
+                        borderRadius: 2.5,
+                        border: '1px solid #d0d9f0'
+                      }}>
+                        <Typography variant='subtitle2' fontWeight={700} color='primary.dark' sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          ✨ Live Tier Ranges Preview
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" display="block">
-                          • <strong>{loyaltyConfig.tierNames?.bronze || 'Bronze'} Range</strong>: 0 to {((loyaltyConfig.tierThresholds?.silver || 2000) - 1).toLocaleString()} points
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" display="block">
-                          • <strong>{loyaltyConfig.tierNames?.silver || 'Silver'} Range</strong>: {(loyaltyConfig.tierThresholds?.silver || 2000).toLocaleString()} to {((loyaltyConfig.tierThresholds?.gold || 5000) - 1).toLocaleString()} points (Gap of {((loyaltyConfig.tierThresholds?.gold || 5000) - (loyaltyConfig.tierThresholds?.silver || 2000)).toLocaleString()} points)
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" display="block">
-                          • <strong>{loyaltyConfig.tierNames?.gold || 'Gold'} Range</strong>: {(loyaltyConfig.tierThresholds?.gold || 5000).toLocaleString()} to {((loyaltyConfig.tierThresholds?.platinum || 10000) - 1).toLocaleString()} points (Gap of {((loyaltyConfig.tierThresholds?.platinum || 10000) - (loyaltyConfig.tierThresholds?.gold || 5000)).toLocaleString()} points)
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" display="block">
-                          • <strong>{loyaltyConfig.tierNames?.platinum || 'Platinum'} Range</strong>: Above {(loyaltyConfig.tierThresholds?.platinum || 10000).toLocaleString()} points
-                        </Typography>
+                        {[
+                          { name: loyaltyConfig.tierNames?.bronze || 'Bronze', range: `0 – ${((loyaltyConfig.tierThresholds?.silver || 2000) - 1).toLocaleString()} pts`, color: '#CD7F32', icon: '🥉' },
+                          { name: loyaltyConfig.tierNames?.silver || 'Silver', range: `${(loyaltyConfig.tierThresholds?.silver || 2000).toLocaleString()} – ${((loyaltyConfig.tierThresholds?.gold || 5000) - 1).toLocaleString()} pts`, gap: `Gap: ${((loyaltyConfig.tierThresholds?.gold || 5000) - (loyaltyConfig.tierThresholds?.silver || 2000)).toLocaleString()} pts`, color: '#9E9E9E', icon: '🥈' },
+                          { name: loyaltyConfig.tierNames?.gold || 'Gold', range: `${(loyaltyConfig.tierThresholds?.gold || 5000).toLocaleString()} – ${((loyaltyConfig.tierThresholds?.platinum || 10000) - 1).toLocaleString()} pts`, gap: `Gap: ${((loyaltyConfig.tierThresholds?.platinum || 10000) - (loyaltyConfig.tierThresholds?.gold || 5000)).toLocaleString()} pts`, color: '#F9A825', icon: '🥇' },
+                          { name: loyaltyConfig.tierNames?.platinum || 'Platinum', range: `${(loyaltyConfig.tierThresholds?.platinum || 10000).toLocaleString()}+ pts`, color: '#7B68EE', icon: '👑' },
+                        ].map((t, i) => (
+                          <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                            <Typography sx={{ fontSize: '1rem', minWidth: 24 }}>{t.icon}</Typography>
+                            <Box sx={{
+                              width: 10, height: 10, borderRadius: '50%',
+                              bgcolor: t.color, flexShrink: 0
+                            }} />
+                            <Typography variant='body2' fontWeight={700} sx={{ minWidth: 90, color: t.color }}>
+                              {t.name}
+                            </Typography>
+                            <Typography variant='body2' color='text.secondary' sx={{ flexGrow: 1 }}>
+                              {t.range}
+                            </Typography>
+                            {t.gap && (
+                              <Chip label={t.gap} size='small' sx={{ fontSize: '0.7rem', bgcolor: 'white', border: '1px solid', borderColor: 'divider' }} />
+                            )}
+                          </Box>
+                        ))}
                       </Box>
                     </Box>
                   )}
@@ -6102,10 +6514,12 @@ function App() {
                   {/* Tab 1: Points Calculation Rules */}
                   {loyaltyConfigTab === 1 && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <Typography variant='body2' color='text.secondary'>
-                        Configure how points are calculated from scan invoice values.
-                      </Typography>
-                      
+                      <Box sx={{ p: 1.5, bgcolor: 'info.lighter', borderRadius: 2, border: '1px solid', borderColor: 'info.light' }}>
+                        <Typography variant='body2' color='info.dark' fontWeight={500}>
+                          ⚙️ Configure how loyalty points are calculated from member scan invoice values.
+                        </Typography>
+                      </Box>
+
                       <FormControl fullWidth>
                         <InputLabel>Calculation Method</InputLabel>
                         <Select
@@ -6116,9 +6530,9 @@ function App() {
                             pointsCalculation: { ...loyaltyConfig.pointsCalculation, method: e.target.value }
                           })}
                         >
-                          <MenuItem value="price_based">Price Based (Points = Price / Divisor)</MenuItem>
-                          <MenuItem value="product_based">Product Based (Points defined per Product)</MenuItem>
-                          <MenuItem value="fixed">Fixed Points per scan</MenuItem>
+                          <MenuItem value="price_based">💰 Price Based (Points = Price ÷ Divisor)</MenuItem>
+                          <MenuItem value="product_based">📦 Product Based (Points defined per Product)</MenuItem>
+                          <MenuItem value="fixed">🔒 Fixed Points per Scan</MenuItem>
                         </Select>
                       </FormControl>
 
@@ -6133,36 +6547,38 @@ function App() {
                             pointsCalculation: { ...loyaltyConfig.pointsCalculation, priceDivisor: parseFloat(e.target.value) || 1000 }
                           })}
                           inputProps={{ min: 1 }}
-                          helperText="Number of LKR spent to earn 1 loyalty point (default: Rs. 1000 = 1 Point)"
+                          InputProps={{
+                            endAdornment: <Typography variant='body2' color='text.secondary'>LKR / pt</Typography>
+                          }}
+                          helperText="How many LKR spent = 1 loyalty point (default: Rs. 1,000 = 1 Point)"
                         />
                       )}
 
                       <TextField
                         fullWidth
-                        label="Applicator Bonus Multiplier"
+                        label="Applicator Bonus Multiplier (%)"
                         type="number"
                         value={Math.round((loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1) * 100)}
                         onChange={(e) => setLoyaltyConfig({
                           ...loyaltyConfig,
-                          pointsCalculation: { 
-                            ...loyaltyConfig.pointsCalculation, 
-                            applicatorBonus: parseFloat(e.target.value) / 100 || 0 
+                          pointsCalculation: {
+                            ...loyaltyConfig.pointsCalculation,
+                            applicatorBonus: parseFloat(e.target.value) / 100 || 0
                           }
                         })}
                         inputProps={{ min: 0, max: 100 }}
                         InputProps={{
                           endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
                         }}
-                        helperText="Percentage bonus points granted to members registered as applicators (default: 10% bonus)"
+                        helperText="Extra % bonus points for Applicator-role members (default: 10%)"
                       />
 
-                      <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 2 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          <strong>Calculation Example:</strong> For a purchase of Rs. 15,000 using Price-Based method (Divisor = 1,000):
-                          <br />• Base points: 15,000 / 1,000 = <strong>15 points</strong>
-                          <br />• Applicator bonus: 15 * {Math.round((loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1) * 100)}% = <strong>{(15 * (loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1)).toFixed(1)} points</strong>
-                          <br />• Total points credited: <strong>{Math.floor(15 + (15 * (loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1)))} points</strong>
-                        </Typography>
+                      <Box sx={{ p: 2, bgcolor: '#e8f5e9', borderRadius: 2, border: '1px solid #c8e6c9' }}>
+                        <Typography variant='body2' fontWeight={700} color='success.dark' gutterBottom>📊 Calculation Example</Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>Purchase of Rs. 15,000 (Price-Based, Divisor = 1,000):</Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>• Base points: 15,000 ÷ 1,000 = <strong>15 pts</strong></Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>• Applicator bonus: 15 × {Math.round((loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1) * 100)}% = <strong>{(15 * (loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1)).toFixed(1)} pts</strong></Typography>
+                        <Typography variant='caption' fontWeight={700} color='success.dark' display='block' sx={{ mt: 0.5 }}>✅ Total Credited: {Math.floor(15 + (15 * (loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1)))} points</Typography>
                       </Box>
                     </Box>
                   )}
@@ -6170,136 +6586,83 @@ function App() {
                   {/* Tab 2: Monthly Cash Rewards */}
                   {loyaltyConfigTab === 2 && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <Typography variant='body2' color='text.secondary'>
-                        Set the cash reward percentage for each monthly purchase tier. Rewards are calculated cumulatively based on total monthly purchases.
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        label='Tier 1: Rs. 0 - 250,000'
-                        type='number'
-                        value={loyaltyConfig.cashRewardTiers?.tier1 || 4.5}
-                        onChange={(e) => setLoyaltyConfig({
-                          ...loyaltyConfig,
-                          cashRewardTiers: {
-                            ...loyaltyConfig.cashRewardTiers,
-                            tier1: parseFloat(e.target.value) || 0
-                          }
-                        })}
-                        inputProps={{ min: 0, max: 100, step: 0.1 }}
-                        InputProps={{
-                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                        }}
-                        helperText='Percentage rate for first Rs. 250,000 (default: 4.5%)'
-                      />
-                      <TextField
-                        fullWidth
-                        label='Tier 2: Rs. 250,001 - 500,000'
-                        type='number'
-                        value={loyaltyConfig.cashRewardTiers?.tier2 || 5.0}
-                        onChange={(e) => setLoyaltyConfig({
-                          ...loyaltyConfig,
-                          cashRewardTiers: {
-                            ...loyaltyConfig.cashRewardTiers,
-                            tier2: parseFloat(e.target.value) || 0
-                          }
-                        })}
-                        inputProps={{ min: 0, max: 100, step: 0.1 }}
-                        InputProps={{
-                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                        }}
-                        helperText='Percentage rate for next Rs. 250,000 (default: 5.0%)'
-                      />
-                      <TextField
-                        fullWidth
-                        label='Tier 3: Rs. 500,001 - 750,000'
-                        type='number'
-                        value={loyaltyConfig.cashRewardTiers?.tier3 || 5.5}
-                        onChange={(e) => setLoyaltyConfig({
-                          ...loyaltyConfig,
-                          cashRewardTiers: {
-                            ...loyaltyConfig.cashRewardTiers,
-                            tier3: parseFloat(e.target.value) || 0
-                          }
-                        })}
-                        inputProps={{ min: 0, max: 100, step: 0.1 }}
-                        InputProps={{
-                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                        }}
-                        helperText='Percentage rate for next Rs. 250,000 (default: 5.5%)'
-                      />
-                      <TextField
-                        fullWidth
-                        label='Tier 4: Rs. 750,001 - 1,000,000'
-                        type='number'
-                        value={loyaltyConfig.cashRewardTiers?.tier4 || 6.0}
-                        onChange={(e) => setLoyaltyConfig({
-                          ...loyaltyConfig,
-                          cashRewardTiers: {
-                            ...loyaltyConfig.cashRewardTiers,
-                            tier4: parseFloat(e.target.value) || 0
-                          }
-                        })}
-                        inputProps={{ min: 0, max: 100, step: 0.1 }}
-                        InputProps={{
-                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                        }}
-                        helperText='Percentage rate for next Rs. 250,000 (default: 6.0%)'
-                      />
-                      <TextField
-                        fullWidth
-                        label='Tier 5: Above Rs. 1,000,000'
-                        type='number'
-                        value={loyaltyConfig.cashRewardTiers?.tier5 || 6.5}
-                        onChange={(e) => setLoyaltyConfig({
-                          ...loyaltyConfig,
-                          cashRewardTiers: {
-                            ...loyaltyConfig.cashRewardTiers,
-                            tier5: parseFloat(e.target.value) || 0
-                          }
-                        })}
-                        inputProps={{ min: 0, max: 100, step: 0.1 }}
-                        InputProps={{
-                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
-                        }}
-                        helperText='Percentage rate for purchases above Rs. 1,000,000 (default: 6.5%)'
-                      />
-                      <Box sx={{ p: 2, bgcolor: 'success.lighter', borderRadius: 1, mt: 1 }}>
-                        <Typography variant='body2' fontWeight={600} gutterBottom>Example Calculation:</Typography>
-                        <Typography variant='caption' color='text.secondary' display='block'>
-                          For Rs. 600,000 monthly purchase:
-                        </Typography>
-                        <Typography variant='caption' color='text.secondary' display='block'>
-                          • First Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier1 || 4.5}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100).toLocaleString()}
-                        </Typography>
-                        <Typography variant='caption' color='text.secondary' display='block'>
-                          • Next Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier2 || 5.0}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100).toLocaleString()}
-                        </Typography>
-                        <Typography variant='caption' color='text.secondary' display='block'>
-                          • Balance Rs. 100,000 at {loyaltyConfig.cashRewardTiers?.tier3 || 5.5}% = Rs. {(100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100).toLocaleString()}
-                        </Typography>
-                        <Typography variant='caption' fontWeight={700} color='success.main' display='block' sx={{ mt: 1 }}>
-                          Total Reward = Rs. {((250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100) + (250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100) + (100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100)).toLocaleString()}
+                      <Box sx={{ p: 1.5, bgcolor: 'success.lighter', borderRadius: 2, border: '1px solid', borderColor: 'success.light' }}>
+                        <Typography variant='body2' color='success.dark' fontWeight={500}>
+                          💰 Set cash reward percentages per monthly purchase tier. Rewards are calculated cumulatively.
                         </Typography>
                       </Box>
-                      <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
-                        <Typography variant='caption' color='text.secondary'>
-                          <strong>Note:</strong> Percentage rates should typically increase with higher tiers to incentivize larger purchases. Changes will apply to new calculations only.
-                        </Typography>
+
+                      {[
+                        { label: 'Tier 1', range: 'Rs. 0 – 250,000', key: 'tier1', def: 4.5 },
+                        { label: 'Tier 2', range: 'Rs. 250,001 – 500,000', key: 'tier2', def: 5.0 },
+                        { label: 'Tier 3', range: 'Rs. 500,001 – 750,000', key: 'tier3', def: 5.5 },
+                        { label: 'Tier 4', range: 'Rs. 750,001 – 1,000,000', key: 'tier4', def: 6.0 },
+                        { label: 'Tier 5', range: 'Above Rs. 1,000,000', key: 'tier5', def: 6.5 },
+                      ].map((t) => (
+                        <Box key={t.key} sx={{
+                          display: 'flex', alignItems: 'center', gap: 2,
+                          p: 1.5, borderRadius: 2, bgcolor: 'background.paper',
+                          border: '1px solid', borderColor: 'divider'
+                        }}>
+                          <Box sx={{ flexGrow: 1 }}>
+                            <Typography variant='body2' fontWeight={700}>{t.label}</Typography>
+                            <Typography variant='caption' color='text.secondary'>{t.range}</Typography>
+                          </Box>
+                          <TextField
+                            size='small'
+                            type='number'
+                            value={loyaltyConfig.cashRewardTiers?.[t.key] ?? t.def}
+                            onChange={(e) => setLoyaltyConfig({
+                              ...loyaltyConfig,
+                              cashRewardTiers: {
+                                ...loyaltyConfig.cashRewardTiers,
+                                [t.key]: parseFloat(e.target.value) || 0
+                              }
+                            })}
+                            inputProps={{ min: 0, max: 100, step: 0.1, style: { width: 70, textAlign: 'right' } }}
+                            InputProps={{
+                              endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                            }}
+                            sx={{ width: 120 }}
+                          />
+                        </Box>
+                      ))}
+
+                      <Box sx={{ p: 2, bgcolor: '#e8f5e9', borderRadius: 2, border: '1px solid #c8e6c9' }}>
+                        <Typography variant='body2' fontWeight={700} color='success.dark' gutterBottom>📊 Example: Rs. 600,000 Purchase</Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>• Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier1 || 4.5}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100).toLocaleString()}</Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>• Rs. 250,000 at {loyaltyConfig.cashRewardTiers?.tier2 || 5.0}% = Rs. {(250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100).toLocaleString()}</Typography>
+                        <Typography variant='caption' color='text.secondary' display='block'>• Rs. 100,000 at {loyaltyConfig.cashRewardTiers?.tier3 || 5.5}% = Rs. {(100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100).toLocaleString()}</Typography>
+                        <Typography variant='caption' fontWeight={700} color='success.dark' display='block' sx={{ mt: 0.5 }}>✅ Total Reward = Rs. {((250000 * (loyaltyConfig.cashRewardTiers?.tier1 || 4.5) / 100) + (250000 * (loyaltyConfig.cashRewardTiers?.tier2 || 5.0) / 100) + (100000 * (loyaltyConfig.cashRewardTiers?.tier3 || 5.5) / 100)).toLocaleString()}</Typography>
                       </Box>
                     </Box>
                   )}
+
+                  </Box>
                 </>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6, gap: 2 }}>
+                  <CircularProgress size={40} />
+                  <Typography variant='body2' color='text.secondary'>Loading loyalty configuration...</Typography>
+                </Box>
               )}
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3 }}>
-              <Button onClick={() => setLoyaltyConfigDialog({ open: false })} variant="outlined">
+
+            <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'divider', gap: 1 }}>
+              <Button onClick={() => setLoyaltyConfigDialog({ open: false })} variant="outlined" sx={{ borderRadius: 2 }}>
                 Cancel
               </Button>
-              <Button 
-                variant='contained' 
-                onClick={handleUpdateLoyaltyConfig} 
+              <Button
+                variant='contained'
+                onClick={handleUpdateLoyaltyConfig}
                 disabled={loading || !loyaltyConfig}
                 startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <Save />}
+                sx={{
+                  background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)',
+                  borderRadius: 2,
+                  px: 3,
+                  '&:hover': { background: 'linear-gradient(135deg, #001a33 0%, #003366 100%)' }
+                }}
               >
                 {loading ? 'Saving...' : 'Save Configuration'}
               </Button>
@@ -7728,7 +8091,7 @@ function App() {
                             </Paper>
                             <Paper sx={{ p: 2, bgcolor: 'info.lighter' }}>
                               <Typography variant='body2' color='text.secondary' gutterBottom>
-                                Customers
+                                Hardwares
                               </Typography>
                               <Typography variant='h4' sx={{ fontWeight: 'bold', color: 'info.main' }}>
                                 {dailyReport.summary.roleBreakdown?.customer || 0}

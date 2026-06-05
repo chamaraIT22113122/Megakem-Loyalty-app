@@ -5,6 +5,79 @@ const QRCodeModel = require('../models/QRCode');
 const Product = require('../models/Product');
 const { protect, qrAdmin, hasPermission } = require('../middleware/auth');
 
+// Helper to extract date from batch number (returns Date object or null)
+function extractDateFromBatch(batchNo) {
+  if (!batchNo) return null;
+  const cleanBatch = batchNo.trim();
+  
+  // 1. Look for YYYY-MM-DD or DD-MM-YYYY patterns first
+  const datePattern = /(\d{2})[-/](\d{2})[-/](\d{4})/;
+  const match = cleanBatch.match(datePattern);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const year = parseInt(match[3], 10);
+    const dateObj = new Date(year, month, day);
+    if (!isNaN(dateObj.getTime())) return dateObj;
+  }
+  
+  const isoPattern = /(\d{4})[-/](\d{2})[-/](\d{2})/;
+  const matchIso = cleanBatch.match(isoPattern);
+  if (matchIso) {
+    const year = parseInt(matchIso[1], 10);
+    const month = parseInt(matchIso[2], 10) - 1;
+    const day = parseInt(matchIso[3], 10);
+    const dateObj = new Date(year, month, day);
+    if (!isNaN(dateObj.getTime())) return dateObj;
+  }
+
+  // 2. Look for 8 consecutive digits (e.g. YYYYMMDD in B2023120501 or DDMMYYYY in B05122023)
+  const eightDigitMatch = cleanBatch.match(/\d{8}/);
+  if (eightDigitMatch) {
+    const d = eightDigitMatch[0];
+    let day, month, year;
+    if (d.startsWith('20') || d.startsWith('19')) {
+      // YYYYMMDD
+      year = parseInt(d.substring(0, 4), 10);
+      month = parseInt(d.substring(4, 6), 10) - 1;
+      day = parseInt(d.substring(6, 8), 10);
+    } else {
+      // DDMMYYYY
+      day = parseInt(d.substring(0, 2), 10);
+      month = parseInt(d.substring(2, 4), 10) - 1;
+      year = parseInt(d.substring(4, 8), 10);
+    }
+    const dateObj = new Date(year, month, day);
+    if (!isNaN(dateObj.getTime())) return dateObj;
+  }
+  
+  // 3. Try split by underscore or space to find 6-digit date (DDMMYY)
+  let parts = cleanBatch.split('_');
+  if (parts.length < 3) {
+    parts = cleanBatch.split(/\s+/);
+  }
+  
+  let dateStr = '';
+  // Check index 2 first (standard 4-part or 5-part Megakem formats)
+  if (parts.length >= 3 && /^\d{6}$/.test(parts[2])) {
+    dateStr = parts[2];
+  } else {
+    // Look for any part that is exactly 6 digits
+    const sixDigitPart = parts.find(p => /^\d{6}$/.test(p));
+    if (sixDigitPart) dateStr = sixDigitPart;
+  }
+  
+  if (dateStr && dateStr.length === 6) {
+    const day = parseInt(dateStr.substring(0, 2), 10);
+    const month = parseInt(dateStr.substring(2, 4), 10) - 1;
+    const year = parseInt('20' + dateStr.substring(4, 6), 10);
+    const dateObj = new Date(year, month, day);
+    if (!isNaN(dateObj.getTime())) return dateObj;
+  }
+  
+  return null;
+}
+
 // Generate QR code for products
 router.post('/generate', protect, qrAdmin, async (req, res) => {
   try {
@@ -25,6 +98,20 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
 
     if (!batchNo) {
       return res.status(400).json({ error: 'Batch number is required' });
+    }
+
+    // Extract manufactureDate and expiryDate from batch number if not provided
+    let finalMfgDate = manufactureDate ? new Date(manufactureDate) : extractDateFromBatch(batchNo);
+    let finalExpDate = expiryDate ? new Date(expiryDate) : null;
+
+    if (finalMfgDate && isNaN(finalMfgDate.getTime())) {
+      finalMfgDate = extractDateFromBatch(batchNo);
+    }
+
+    if (finalMfgDate && !finalExpDate) {
+      // Default expiry date: 2 years after manufacture date
+      finalExpDate = new Date(finalMfgDate);
+      finalExpDate.setFullYear(finalExpDate.getFullYear() + 2);
     }
 
     const baseUrl = process.env.FRONTEND_URL_PROD || process.env.FRONTEND_URL || 'https://chamarait22113122.github.io/Megakem-Loyalty-app';
@@ -57,8 +144,8 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
         productNo: product.productNo,
         batchNo,
         packageNo,
-        manufactureDate,
-        expiryDate,
+        manufactureDate: finalMfgDate,
+        expiryDate: finalExpDate,
         qrLink,
         customLink,
         qrData: qrDataUrl,
@@ -267,6 +354,20 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    // Extract manufactureDate and expiryDate from batch number if not provided
+    let finalMfgDate = manufactureDate ? new Date(manufactureDate) : extractDateFromBatch(batchNo);
+    let finalExpDate = expiryDate ? new Date(expiryDate) : null;
+
+    if (finalMfgDate && isNaN(finalMfgDate.getTime())) {
+      finalMfgDate = extractDateFromBatch(batchNo);
+    }
+
+    if (finalMfgDate && !finalExpDate) {
+      // Default expiry date: 2 years after manufacture date
+      finalExpDate = new Date(finalMfgDate);
+      finalExpDate.setFullYear(finalExpDate.getFullYear() + 2);
+    }
+
     // Check for duplicates in the database first
     const existingQRs = await QRCodeModel.find({
       product: productId,
@@ -317,8 +418,8 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
         productNo: product.productNo,
         batchNo,
         packageNo: pNo,
-        manufactureDate,
-        expiryDate,
+        manufactureDate: finalMfgDate,
+        expiryDate: finalExpDate,
         qrLink,
         customLink,
         qrData: qrDataUrl,
@@ -395,6 +496,54 @@ router.get('/settings/printers', protect, qrAdmin, (req, res) => {
   };
 
   res.json(printerSettings);
+});
+
+// @route   POST /api/qr-codes/record-scan
+// @desc    Record a QR code scan event (public, called when landing page is loaded via QR)
+// @access  Public
+router.post('/record-scan', async (req, res) => {
+  try {
+    const { productNo, batchNo, packageNo } = req.body;
+
+    if (!productNo || !batchNo) {
+      return res.status(400).json({ error: 'productNo and batchNo are required' });
+    }
+
+    // Find the matching QR code
+    const query = {
+      productNo: productNo.toUpperCase(),
+      batchNo: batchNo
+    };
+
+    if (packageNo) {
+      query.packageNo = packageNo;
+    }
+
+    const qrCode = await QRCodeModel.findOne(query);
+
+    if (!qrCode) {
+      return res.status(404).json({ error: 'QR Code not found' });
+    }
+
+    // Update status and tracing info
+    qrCode.status = 'scanned';
+    qrCode.tracingInfo = qrCode.tracingInfo || {};
+    qrCode.tracingInfo.qrScanned = true;
+    qrCode.tracingInfo.scanCount = (qrCode.tracingInfo.scanCount || 0) + 1;
+    qrCode.tracingInfo.lastScanDate = new Date();
+    
+    await qrCode.save();
+
+    res.json({
+      success: true,
+      message: 'QR scan recorded successfully',
+      qrId: qrCode.qrId,
+      status: qrCode.status
+    });
+  } catch (error) {
+    console.error('Error recording QR scan:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

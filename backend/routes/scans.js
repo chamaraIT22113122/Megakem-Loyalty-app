@@ -6,6 +6,7 @@ const Member = require('../models/Member');
 const Product = require('../models/Product');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { optionalAuth, protect, authorize, hasPermission } = require('../middleware/auth');
+const QRCodeModel = require('../models/QRCode');
 
 // @route   GET /api/scans
 // @desc    Get all scans (with pagination and filters)
@@ -225,6 +226,9 @@ router.post('/', optionalAuth, async (req, res) => {
     // Create or update member from scan
     await updateMemberFromScan(scan);
 
+    // Update matching QRCode status to scanned
+    await updateQRCodeStatus(scan);
+
     // Update scan count if user is authenticated
     if (req.user) {
       const user = await User.findById(req.user._id);
@@ -366,9 +370,10 @@ router.post('/batch', optionalAuth, async (req, res) => {
 
     const createdScans = await Scan.insertMany(validScans);
 
-    // Create or update members from scans
+    // Create or update members from scans and update QRCode status
     for (const scan of createdScans) {
       await updateMemberFromScan(scan);
+      await updateQRCodeStatus(scan);
     }
 
     // Update scan count if user is authenticated
@@ -673,5 +678,36 @@ router.post('/sync-members', protect, hasPermission('canManageUsers'), async (re
     });
   }
 });
+
+// Helper function to update QRCode status to 'scanned' when a scan is registered
+async function updateQRCodeStatus(scan) {
+  try {
+    // Find the matching QR code
+    const query = {
+      productNo: scan.productNo.toUpperCase(),
+      batchNo: scan.batchNo
+    };
+
+    if (scan.bagNo) {
+      query.packageNo = scan.bagNo;
+    }
+
+    const qrCode = await QRCodeModel.findOne(query);
+    if (qrCode) {
+      qrCode.status = 'scanned';
+      qrCode.tracingInfo = qrCode.tracingInfo || {};
+      qrCode.tracingInfo.qrScanned = true;
+      qrCode.tracingInfo.scanCount = (qrCode.tracingInfo.scanCount || 0) + 1;
+      qrCode.tracingInfo.lastScanDate = new Date();
+      if (scan.userId) {
+        qrCode.tracingInfo.lastScanBy = scan.userId;
+      }
+      await qrCode.save();
+      console.log(`Successfully updated matching QRCode ${qrCode.qrId} to scanned`);
+    }
+  } catch (error) {
+    console.error('Error updating QRCode status from scan:', error);
+  }
+}
 
 module.exports = router;

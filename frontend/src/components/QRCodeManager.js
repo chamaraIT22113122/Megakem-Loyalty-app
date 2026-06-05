@@ -48,6 +48,66 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import api from '../services/api';
 
+// Helper to extract date from batch number (returns string DD/MM/YYYY or null)
+const extractDateFromBatch = (batchNo) => {
+  if (!batchNo) return null;
+  const cleanBatch = batchNo.trim();
+  
+  // Try split by underscore or space
+  let parts = cleanBatch.split('_');
+  if (parts.length < 3) {
+    parts = cleanBatch.split(/\s+/);
+  }
+  
+  let dateStr = '';
+  let format = ''; // 'DDMMYY', 'YYYYMMDD', 'DDMMYYYY'
+  
+  // Check index 2 first (standard 4-part or 5-part Megakem formats)
+  if (parts.length >= 3 && /^\d{6}$/.test(parts[2])) {
+    dateStr = parts[2];
+    format = 'DDMMYY';
+  } else {
+    // Look for any part that is exactly 6 digits
+    const sixDigitPart = parts.find(p => /^\d{6}$/.test(p));
+    if (sixDigitPart) {
+      dateStr = sixDigitPart;
+      format = 'DDMMYY';
+    } else {
+      // Look for any part that is exactly 8 digits
+      const eightDigitPart = parts.find(p => /^\d{8}$/.test(p));
+      if (eightDigitPart) {
+        dateStr = eightDigitPart;
+        format = (dateStr.startsWith('20') || dateStr.startsWith('19')) ? 'YYYYMMDD' : 'DDMMYYYY';
+      }
+    }
+  }
+  
+  if (dateStr) {
+    if (format === 'DDMMYY') {
+      return `${dateStr.substring(0, 2)}/${dateStr.substring(2, 4)}/20${dateStr.substring(4, 6)}`;
+    } else if (format === 'YYYYMMDD') {
+      return `${dateStr.substring(6, 8)}/${dateStr.substring(4, 6)}/${dateStr.substring(0, 4)}`;
+    } else if (format === 'DDMMYYYY') {
+      return `${dateStr.substring(0, 2)}/${dateStr.substring(2, 4)}/${dateStr.substring(4, 8)}`;
+    }
+  }
+  
+  // Match DD-MM-YYYY or YYYY-MM-DD patterns
+  const datePattern = /(\d{2})[-/](\d{2})[-/](\d{4})/;
+  const match = cleanBatch.match(datePattern);
+  if (match) {
+    return `${match[1]}/${match[2]}/${match[3]}`;
+  }
+  
+  const isoPattern = /(\d{4})[-/](\d{2})[-/](\d{2})/;
+  const matchIso = cleanBatch.match(isoPattern);
+  if (matchIso) {
+    return `${matchIso[3]}/${matchIso[2]}/${matchIso[1]}`;
+  }
+  
+  return null;
+};
+
 const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts }) => {
   const [loading, setLoading] = useState(false);
   const [qrCodes, setQRCodes] = useState([]);
@@ -86,6 +146,26 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [selectedForPrint, setSelectedForPrint] = useState([]);
   
   const qrPreviewRef = useRef();
+
+  const handleBatchNoChange = (val) => {
+    setBatchNo(val);
+    const extracted = extractDateFromBatch(val);
+    if (extracted) {
+      const parts = extracted.split('/');
+      if (parts.length === 3) {
+        const day = parts[0];
+        const month = parts[1];
+        const year = parts[2];
+        const mfgDateString = `${year}-${month}-${day}`;
+        setManufactureDate(mfgDateString);
+        
+        // Calculate expiry date (2 years later)
+        const expYear = parseInt(year, 10) + 2;
+        const expDateString = `${expYear}-${month}-${day}`;
+        setExpiryDate(expDateString);
+      }
+    }
+  };
 
   // Sync products from props
   useEffect(() => {
@@ -315,18 +395,27 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     `;
 
     qrs.forEach(qr => {
+      const parsedDate = extractDateFromBatch(qr.batchNo);
+      // If layout is compact, don't show text/details
+      const showDetails = layout !== 'compact';
+      const isDetailed = layout === 'detailed';
+
       html += `
         <div class="label">
-          <div class="product-header">${qr.productName}</div>
+          ${showDetails ? `<div class="product-header">${qr.productName}</div>` : ''}
+          ${showDetails ? `
           <div class="batch-info">
             BATCH: <strong>${qr.batchNo}</strong><br>
-            PKG: <strong>${qr.packageNo}</strong>
+            PKG: <strong>${qr.packageNo || '-'}</strong>
+            ${parsedDate ? `<br>DATE: <strong>${parsedDate}</strong>` : ''}
+            ${isDetailed && qr.expiryDate ? `<br>EXP: <strong>${new Date(qr.expiryDate).toLocaleDateString()}</strong>` : ''}
           </div>
-          <div class="qr-container">
+          ` : ''}
+          <div class="qr-container" style="${layout === 'compact' ? 'width: 80%;' : ''}">
             <img src="${qr.qrData}" alt="QR">
           </div>
-          <div class="scan-text">SCAN ME</div>
-          <div style="font-size: 8pt; margin-top: 1mm;">Megakem Loyalty System</div>
+          ${showDetails ? `<div class="scan-text">SCAN ME</div>` : ''}
+          ${showDetails ? `<div style="font-size: 8pt; margin-top: 1mm;">Megakem Loyalty System</div>` : ''}
         </div>
       `;
     });
@@ -508,9 +597,10 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             fullWidth
             label="Batch Number"
             value={batchNo}
-            onChange={(e) => setBatchNo(e.target.value)}
+            onChange={(e) => handleBatchNoChange(e.target.value)}
             margin="normal"
             required
+            helperText="Extracts MFG & EXP date automatically if format matches"
           />
           <TextField
             fullWidth
@@ -642,10 +732,30 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             fullWidth
             label="Batch Number"
             value={batchNo}
-            onChange={(e) => setBatchNo(e.target.value)}
+            onChange={(e) => handleBatchNoChange(e.target.value)}
             margin="normal"
             required
-            helperText="Enter production batch number"
+            helperText="Enter production batch number (MFG & EXP dates auto-populated)"
+          />
+
+          <TextField
+            fullWidth
+            label="Manufacture Date"
+            type="date"
+            value={manufactureDate}
+            onChange={(e) => setManufactureDate(e.target.value)}
+            margin="normal"
+            InputLabelProps={{ shrink: true }}
+          />
+
+          <TextField
+            fullWidth
+            label="Expiry Date"
+            type="date"
+            value={expiryDate}
+            onChange={(e) => setExpiryDate(e.target.value)}
+            margin="normal"
+            InputLabelProps={{ shrink: true }}
           />
 
           <Grid container spacing={2}>
@@ -803,7 +913,16 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       />
                     </TableCell>
                     <TableCell>{qr.productName}</TableCell>
-                    <TableCell>{qr.batchNo}</TableCell>
+                    <TableCell>
+                      <Box>
+                        <Typography variant="body2">{qr.batchNo}</Typography>
+                        {(qr.manufactureDate || extractDateFromBatch(qr.batchNo)) && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            Date: {qr.manufactureDate ? new Date(qr.manufactureDate).toLocaleDateString() : extractDateFromBatch(qr.batchNo)}
+                          </Typography>
+                        )}
+                      </Box>
+                    </TableCell>
                     <TableCell>{qr.packageNo || '-'}</TableCell>
                     <TableCell>
                       <Chip
