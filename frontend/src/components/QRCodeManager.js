@@ -158,7 +158,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [printRows, setPrintRows] = useState(7);
   const [printGap, setPrintGap] = useState(4); // mm
   const [printLabelPadding, setPrintLabelPadding] = useState(2); // mm
-  // Label content is fixed: QR → BATCH → MFG DATE → EXP DATE → SCAN ME → (MWTC ONLY)
+  // Label content is fixed: QR → BATCH → MFG DATE → EXP DATE → SCAN ME → (MWTC MEMBERS ONLY)
 
   useEffect(() => {
     if (printPaperSize === 'a4') {
@@ -332,7 +332,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 lineHeight: 1
               }}
             >
-              (MWTC ONLY)
+              (MWTC MEMBERS ONLY)
             </Typography>
           </Box>
         ))}
@@ -782,7 +782,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               ${expDateToShow ? `EXP DATE: <strong>${expDateToShow}</strong>` : ''}
             </div>
             <div class="scan-text">SCAN ME</div>
-            <div style="font-size: 6.5pt; margin-top: 0.5mm; text-align: center; width: 100%;">(MWTC ONLY)</div>
+            <div style="font-size: 6.5pt; margin-top: 0.5mm; text-align: center; width: 100%;">(MWTC MEMBERS ONLY)</div>
           </div>
         `;
       });
@@ -1427,7 +1427,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 <Typography variant="body2" color="text.secondary">✅ MFG Date</Typography>
                 <Typography variant="body2" color="text.secondary">✅ Expiry Date</Typography>
                 <Typography variant="body2" color="text.secondary">✅ SCAN ME</Typography>
-                <Typography variant="body2" color="text.secondary">✅ (MWTC ONLY)</Typography>
+                <Typography variant="body2" color="text.secondary">✅ (MWTC MEMBERS ONLY)</Typography>
               </Box>
             </Grid>
 
