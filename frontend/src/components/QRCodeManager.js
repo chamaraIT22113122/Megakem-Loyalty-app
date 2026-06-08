@@ -138,6 +138,225 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [printSize, setPrintSize] = useState('medium');
   const [layout, setLayout] = useState('standard');
   const [dpi, setDpi] = useState(203);
+
+  // Advanced Print Settings Dialog States
+  const [openPrintConfigDialog, setOpenPrintConfigDialog] = useState(false);
+  const [printLayoutMode, setPrintLayoutMode] = useState('grid'); // 'roll' or 'grid'
+  const [printPaperSize, setPrintPaperSize] = useState('a4'); // 'a4', 'letter', 'medium', 'small', 'custom'
+  const [customPaperWidth, setCustomPaperWidth] = useState(210); // mm
+  const [customPaperHeight, setCustomPaperHeight] = useState(297); // mm
+  const [printMarginTop, setPrintMarginTop] = useState(10); // mm
+  const [printMarginBottom, setPrintMarginBottom] = useState(10); // mm
+  const [printMarginLeft, setPrintMarginLeft] = useState(10); // mm
+  const [printMarginRight, setPrintMarginRight] = useState(10); // mm
+  const [printQRSize, setPrintQRSize] = useState(25); // mm
+  const [printColumns, setPrintColumns] = useState(3);
+  const [printRows, setPrintRows] = useState(7);
+  const [printGap, setPrintGap] = useState(4); // mm
+  const [printLabelPadding, setPrintLabelPadding] = useState(2); // mm
+  const [printShowProdName, setPrintShowProdName] = useState(true);
+  const [printShowBatch, setPrintShowBatch] = useState(true);
+  const [printShowPkg, setPrintShowPkg] = useState(true);
+  const [printShowDate, setPrintShowDate] = useState(true);
+  const [printShowExpiry, setPrintShowExpiry] = useState(false);
+
+  useEffect(() => {
+    if (printPaperSize === 'a4') {
+      setPrintLayoutMode('grid');
+      setCustomPaperWidth(210);
+      setCustomPaperHeight(297);
+      setPrintColumns(3);
+      setPrintRows(7);
+      setPrintMarginTop(10);
+      setPrintMarginBottom(10);
+      setPrintMarginLeft(10);
+      setPrintMarginRight(10);
+      setPrintQRSize(25);
+      setPrintGap(4);
+      setPrintLabelPadding(2);
+    } else if (printPaperSize === 'letter') {
+      setPrintLayoutMode('grid');
+      setCustomPaperWidth(215.9);
+      setCustomPaperHeight(279.4);
+      setPrintColumns(3);
+      setPrintRows(6);
+      setPrintMarginTop(10);
+      setPrintMarginBottom(10);
+      setPrintMarginLeft(10);
+      setPrintMarginRight(10);
+      setPrintQRSize(28);
+      setPrintGap(4);
+      setPrintLabelPadding(2);
+    } else if (printPaperSize === 'medium') {
+      setPrintLayoutMode('roll');
+      setCustomPaperWidth(101.6);
+      setCustomPaperHeight(152.4);
+      setPrintColumns(1);
+      setPrintRows(1);
+      setPrintMarginTop(5);
+      setPrintMarginBottom(5);
+      setPrintMarginLeft(5);
+      setPrintMarginRight(5);
+      setPrintQRSize(50);
+      setPrintGap(0);
+      setPrintLabelPadding(4);
+    } else if (printPaperSize === 'small') {
+      setPrintLayoutMode('roll');
+      setCustomPaperWidth(76.2);
+      setCustomPaperHeight(76.2);
+      setPrintColumns(1);
+      setPrintRows(1);
+      setPrintMarginTop(3);
+      setPrintMarginBottom(3);
+      setPrintMarginLeft(3);
+      setPrintMarginRight(3);
+      setPrintQRSize(40);
+      setPrintGap(0);
+      setPrintLabelPadding(3);
+    }
+  }, [printPaperSize]);
+
+  const renderLivePreview = () => {
+    const paperW = printPaperSize === 'custom' ? customPaperWidth : (printPaperSize === 'a4' ? 210 : (printPaperSize === 'letter' ? 215.9 : (printPaperSize === 'medium' ? 101.6 : 76.2)));
+    const paperH = printPaperSize === 'custom' ? customPaperHeight : (printPaperSize === 'a4' ? 297 : (printPaperSize === 'letter' ? 279.4 : (printPaperSize === 'medium' ? 152.4 : 76.2)));
+    
+    const aspect = paperH / paperW;
+    const pWidth = 260; // preview container width in px
+    const pHeight = pWidth * aspect;
+    const scale = pWidth / paperW; // multiplier to scale mm to px
+
+    const cols = printLayoutMode === 'roll' ? 1 : printColumns;
+    const rows = printLayoutMode === 'roll' ? 1 : printRows;
+    const qrsToShow = Math.min(cols * rows, selectedForPrint.length > 0 ? selectedForPrint.length : 1);
+    
+    // Build dummy items for preview
+    const previewItems = [];
+    const dummyQR = qrCodes.find(qr => selectedForPrint.includes(qr._id)) || qrCodes[0] || {
+      productName: 'Ecolastic 32 Kg Set',
+      productNo: 'MKL39',
+      batchNo: 'MKL39 001 050525 020',
+      packageNo: '020',
+      qrData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJQAAACUCAYAAAB1NDgoAAAACXBIWXMAAAsTAAALEwEAmpwYAAAET0lEQVR4Xu3VMQ0AMADAsIG/583gQY9cEMmqugIe1mYJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBQkKUZCgEAUJClGQoBAFCQpRkKAQBfcWnJ0Z2a9XsgAAAABJRU5ErkJggg=='
+    };
+
+    for (let i = 0; i < qrsToShow; i++) {
+      previewItems.push(dummyQR);
+    }
+
+    return (
+      <Box 
+        sx={{ 
+          width: `${pWidth}px`, 
+          height: `${pHeight}px`, 
+          border: '2px dashed #003366', 
+          borderRadius: '4px',
+          backgroundColor: '#fff',
+          position: 'relative',
+          padding: `${printMarginTop * scale}px ${printMarginRight * scale}px ${printMarginBottom * scale}px ${printMarginLeft * scale}px`,
+          boxSizing: 'border-box',
+          display: 'grid',
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
+          gap: `${printGap * scale}px`,
+          overflow: 'hidden',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+          mx: 'auto'
+        }}
+      >
+        {previewItems.map((item, idx) => (
+          <Box 
+            key={idx}
+            sx={{
+              border: '1px dotted #aaa',
+              padding: `${printLabelPadding * scale}px`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              height: '100%',
+              backgroundColor: '#fafafa'
+            }}
+          >
+            {printShowProdName && (
+              <Typography 
+                sx={{ 
+                  fontSize: `${Math.max(4, 8 * scale * 0.3)}px`, 
+                  fontWeight: 'bold', 
+                  lineHeight: 1, 
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  width: '100%',
+                  textAlign: 'center',
+                  mb: 0.5
+                }}
+              >
+                {item.productName}
+              </Typography>
+            )}
+            <Box 
+              sx={{ 
+                width: `${printQRSize * scale}px`, 
+                height: `${printQRSize * scale}px`,
+                backgroundColor: '#eee',
+                border: '1px solid #ccc',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <img 
+                src={item.qrData} 
+                alt="QR Preview" 
+                style={{ width: '100%', height: '100%' }} 
+              />
+            </Box>
+            <Box sx={{ width: '100%', textAlign: 'center', mt: 0.5 }}>
+              {printShowBatch && (
+                <Typography sx={{ fontSize: `${Math.max(3.5, 6 * scale * 0.35)}px`, lineHeight: 1 }}>
+                  B: {item.batchNo.substring(0, 15)}...
+                </Typography>
+              )}
+              {printShowPkg && (
+                <Typography sx={{ fontSize: `${Math.max(3.5, 6 * scale * 0.35)}px`, lineHeight: 1 }}>
+                  PKG: {item.packageNo || '-'}
+                </Typography>
+              )}
+            </Box>
+            <Typography 
+              sx={{ 
+                fontSize: `${Math.max(4, 9 * scale * 0.35)}px`, 
+                fontWeight: 'bold', 
+                letterSpacing: '0.5px',
+                borderTop: '1px solid #000',
+                pt: 0.1,
+                width: '80%',
+                textAlign: 'center',
+                mt: 0.5,
+                lineHeight: 1
+              }}
+            >
+              SCAN ME
+            </Typography>
+            <Typography 
+              sx={{ 
+                fontSize: `${Math.max(3, 5 * scale * 0.35)}px`, 
+                color: 'text.secondary',
+                textAlign: 'center',
+                mt: 0.1,
+                lineHeight: 1
+              }}
+            >
+              Megakem Loyalty System
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    );
+  };
   
   // Filter states
   const [filterBatch, setFilterBatch] = useState('');
@@ -343,47 +562,91 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   };
 
   const generatePrintHTML = (qrs) => {
-    const getSize = (size) => {
-      const sizes = { 
-        small: 'width: 50mm; height: 50mm;', 
-        medium: 'width: 101.6mm; height: 101.6mm;', // 4x4
-        large: 'width: 101.6mm; height: 152.4mm;'   // 4x6
-      };
-      return sizes[size] || sizes.medium;
-    };
+    const paperW = printPaperSize === 'custom' ? customPaperWidth : (printPaperSize === 'a4' ? 210 : (printPaperSize === 'letter' ? 215.9 : (printPaperSize === 'medium' ? 101.6 : 76.2)));
+    const paperH = printPaperSize === 'custom' ? customPaperHeight : (printPaperSize === 'a4' ? 297 : (printPaperSize === 'letter' ? 279.4 : (printPaperSize === 'medium' ? 152.4 : 76.2)));
+    
+    const cols = printLayoutMode === 'roll' ? 1 : printColumns;
+    const rows = printLayoutMode === 'roll' ? 1 : printRows;
+    const itemsPerPage = cols * rows;
 
     let html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Zebra ZD320 Print Job</title>
+        <title>Megakem Print Job</title>
         <style>
-          @page { size: auto; margin: 0; }
-          body { margin: 0; padding: 0; background: #fff; }
+          @page { 
+            size: ${paperW}mm ${paperH}mm; 
+            margin: 0; 
+          }
+          body { 
+            margin: 0; 
+            padding: 0; 
+            background: #fff; 
+            font-family: Arial, sans-serif;
+            -webkit-print-color-adjust: exact;
+          }
+          .page {
+            box-sizing: border-box;
+            width: ${paperW}mm;
+            height: ${paperH}mm;
+            padding: ${printMarginTop}mm ${printMarginRight}mm ${printMarginBottom}mm ${printMarginLeft}mm;
+            page-break-after: always;
+            display: grid;
+            grid-template-columns: repeat(${cols}, 1fr);
+            grid-template-rows: repeat(${rows}, 1fr);
+            gap: ${printGap}mm;
+            overflow: hidden;
+          }
           .label {
+            box-sizing: border-box;
+            border: 1px dashed #ccc;
+            padding: ${printLabelPadding}mm;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            page-break-after: always;
-            box-sizing: border-box;
-            border: 1px dashed #eee;
-            padding: 5mm;
-            ${getSize(printSize)}
             text-align: center;
             overflow: hidden;
+            background: #fff;
           }
-          .product-header { font-size: 14pt; font-weight: bold; margin-bottom: 2mm; text-transform: uppercase; }
-          .qr-container { width: 60%; margin: 2mm 0; }
-          .qr-container img { width: 100%; height: auto; display: block; }
-          .batch-info { font-size: 10pt; margin: 1mm 0; }
+          .product-header { 
+            font-size: 8pt; 
+            font-weight: bold; 
+            margin-bottom: 1mm; 
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+          }
+          .qr-container { 
+            width: ${printQRSize}mm; 
+            height: ${printQRSize}mm;
+            margin: 1mm 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .qr-container img { 
+            width: 100%; 
+            height: 100%; 
+            display: block; 
+          }
+          .batch-info { 
+            font-size: 6.5pt; 
+            margin: 0.5mm 0;
+            line-height: 1.2;
+            width: 100%;
+            overflow: hidden;
+          }
           .scan-text { 
-            font-weight: 900; 
-            margin-top: 3mm; 
-            font-size: 18pt; 
-            letter-spacing: 2px;
-            border-top: 2px solid #000;
-            padding-top: 1mm;
+            font-weight: bold; 
+            margin-top: 1mm; 
+            font-size: 10pt; 
+            letter-spacing: 1px;
+            border-top: 1px solid #000;
+            padding-top: 0.5mm;
             width: 80%;
           }
           @media print {
@@ -394,31 +657,40 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       <body>
     `;
 
-    qrs.forEach(qr => {
-      const parsedDate = extractDateFromBatch(qr.batchNo);
-      // If layout is compact, don't show text/details
-      const showDetails = layout !== 'compact';
-      const isDetailed = layout === 'detailed';
+    for (let i = 0; i < qrs.length; i += itemsPerPage) {
+      const pageQRs = qrs.slice(i, i + itemsPerPage);
+      html += `<div class="page">`;
+      
+      pageQRs.forEach(qr => {
+        const parsedDate = extractDateFromBatch(qr.batchNo);
+        html += `
+          <div class="label">
+            ${printShowProdName ? `<div class="product-header">${qr.productName}</div>` : ''}
+            <div class="qr-container">
+              <img src="${qr.qrData}" alt="QR">
+            </div>
+            <div class="batch-info">
+              ${printShowBatch ? `BATCH: <strong>${qr.batchNo}</strong><br>` : ''}
+              ${printShowPkg ? `PKG: <strong>${qr.packageNo || '-'}</strong>` : ''}
+              ${printShowDate && parsedDate ? `<br>DATE: <strong>${parsedDate}</strong>` : ''}
+              ${printShowExpiry && qr.expiryDate ? `<br>EXP: <strong>${new Date(qr.expiryDate).toLocaleDateString()}</strong>` : ''}
+            </div>
+            <div class="scan-text">SCAN ME</div>
+            <div style="font-size: 6.5pt; margin-top: 0.5mm; text-align: center; width: 100%;">Megakem Loyalty System</div>
+          </div>
+        `;
+      });
 
-      html += `
-        <div class="label">
-          ${showDetails ? `<div class="product-header">${qr.productName}</div>` : ''}
-          ${showDetails ? `
-          <div class="batch-info">
-            BATCH: <strong>${qr.batchNo}</strong><br>
-            PKG: <strong>${qr.packageNo || '-'}</strong>
-            ${parsedDate ? `<br>DATE: <strong>${parsedDate}</strong>` : ''}
-            ${isDetailed && qr.expiryDate ? `<br>EXP: <strong>${new Date(qr.expiryDate).toLocaleDateString()}</strong>` : ''}
-          </div>
-          ` : ''}
-          <div class="qr-container" style="${layout === 'compact' ? 'width: 80%;' : ''}">
-            <img src="${qr.qrData}" alt="QR">
-          </div>
-          ${showDetails ? `<div class="scan-text">SCAN ME</div>` : ''}
-          ${showDetails ? `<div style="font-size: 8pt; margin-top: 1mm;">Megakem Loyalty System</div>` : ''}
-        </div>
-      `;
-    });
+      if (printLayoutMode === 'grid') {
+        const filledSlots = pageQRs.length;
+        const emptySlots = itemsPerPage - filledSlots;
+        for (let s = 0; s < emptySlots; s++) {
+          html += `<div class="label" style="border: none; opacity: 0;"><div style="width: ${printQRSize}mm; height: ${printQRSize}mm;"></div></div>`;
+        }
+      }
+
+      html += `</div>`;
+    }
 
     html += `
       </body>
@@ -573,7 +845,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               variant="contained"
               color="info"
               startIcon={<Print />}
-              onClick={() => printQRLabels(selectedForPrint)}
+              onClick={() => setOpenPrintConfigDialog(true)}
             >
               Print Labels
             </Button>
@@ -825,6 +1097,266 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           <Button onClick={() => setOpenBulkDialog(false)}>Cancel</Button>
           <Button onClick={generateBulkQRCodes} variant="contained" disabled={loading}>
             {loading ? <CircularProgress size={24} /> : 'Generate Bulk'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Advanced Print Config Dialog */}
+      <Dialog 
+        open={openPrintConfigDialog} 
+        onClose={() => setOpenPrintConfigDialog(false)} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 'bold', background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
+          Sticker & Print Settings
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Alert severity="warning" sx={{ mb: 3, fontWeight: 'bold' }}>
+            Printer Alignment Guide: In the browser print pop-up, set "Margins" to "None" and uncheck "Headers and footers" (found in "More settings") to align sticker sheets perfectly.
+          </Alert>
+          <Grid container spacing={3}>
+            {/* Left Column: Form Controls */}
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary">
+                Layout Options
+              </Typography>
+              <FormControl fullWidth margin="normal" size="small">
+                <InputLabel>Layout Mode</InputLabel>
+                <Select
+                  value={printLayoutMode}
+                  onChange={(e) => setPrintLayoutMode(e.target.value)}
+                  label="Layout Mode"
+                >
+                  <MenuItem value="roll">Roll / Thermal (Single Label)</MenuItem>
+                  <MenuItem value="grid">Sheet / Grid (Stickers on Page)</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth margin="normal" size="small">
+                <InputLabel>Paper / Sheet Size Preset</InputLabel>
+                <Select
+                  value={printPaperSize}
+                  onChange={(e) => setPrintPaperSize(e.target.value)}
+                  label="Paper / Sheet Size Preset"
+                >
+                  <MenuItem value="medium">4" x 6" Roll Label</MenuItem>
+                  <MenuItem value="small">3" x 3" Roll Label</MenuItem>
+                  <MenuItem value="a4">A4 Sheet (Sticker Grid)</MenuItem>
+                  <MenuItem value="letter">Letter Sheet (Sticker Grid)</MenuItem>
+                  <MenuItem value="custom">Custom Dimensions (mm)</MenuItem>
+                </Select>
+              </FormControl>
+
+              {printPaperSize === 'custom' && (
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Paper Width (mm)"
+                      type="number"
+                      value={customPaperWidth}
+                      onChange={(e) => setCustomPaperWidth(parseFloat(e.target.value) || 0)}
+                      margin="normal"
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Paper Height (mm)"
+                      type="number"
+                      value={customPaperHeight}
+                      onChange={(e) => setCustomPaperHeight(parseFloat(e.target.value) || 0)}
+                      margin="normal"
+                    />
+                  </Grid>
+                </Grid>
+              )}
+
+              {printLayoutMode === 'grid' && (
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Grid Columns"
+                      type="number"
+                      value={printColumns}
+                      onChange={(e) => setPrintColumns(parseInt(e.target.value) || 1)}
+                      margin="normal"
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Grid Rows"
+                      type="number"
+                      value={printRows}
+                      onChange={(e) => setPrintRows(parseInt(e.target.value) || 1)}
+                      margin="normal"
+                    />
+                  </Grid>
+                </Grid>
+              )}
+
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 2 }} gutterBottom color="primary">
+                Sizing & Spacing (mm)
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="QR Code Size"
+                    type="number"
+                    value={printQRSize}
+                    onChange={(e) => setPrintQRSize(parseFloat(e.target.value) || 0)}
+                    margin="none"
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Label Padding"
+                    type="number"
+                    value={printLabelPadding}
+                    onChange={(e) => setPrintLabelPadding(parseFloat(e.target.value) || 0)}
+                    margin="none"
+                  />
+                </Grid>
+                {printLayoutMode === 'grid' && (
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Gap between stickers"
+                      type="number"
+                      value={printGap}
+                      onChange={(e) => setPrintGap(parseFloat(e.target.value) || 0)}
+                      margin="none"
+                    />
+                  </Grid>
+                )}
+              </Grid>
+
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 2 }} gutterBottom color="primary">
+                Page Margins (mm)
+              </Typography>
+              <Grid container spacing={1}>
+                <Grid item xs={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Top"
+                    type="number"
+                    value={printMarginTop}
+                    onChange={(e) => setPrintMarginTop(parseFloat(e.target.value) || 0)}
+                  />
+                </Grid>
+                <Grid item xs={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Bottom"
+                    type="number"
+                    value={printMarginBottom}
+                    onChange={(e) => setPrintMarginBottom(parseFloat(e.target.value) || 0)}
+                  />
+                </Grid>
+                <Grid item xs={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Left"
+                    type="number"
+                    value={printMarginLeft}
+                    onChange={(e) => setPrintMarginLeft(parseFloat(e.target.value) || 0)}
+                  />
+                </Grid>
+                <Grid item xs={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Right"
+                    type="number"
+                    value={printMarginRight}
+                    onChange={(e) => setPrintMarginRight(parseFloat(e.target.value) || 0)}
+                  />
+                </Grid>
+              </Grid>
+
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 2 }} gutterBottom color="primary">
+                Label Content Details
+              </Typography>
+              <Grid container spacing={0}>
+                <Grid item xs={6}>
+                  <FormControlLabel
+                    control={<Checkbox checked={printShowProdName} onChange={(e) => setPrintShowProdName(e.target.checked)} />}
+                    label="Product Name"
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControlLabel
+                    control={<Checkbox checked={printShowBatch} onChange={(e) => setPrintShowBatch(e.target.checked)} />}
+                    label="Batch Number"
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControlLabel
+                    control={<Checkbox checked={printShowPkg} onChange={(e) => setPrintShowPkg(e.target.checked)} />}
+                    label="Package Number"
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControlLabel
+                    control={<Checkbox checked={printShowDate} onChange={(e) => setPrintShowDate(e.target.checked)} />}
+                    label="Mfg Date"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControlLabel
+                    control={<Checkbox checked={printShowExpiry} onChange={(e) => setPrintShowExpiry(e.target.checked)} />}
+                    label="Expiry Date"
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+
+            {/* Right Column: Live Layout Preview */}
+            <Grid item xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderLeft: { md: '1px solid #eee' }, pl: { md: 3 } }}>
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary" sx={{ alignSelf: 'flex-start' }}>
+                Live Layout Preview
+              </Typography>
+              <Typography variant="caption" color="textSecondary" sx={{ mb: 2, alignSelf: 'flex-start' }}>
+                Displays relative sizes & placement of margins, stickers, and QR modules.
+              </Typography>
+              <Box sx={{ p: 2, bgcolor: '#f0f4f8', borderRadius: 2, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
+                {renderLivePreview()}
+              </Box>
+              <Typography variant="body2" sx={{ mt: 1, fontWeight: 'bold' }} color="textSecondary">
+                Paper Aspect: {printPaperSize === 'custom' ? `${customPaperWidth} x ${customPaperHeight}` : (printPaperSize === 'a4' ? 'A4 (210 x 297)' : (printPaperSize === 'letter' ? 'Letter (215.9 x 279.4)' : (printPaperSize === 'medium' ? 'Roll (101.6 x 152.4)' : 'Roll (76.2 x 76.2)')))} mm
+              </Typography>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, borderTop: '1px solid #eee' }}>
+          <Button onClick={() => setOpenPrintConfigDialog(false)} variant="outlined">
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => {
+              setOpenPrintConfigDialog(false);
+              printQRLabels(selectedForPrint);
+            }} 
+            variant="contained" 
+            startIcon={<Print />}
+            color="primary"
+          >
+            Start Printing
           </Button>
         </DialogActions>
       </Dialog>
