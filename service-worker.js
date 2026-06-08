@@ -1,8 +1,8 @@
 /* eslint-disable no-restricted-globals */
 
 // Cache name
-const CACHE_NAME = 'megakem-loyalty-v1';
-const RUNTIME_CACHE = 'megakem-runtime';
+const CACHE_NAME = 'megakem-loyalty-v3';
+const RUNTIME_CACHE = 'megakem-runtime-v3';
 
 // Assets to cache
 const urlsToCache = [
