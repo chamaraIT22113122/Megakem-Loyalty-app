@@ -69,20 +69,26 @@ const initializeApp = async () => {
       const Member = require('./models/Member');
       const Scan   = require('./models/Scan');
 
-      const [mApp, mCustMH, mCustCUS, sApp, sCustMH, sCustCUS] = await Promise.all([
+      const [mApp, mCustMH, mCustCUS, sApp, sCustMH, sCustCUS, mHwEquip] = await Promise.all([
         Member.updateMany({ memberId: { $regex: '^MA', $options: 'i' }, role: { $ne: 'applicator' } }, { $set: { role: 'applicator' } }),
         Member.updateMany({ memberId: { $regex: '^MH', $options: 'i' }, role: { $ne: 'customer'   } }, { $set: { role: 'customer'   } }),
         Member.updateMany({ memberId: { $regex: '^CUS-', $options: 'i' }, role: { $ne: 'customer' } }, { $set: { role: 'customer'   } }),
         Scan.updateMany(  { memberId: { $regex: '^MA', $options: 'i' }, role: { $ne: 'applicator' } }, { $set: { role: 'applicator' } }),
         Scan.updateMany(  { memberId: { $regex: '^MH', $options: 'i' }, role: { $ne: 'customer'   } }, { $set: { role: 'customer'   } }),
         Scan.updateMany(  { memberId: { $regex: '^CUS-', $options: 'i' }, role: { $ne: 'customer' } }, { $set: { role: 'customer'   } }),
+        // Ensure all MH members have equipment:'Hardware' so the Hardwares tab filter works
+        Member.updateMany(
+          { memberId: { $regex: '^MH', $options: 'i' }, equipment: { $in: [null, '', undefined] } },
+          { $set: { equipment: 'Hardware' } }
+        ),
       ]);
 
       const membersFixed = (mApp.modifiedCount || 0) + (mCustMH.modifiedCount || 0) + (mCustCUS.modifiedCount || 0);
       const scansFixed   = (sApp.modifiedCount || 0) + (sCustMH.modifiedCount || 0) + (sCustCUS.modifiedCount || 0);
+      const equipFixed   = mHwEquip.modifiedCount || 0;
 
-      if (membersFixed > 0 || scansFixed > 0) {
-        console.log(`🔧 Role migration: fixed ${membersFixed} member(s) and ${scansFixed} scan(s) (MA→applicator, MH→customer)`);
+      if (membersFixed > 0 || scansFixed > 0 || equipFixed > 0) {
+        console.log(`🔧 Role migration: fixed ${membersFixed} member(s), ${scansFixed} scan(s), ${equipFixed} hardware equipment field(s)`);
       } else {
         console.log('✅ Role migration: all member/scan roles are already correct');
       }

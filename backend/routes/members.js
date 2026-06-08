@@ -236,10 +236,15 @@ router.post('/fix-roles', protect, async (req, res) => {
         { memberId: { $regex: '^MA', $options: 'i' }, role: { $ne: 'applicator' } },
         { $set: { role: 'applicator' } }
       ),
-      // MH* → customer
+      // MH* → customer + equipment:'Hardware'
       Member.updateMany(
         { memberId: { $regex: '^MH', $options: 'i' }, role: { $ne: 'customer' } },
         { $set: { role: 'customer' } }
+      ),
+      // MH* missing equipment field → set to 'Hardware'
+      Member.updateMany(
+        { memberId: { $regex: '^MH', $options: 'i' }, equipment: { $in: [null, '', undefined] } },
+        { $set: { equipment: 'Hardware' } }
       ),
       // CUS-* → customer
       Member.updateMany(
@@ -266,7 +271,8 @@ router.post('/fix-roles', protect, async (req, res) => {
     const membersFixed =
       (memberResults[0].modifiedCount || 0) +
       (memberResults[1].modifiedCount || 0) +
-      (memberResults[2].modifiedCount || 0);
+      (memberResults[2].modifiedCount || 0) +   // equipment fix
+      (memberResults[3].modifiedCount || 0);
 
     const scansFixed =
       (scanResults[0].modifiedCount || 0) +
