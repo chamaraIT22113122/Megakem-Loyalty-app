@@ -153,6 +153,7 @@ export const cashRewardsAPI = {
 // QR Codes API
 export const qrCodesAPI = {
   recordScan: (scanData) => api.post('/qr-codes/record-scan', scanData),
+  getScanLogs: (params) => api.get('/qr-codes/scan-logs', { params }),
 };
 
 export default api;

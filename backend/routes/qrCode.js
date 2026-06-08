@@ -1,9 +1,58 @@
 const express = require('express');
 const router = express.Router();
 const QRCode = require('qrcode');
+const crypto = require('crypto');
 const QRCodeModel = require('../models/QRCode');
+const ScanLog = require('../models/ScanLog');
 const Product = require('../models/Product');
 const { protect, qrAdmin, hasPermission } = require('../middleware/auth');
+
+// ─── HMAC Signature Helpers (Upgrade 1: Anti-Fraud) ─────────────────────────
+const QR_HMAC_SECRET = process.env.QR_HMAC_SECRET || 'megakem-qr-default-secret-change-in-production';
+
+/**
+ * Signs the canonical QR params string and returns hex HMAC-SHA256.
+ * Canonical string: "p=<productNo>&b=<batchNo>&pkg=<packageNo>"
+ */
+function signQRLink(productNo, batchNo, packageNo) {
+  const canonical = `p=${productNo}&b=${batchNo}&pkg=${packageNo || ''}`;
+  return crypto.createHmac('sha256', QR_HMAC_SECRET).update(canonical).digest('hex');
+}
+
+/**
+ * Verifies an HMAC signature.
+ * Returns: 'valid' | 'invalid' | 'missing'
+ */
+function verifyQRSignature(productNo, batchNo, packageNo, sig) {
+  if (!sig) return 'missing';
+  const expected = signQRLink(productNo, batchNo, packageNo);
+  // Constant-time comparison to prevent timing attacks
+  try {
+    const sigBuf = Buffer.from(sig, 'hex');
+    const expectedBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length !== expectedBuf.length) return 'invalid';
+    return crypto.timingSafeEqual(sigBuf, expectedBuf) ? 'valid' : 'invalid';
+  } catch {
+    return 'invalid';
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── Branded QR Helper (Upgrade 4: Navy Color) ───────────────────────────────
+async function generateBrandedQR(link) {
+  return await QRCode.toDataURL(link, {
+    errorCorrectionLevel: 'H',
+    type: 'image/png',
+    quality: 0.95,
+    margin: 2,
+    width: 400,
+    color: {
+      dark: '#003366',  // Megakem primary navy
+      light: '#FFFFFF'
+    }
+  });
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Helper to extract date from batch number (returns Date object or null)
 function extractDateFromBatch(batchNo) {
@@ -171,17 +220,14 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
       // Create unique QR ID - replace spaces with underscores for ID uniqueness
       const qrId = `${product.productNo}-${formattedBatch.replace(/\s+/g, '_')}-${packageNo || 'STD'}-${Date.now()}`;
       
-      // Create QR link without path to prevent 404s on GitHub Pages
-      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(formattedBatch)}&pkg=${encodeURIComponent(packageNo || '')}`;
+      // Compute HMAC signature for anti-fraud (Upgrade 1)
+      const sig = signQRLink(product.productNo, formattedBatch, packageNo || '');
 
-      // Generate QR code as data URL
-      const qrDataUrl = await QRCode.toDataURL(qrLink, {
-        errorCorrectionLevel: 'H',
-        type: 'image/png',
-        quality: 0.95,
-        margin: 1,
-        width: 300
-      });
+      // Create QR link with signature appended
+      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(formattedBatch)}&pkg=${encodeURIComponent(packageNo || '')}&sig=${sig}`;
+
+      // Generate branded QR code (navy color) as data URL (Upgrade 4)
+      const qrDataUrl = await generateBrandedQR(qrLink);
 
       // Create QR code record
       const qrRecord = new QRCodeModel({
@@ -281,7 +327,31 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
           lastPrintDate: {
             $max: '$printedDate'
           },
+          // Add expiry detection (Upgrade 5)
+          minExpiryDate: { $min: '$expiryDate' },
           productCount: { $push: '$productNo' }
+        }
+      },
+      // Compute isExpired and scanRate in a projection stage
+      {
+        $addFields: {
+          isExpired: {
+            $cond: [
+              { $and: [
+                { $ne: ['$minExpiryDate', null] },
+                { $lt: ['$minExpiryDate', new Date()] }
+              ]},
+              true,
+              false
+            ]
+          },
+          scanRate: {
+            $cond: [
+              { $gt: ['$totalQRs', 0] },
+              { $round: [{ $multiply: [{ $divide: ['$scanned', '$totalQRs'] }, 100] }, 1] },
+              0
+            ]
+          }
         }
       },
       { $sort: { lastPrintDate: -1 } }
@@ -451,17 +521,17 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       // Create unique QR ID - replace spaces with underscores for ID uniqueness
       const qrId = `${product.productNo}-${formattedBatch.replace(/\s+/g, '_')}-${pNo}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       
-      // The user wants the link and batch info in the QR without triggering 404s
-      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(formattedBatch)}&pkg=${encodeURIComponent(pNo)}`;
+      // Compute HMAC signature for anti-fraud (Upgrade 1)
+      const sig = signQRLink(product.productNo, formattedBatch, pNo);
+
+      // Create QR link with signature
+      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(formattedBatch)}&pkg=${encodeURIComponent(pNo)}&sig=${sig}`;
+
+      // Generate branded QR code (navy color) as data URL (Upgrade 4)
+      const qrDataUrl = await generateBrandedQR(qrLink);
       
       // Pipe delimited data as secondary info or for the scanner app
       const pipeData = `${product.productNo}|${product.name}|${formattedBatch}|${pNo}|${product.packSize || 'N/A'}`;
-
-      const qrDataUrl = await QRCode.toDataURL(qrLink, {
-        errorCorrectionLevel: 'H',
-        margin: 1,
-        width: 300
-      });
 
       qrRecords.push({
         qrId,
@@ -555,11 +625,33 @@ router.get('/settings/printers', protect, qrAdmin, (req, res) => {
 // @access  Public
 router.post('/record-scan', async (req, res) => {
   try {
-    const { productNo, batchNo, packageNo } = req.body;
+    const { productNo, batchNo, packageNo, sig } = req.body;
 
     if (!productNo || !batchNo) {
       return res.status(400).json({ error: 'productNo and batchNo are required' });
     }
+
+    // ── Upgrade 1: HMAC Signature Verification (backwards-compatible) ──────
+    const sigStatus = verifyQRSignature(productNo, batchNo, packageNo, sig);
+
+    if (sigStatus === 'invalid') {
+      // Log the fraud attempt
+      await ScanLog.create({
+        eventType: 'invalid_sig',
+        productNo: productNo.toUpperCase(),
+        batchNo,
+        packageNo,
+        signature: 'invalid',
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }).catch(() => {});
+
+      return res.status(403).json({
+        error: 'Invalid QR signature. Counterfeit QR code detected.',
+        counterfeit: true
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────
 
     // Find the matching QR code
     const query = {
@@ -586,6 +678,17 @@ router.post('/record-scan', async (req, res) => {
     
     await qrCode.save();
 
+    // Log successful scan event
+    await ScanLog.create({
+      eventType: 'success',
+      productNo: productNo.toUpperCase(),
+      batchNo,
+      packageNo,
+      signature: sigStatus,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    }).catch(() => {});
+
     res.json({
       success: true,
       message: 'QR scan recorded successfully',
@@ -594,6 +697,44 @@ router.post('/record-scan', async (req, res) => {
     });
   } catch (error) {
     console.error('Error recording QR scan:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// @route   GET /api/qr-codes/scan-logs
+// @desc    Get all QR scan attempt logs (Upgrade 5: Traceability)
+// @access  Private/Admin
+router.get('/scan-logs', protect, qrAdmin, async (req, res) => {
+  try {
+    const { eventType, productNo, startDate, endDate, page = 1, limit = 50 } = req.query;
+
+    const filter = {};
+    if (eventType) filter.eventType = eventType;
+    if (productNo) filter.productNo = productNo.toUpperCase();
+    if (startDate || endDate) {
+      filter.timestamp = {};
+      if (startDate) filter.timestamp.$gte = new Date(startDate);
+      if (endDate) filter.timestamp.$lte = new Date(endDate);
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const logs = await ScanLog.find(filter)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await ScanLog.countDocuments(filter);
+
+    res.json({
+      data: logs,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

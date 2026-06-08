@@ -12,6 +12,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -29,6 +30,9 @@ import {
   IconButton,
   Tooltip,
   CircularProgress,
+  LinearProgress,
+  Tab,
+  Tabs,
   TextField as StyledTextField,
   InputAdornment
 } from '@mui/material';
@@ -46,7 +50,7 @@ import {
 } from '@mui/icons-material';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import api from '../services/api';
+import api, { qrCodesAPI } from '../services/api';
 
 // Helper to extract date from batch number (returns string DD/MM/YYYY or null)
 const extractDateFromBatch = (batchNo) => {
@@ -364,7 +368,97 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedForPrint, setSelectedForPrint] = useState([]);
   
+  // Upgrade 5: Tab and Scan Logs state
+  const [activeTab, setActiveTab] = useState(0);
+  const [scanLogs, setScanLogs] = useState([]);
+  const [scanLogsLoading, setScanLogsLoading] = useState(false);
+  const [scanLogFilter, setScanLogFilter] = useState('');
+
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  
   const qrPreviewRef = useRef();
+
+  // Upgrade 2: Generate ZPL commands for Zebra thermal printers
+  const generateZPL = (qrIds) => {
+    const qrsToPrint = qrCodes.filter(qr => qrIds.includes(qr._id));
+    if (qrsToPrint.length === 0) return;
+
+    const getFormattedDate = (dateVal) => {
+      if (!dateVal) return null;
+      const d = new Date(dateVal);
+      if (!isNaN(d.getTime())) return d.toLocaleDateString('en-GB');
+      return String(dateVal);
+    };
+
+    let zpl = '';
+    qrsToPrint.forEach(qr => {
+      const mfgDate = qr.manufactureDate
+        ? getFormattedDate(qr.manufactureDate)
+        : extractDateFromBatch(qr.batchNo) || 'N/A';
+
+      let expDate = qr.expiryDate ? getFormattedDate(qr.expiryDate) : null;
+      if (!expDate && mfgDate && mfgDate !== 'N/A') {
+        const parts = mfgDate.split('/');
+        if (parts.length === 3) expDate = `${parts[0]}/${parts[1]}/${parseInt(parts[2]) + 2}`;
+      }
+
+      zpl += `^XA\n`;
+      zpl += `^FO30,25^ADN,28,15^FD${(qr.productName || '').substring(0, 28).toUpperCase()}^FS\n`;
+      zpl += `^FO30,65^ADN,20,10^FDBatch: ${(qr.batchNo || '').substring(0, 30)}^FS\n`;
+      zpl += `^FO30,92^ADN,20,10^FDPkg: ${qr.packageNo || 'N/A'}^FS\n`;
+      if (mfgDate && mfgDate !== 'N/A') {
+        zpl += `^FO30,119^ADN,18,9^FDMFG: ${mfgDate}^FS\n`;
+      }
+      if (expDate) {
+        zpl += `^FO30,143^ADN,18,9^FDEXP: ${expDate}^FS\n`;
+      }
+      // QR code module (BQ = QR code, N=normal, 2=model 2, 6=magnification factor)
+      zpl += `^FO190,30^BQN,2,5^FDQA,${qr.qrLink || ''}^FS\n`;
+      zpl += `^FO30,175^ADN,16,8^FDMegakem Loyalty System^FS\n`;
+      zpl += `^XZ\n`;
+    });
+
+    const blob = new Blob([zpl], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `megakem_labels_${new Date().toISOString().split('T')[0]}.zpl`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    onShowNotification(`Downloaded ZPL file for ${qrsToPrint.length} label(s)`, 'success');
+  };
+
+  // CSV export helper
+  const exportCSV = (rows, filename) => {
+    if (!rows.length) return;
+    const headers = Object.keys(rows[0]);
+    const csvLines = [
+      headers.join(','),
+      ...rows.map(row => headers.map(h => `"${String(row[h] ?? '').replace(/"/g, '""')}"`).join(','))
+    ];
+    const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  // Upgrade 5: Load scan logs
+  const loadScanLogs = async () => {
+    try {
+      setScanLogsLoading(true);
+      const params = {};
+      if (scanLogFilter) params.eventType = scanLogFilter;
+      const response = await qrCodesAPI.getScanLogs(params);
+      setScanLogs(response.data.data || []);
+    } catch (error) {
+      onShowNotification('Error loading scan logs: ' + (error.response?.data?.error || error.message), 'error');
+    } finally {
+      setScanLogsLoading(false);
+    }
+  };
 
   const handleBatchNoChange = (val) => {
     setBatchNo(val);
@@ -828,7 +922,13 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   batchSummary.map(batch => (
                     <TableRow key={batch._id} hover>
                       <TableCell>
-                        <Chip label={batch._id} size="small" variant="outlined" color="primary" sx={{ fontWeight: 'bold' }} />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Chip label={batch._id} size="small" variant="outlined" color="primary" sx={{ fontWeight: 'bold' }} />
+                          {/* Upgrade 5: Expiry badge */}
+                          {batch.isExpired && (
+                            <Chip label="⚠️ Expired" size="small" color="error" />
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell align="center">{batch.totalQRs}</TableCell>
                       <TableCell align="center">
@@ -838,7 +938,24 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                           color={batch.printed === batch.totalQRs ? "success" : "warning"}
                         />
                       </TableCell>
-                      <TableCell align="center">{batch.scanned}</TableCell>
+                      <TableCell align="center">
+                        {/* Upgrade 5: Scan rate with progress bar */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 80 }}>
+                          <Box sx={{ flexGrow: 1 }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={batch.scanRate || 0}
+                              sx={{ height: 6, borderRadius: 3,
+                                bgcolor: 'grey.200',
+                                '& .MuiLinearProgress-bar': { bgcolor: batch.scanRate >= 80 ? 'success.main' : batch.scanRate >= 40 ? 'warning.main' : 'info.main' }
+                              }}
+                            />
+                          </Box>
+                          <Typography variant="caption" fontWeight="bold" sx={{ minWidth: 32, textAlign: 'right' }}>
+                            {batch.scanned}
+                          </Typography>
+                        </Box>
+                      </TableCell>
                       <TableCell align="right">
                         {batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : 'N/A'}
                       </TableCell>
@@ -1383,6 +1500,18 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           <Button onClick={() => setOpenPrintConfigDialog(false)} variant="outlined">
             Cancel
           </Button>
+          {/* Upgrade 2: Download ZPL for native Zebra thermal printing */}
+          <Button
+            onClick={() => {
+              setOpenPrintConfigDialog(false);
+              generateZPL(selectedForPrint);
+            }}
+            variant="outlined"
+            color="secondary"
+            startIcon={<Download />}
+          >
+            Download ZPL (Zebra Native)
+          </Button>
           <Button 
             onClick={() => {
               setOpenPrintConfigDialog(false);
@@ -1466,7 +1595,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredQRCodes.map(qr => (
+                {filteredQRCodes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(qr => (
                   <TableRow key={qr._id}>
                     <TableCell padding="checkbox">
                       <Checkbox
@@ -1532,14 +1661,32 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               No QR codes found. Start by generating new QR codes.
             </Alert>
           )}
+
+          {/* Pagination */}
+          <TablePagination
+            component="div"
+            count={filteredQRCodes.length}
+            page={page}
+            onPageChange={(e, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+          />
         </CardContent>
       </Card>
 
-      {/* Batch Summary */}
-      {batchSummary.length > 0 && (
-        <Card sx={{ mt: 3 }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 2 }}>Batch Summary</Typography>
+      {/* Upgrade 5: Scan Logs Tab Panel */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+            <Tabs value={activeTab} onChange={(e, v) => { setActiveTab(v); if (v === 1) loadScanLogs(); }}>
+              <Tab label="Batch Summary" />
+              <Tab label={`🔍 Scan Attempt Logs`} />
+            </Tabs>
+          </Box>
+
+          {/* Tab 0: Batch Summary (existing) */}
+          {activeTab === 0 && batchSummary.length > 0 && (
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -1554,21 +1701,134 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 <TableBody>
                   {batchSummary.map(batch => (
                     <TableRow key={batch._id}>
-                      <TableCell><strong>{batch._id}</strong></TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <strong>{batch._id}</strong>
+                          {batch.isExpired && <Chip label="Expired" size="small" color="error" />}
+                        </Box>
+                      </TableCell>
                       <TableCell align="center">{batch.totalQRs}</TableCell>
                       <TableCell align="center">{batch.printed}</TableCell>
                       <TableCell align="center">{batch.scanned}</TableCell>
-                      <TableCell>
-                        {batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : '-'}
-                      </TableCell>
+                      <TableCell>{batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TableContainer>
-          </CardContent>
-        </Card>
-      )}
+          )}
+
+          {/* Tab 1: Scan Attempt Logs */}
+          {activeTab === 1 && (
+            <Box>
+              <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                <FormControl sx={{ minWidth: 180 }} size="small">
+                  <InputLabel>Filter by Event</InputLabel>
+                  <Select
+                    value={scanLogFilter}
+                    onChange={(e) => setScanLogFilter(e.target.value)}
+                    label="Filter by Event"
+                  >
+                    <MenuItem value="">All Events</MenuItem>
+                    <MenuItem value="success">✅ Success</MenuItem>
+                    <MenuItem value="duplicate">🔁 Duplicate</MenuItem>
+                    <MenuItem value="invalid_sig">🚨 Counterfeit / Invalid Sig</MenuItem>
+                    <MenuItem value="product_not_found">❓ Product Not Found</MenuItem>
+                    <MenuItem value="legacy">📜 Legacy (Unsigned)</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button variant="outlined" startIcon={<Refresh />} onClick={loadScanLogs} disabled={scanLogsLoading}>
+                  {scanLogsLoading ? <CircularProgress size={20} /> : 'Refresh'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<Download />}
+                  onClick={() => exportCSV(scanLogs.map(l => ({
+                    'Timestamp': new Date(l.timestamp).toLocaleString(),
+                    'Event': l.eventType,
+                    'Product': l.productNo || '',
+                    'Batch': l.batchNo || '',
+                    'Package': l.packageNo || '',
+                    'Member': l.memberId || '',
+                    'Role': l.role || '',
+                    'Signature': l.signature,
+                    'City': l.city || '',
+                    'IP': l.ipAddress || ''
+                  })), 'scan_logs')}
+                  disabled={!scanLogs.length}
+                >
+                  Export CSV
+                </Button>
+              </Box>
+
+              {scanLogsLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <TableContainer sx={{ maxHeight: 400 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>Time</strong></TableCell>
+                        <TableCell><strong>Event</strong></TableCell>
+                        <TableCell><strong>Product</strong></TableCell>
+                        <TableCell><strong>Batch</strong></TableCell>
+                        <TableCell><strong>Member</strong></TableCell>
+                        <TableCell><strong>Sig</strong></TableCell>
+                        <TableCell><strong>City</strong></TableCell>
+                        <TableCell><strong>IP</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {scanLogs.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                            <Typography color="textSecondary">No scan logs yet. Click Refresh to load.</Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        scanLogs.map((log, idx) => {
+                          const rowColor = log.eventType === 'success' ? 'rgba(76,175,80,0.06)'
+                            : log.eventType === 'invalid_sig' ? 'rgba(244,67,54,0.08)'
+                            : log.eventType === 'duplicate' ? 'rgba(255,152,0,0.07)'
+                            : 'transparent';
+                          const eventChip = log.eventType === 'success' ? <Chip label="✅ Success" size="small" color="success" />
+                            : log.eventType === 'invalid_sig' ? <Chip label="🚨 Counterfeit" size="small" color="error" />
+                            : log.eventType === 'duplicate' ? <Chip label="🔁 Duplicate" size="small" color="warning" />
+                            : log.eventType === 'legacy' ? <Chip label="📜 Legacy" size="small" />
+                            : <Chip label={log.eventType} size="small" />;
+                          return (
+                            <TableRow key={log._id || idx} sx={{ bgcolor: rowColor }}>
+                              <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
+                                {new Date(log.timestamp).toLocaleString()}
+                              </TableCell>
+                              <TableCell>{eventChip}</TableCell>
+                              <TableCell sx={{ fontSize: '0.75rem' }}>{log.productNo || '-'}</TableCell>
+                              <TableCell sx={{ fontSize: '0.75rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.batchNo || '-'}</TableCell>
+                              <TableCell sx={{ fontSize: '0.75rem' }}>{log.memberId || '-'}</TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={log.signature}
+                                  size="small"
+                                  color={log.signature === 'valid' ? 'success' : log.signature === 'invalid' ? 'error' : 'default'}
+                                  variant="outlined"
+                                />
+                              </TableCell>
+                              <TableCell sx={{ fontSize: '0.75rem' }}>{log.city || '-'}</TableCell>
+                              <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{log.ipAddress || '-'}</TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
     </Box>
   );
 };

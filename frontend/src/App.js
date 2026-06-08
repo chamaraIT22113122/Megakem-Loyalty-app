@@ -710,6 +710,11 @@ function App() {
   const scannerRef = useRef(null);
   const pollIntervalRef = useRef(null);
   const scanErrorCountRef = useRef(0);
+  // Upgrade 3: Scanner UX state
+  const [torchOn, setTorchOn] = useState(false);
+  const [continuousScan, setContinuousScan] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
+  const html5QrCodeRef = useRef(null); // Raw Html5Qrcode instance for torch access
 
   // Load applicator info from database when user session is available
   useEffect(() => {
@@ -896,6 +901,7 @@ function App() {
     
     if (batchParam || productParam) {
       console.log('Detected QR parameters:', { batchParam, productParam, pkgParam });
+      const sigParam = params.get('sig'); // HMAC signature — Upgrade 1
       
       let parsedData = {
         productCode: productParam || '',
@@ -944,11 +950,16 @@ function App() {
           await qrCodesAPI.recordScan({
             productNo: parsedData.productCode,
             batchNo: parsedData.fullBatch || parsedData.batchNo,
-            packageNo: parsedData.bagNo
+            packageNo: parsedData.bagNo,
+            sig: sigParam  // Pass HMAC sig for backend verification — Upgrade 1
           });
           console.log('Automatically recorded QR scan event in backend');
         } catch (err) {
-          console.warn('Failed to record QR scan event in backend:', err.response?.data?.error || err.message);
+          if (err.response?.data?.counterfeit) {
+            console.warn('⚠️ Counterfeit QR code rejected by backend:', err.response.data.error);
+          } else {
+            console.warn('Failed to record QR scan event in backend:', err.response?.data?.error || err.message);
+          }
         }
       };
       recordScanEvent();
@@ -1028,8 +1039,38 @@ function App() {
     loadData();
   }, [user]);
 
+  // Upgrade 3: Play beep sound using Web Audio API (no audio file needed)
+  const playScanBeep = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+    } catch (e) { /* AudioContext unavailable */ }
+  };
+
+  // Upgrade 3: Toggle flashlight/torch
+  const toggleTorch = async () => {
+    if (!html5QrCodeRef.current) return;
+    try {
+      const newState = !torchOn;
+      await html5QrCodeRef.current.applyVideoConstraints({ advanced: [{ torch: newState }] });
+      setTorchOn(newState);
+    } catch (e) {
+      console.warn('Torch not supported on this device:', e);
+      showNotification('Torch not supported on this device', 'warning');
+    }
+  };
+
   const initializeScanner = () => {
-    if (!window.Html5QrcodeScanner) return;
+    if (!window.Html5Qrcode) return;
     
     const container = document.getElementById('reader');
     if (!container) {
@@ -1037,39 +1078,72 @@ function App() {
       return;
     }
     container.innerHTML = '';
-    
-    const scanner = new window.Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-    scanner.render(async (decodedText) => {
-      // Clear the scanner temporarily
-      await scanner.clear().catch(err => console.error('Failed to clear scanner', err));
-      
-      // Process the scan
-      await handleScan(decodedText);
-      
-      // Restart the scanner after a short delay
-      setTimeout(() => {
-        if (view === 'scanner') {
-          initializeScanner();
+
+    // Use raw Html5Qrcode class for full camera track access
+    const html5QrCode = new window.Html5Qrcode('reader');
+    html5QrCodeRef.current = html5QrCode;
+
+    const config = {
+      fps: 12,
+      qrbox: { width: 260, height: 260 },
+      aspectRatio: 1.0,
+      rememberLastUsedCamera: true
+    };
+
+    html5QrCode.start(
+      { facingMode: 'environment' },
+      config,
+      async (decodedText) => {
+        // Upgrade 3: Sound + Haptic feedback on success
+        playScanBeep();
+        if (navigator.vibrate) navigator.vibrate(120);
+
+        if (continuousScan) {
+          // Continuous mode: process scan but keep camera running
+          setScanCount(prev => prev + 1);
+          await handleScan(decodedText);
+          // Pause briefly to avoid double-scanning same code
+          html5QrCode.pause(true);
+          setTimeout(() => {
+            try { html5QrCode.resume(); } catch (e) {}
+          }, 1500);
+        } else {
+          // One-shot mode: stop camera and go to cart
+          await html5QrCode.stop().catch(() => {});
+          html5QrCodeRef.current = null;
+          await handleScan(decodedText);
         }
-      }, 500);
-    }, () => {});
-    
-    scannerRef.current = scanner;
+      },
+      () => { /* QR scan failure — ignore per-frame errors */ }
+    ).catch(err => console.warn('Camera start error:', err));
+
+    scannerRef.current = html5QrCode;
   };
 
   useEffect(() => {
     if (view === 'scanner') {
+      // Reset session scan counter when entering scanner
+      setScanCount(0);
+      setTorchOn(false);
       loadScript('https://unpkg.com/html5-qrcode').then(() => {
-        // Add a small delay to ensure DOM is ready
         setTimeout(() => {
-          if (window.Html5QrcodeScanner && view === 'scanner') {
+          if (window.Html5Qrcode && view === 'scanner') {
             initializeScanner();
           }
-        }, 100);
+        }, 150);
       }).catch(err => console.error('Failed to load QR library', err));
     }
-    return () => { if (scannerRef.current) { scannerRef.current.clear().catch(() => {}); scannerRef.current = null; } };
-  }, [view]);
+    return () => {
+      if (html5QrCodeRef.current) {
+        html5QrCodeRef.current.stop().catch(() => {});
+        html5QrCodeRef.current = null;
+      }
+      if (scannerRef.current && scannerRef.current !== html5QrCodeRef.current) {
+        scannerRef.current.clear?.().catch(() => {});
+        scannerRef.current = null;
+      }
+    };
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // User-friendly error messages
   const getUserFriendlyError = (error) => {
@@ -1196,6 +1270,7 @@ function App() {
         let materialBatch = '';
         let dateCode = '';
         let packNo = '';
+        let urlSig = null;
 
         const cleanString = qrString.trim();
 
@@ -1205,12 +1280,14 @@ function App() {
             productCode = urlObj.searchParams.get('p') || urlObj.searchParams.get('product') || urlObj.searchParams.get('code') || '';
             batchNo = urlObj.searchParams.get('b') || urlObj.searchParams.get('batch') || urlObj.searchParams.get('batchNo') || '';
             bagNo = urlObj.searchParams.get('pkg') || urlObj.searchParams.get('package') || '';
+            urlSig = urlObj.searchParams.get('sig') || null;
           } catch (urlErr) {
             const searchPart = cleanString.includes('?') ? cleanString.split('?')[1] : cleanString;
             const params = new URLSearchParams(searchPart);
             productCode = params.get('p') || params.get('product') || params.get('code') || '';
             batchNo = params.get('b') || params.get('batch') || params.get('batchNo') || '';
             bagNo = params.get('pkg') || params.get('package') || '';
+            urlSig = params.get('sig') || null;
           }
           packNo = bagNo;
           
@@ -1316,7 +1393,8 @@ function App() {
             batch: batchNo || qrString,
             bag: bagNo || packNo || '001',
             qty: finalPackSize,
-            price: product.price || 0
+            price: product.price || 0,
+            sig: urlSig
           };
           
           showNotification(`Added ${product.name} (${finalPackSize}) - Rs. ${product.price?.toLocaleString() || '0'}`, 'success');
@@ -1332,7 +1410,8 @@ function App() {
             bag: bagNo || packNo || 'N/A',
             id: productCode,
             qty: packSize ? packSize : '1kg',
-            price: 0
+            price: 0,
+            sig: urlSig
           };
           
           showNotification(
@@ -1408,7 +1487,8 @@ function App() {
         bagNo: item.bag, 
         qty: item.qty,
         price: item.price || 0,
-        location: finalLocation || '' 
+        location: finalLocation || '',
+        sig: item.sig
       }));
       const response = await scansAPI.createBatch(scansData);
       
@@ -3499,6 +3579,70 @@ function App() {
             <Box sx={{ position: 'absolute', zIndex: 0, opacity: 0.3, textAlign: 'center' }}><Typography variant='caption' sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Loading Camera...</Typography></Box>
             <IconButton onClick={() => setView('welcome')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, left: { xs: 8, sm: 16 }, zIndex: 10, bgcolor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', transition: 'all 0.3s', '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
             {cart.length > 0 && <Fab variant='extended' size={window.innerWidth < 600 ? 'small' : 'medium'} onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, right: { xs: 8, sm: 16 }, zIndex: 10, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white', fontWeight: 700, boxShadow: '0 6px 20px rgba(164,210,51,0.4)', animation: 'bounce 2s ease-in-out infinite', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }, '&:hover': { background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1.5, sm: 2 } }}>View Cart ({cart.length})</Fab>}
+
+            {/* Upgrade 3: Scanner Control Bar — Torch + Continuous Scan + Count */}
+            <Box sx={{
+              position: 'absolute', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 10, display: 'flex', alignItems: 'center', gap: 1.5,
+              bgcolor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8,
+              px: 2, py: 1
+            }}>
+              {/* Torch Button */}
+              <Tooltip title={torchOn ? 'Turn Off Torch' : 'Turn On Torch'}>
+                <IconButton
+                  onClick={toggleTorch}
+                  size='small'
+                  sx={{
+                    bgcolor: torchOn ? 'rgba(255,220,50,0.25)' : 'rgba(255,255,255,0.1)',
+                    color: torchOn ? '#FFD700' : 'rgba(255,255,255,0.7)',
+                    border: torchOn ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.2)',
+                    transition: 'all 0.3s',
+                    '&:hover': { bgcolor: 'rgba(255,220,50,0.3)', color: '#FFD700' }
+                  }}
+                >
+                  {torchOn ? '🔦' : '🔦'}
+                </IconButton>
+              </Tooltip>
+
+              {/* Divider */}
+              <Box sx={{ width: '1px', height: 24, bgcolor: 'rgba(255,255,255,0.2)' }} />
+
+              {/* Continuous Scan Toggle */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
+                  Continuous
+                </Typography>
+                <Box
+                  onClick={() => setContinuousScan(prev => !prev)}
+                  sx={{
+                    width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
+                    bgcolor: continuousScan ? '#A4D233' : 'rgba(255,255,255,0.2)',
+                    position: 'relative', transition: 'all 0.3s',
+                    border: continuousScan ? '1px solid #7fa326' : '1px solid rgba(255,255,255,0.3)'
+                  }}
+                >
+                  <Box sx={{
+                    position: 'absolute', top: 2, left: continuousScan ? 18 : 2,
+                    width: 14, height: 14, borderRadius: '50%',
+                    bgcolor: 'white', transition: 'all 0.3s',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.4)'
+                  }} />
+                </Box>
+              </Box>
+
+              {/* Scan Count Badge (shown in continuous mode) */}
+              {continuousScan && scanCount > 0 && (
+                <Box sx={{
+                  bgcolor: '#A4D233', color: '#1a2e00', borderRadius: 8,
+                  px: 1, py: 0.25, display: 'flex', alignItems: 'center', gap: 0.5
+                }}>
+                  <Typography variant='caption' fontWeight='bold' sx={{ fontSize: '0.7rem' }}>
+                    ✓ {scanCount} scanned
+                  </Typography>
+                </Box>
+              )}
+            </Box>
           </Box>
           <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10, bgcolor: 'rgba(255,255,255,0.98)', p: 2, borderTop: '2px solid', borderColor: 'primary.main' }}>
             <Typography variant='subtitle2' fontWeight='bold' color='primary' gutterBottom>Manual Entry (Temporary Simulator)</Typography>

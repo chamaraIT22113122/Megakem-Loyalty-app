@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const Scan = require('../models/Scan');
 const User = require('../models/User');
 const Member = require('../models/Member');
@@ -7,6 +8,21 @@ const Product = require('../models/Product');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { optionalAuth, protect, authorize, hasPermission } = require('../middleware/auth');
 const QRCodeModel = require('../models/QRCode');
+const ScanLog = require('../models/ScanLog');
+
+// HMAC verification helper (mirrors qrCode.js) — Upgrade 1
+const QR_HMAC_SECRET = process.env.QR_HMAC_SECRET || 'megakem-qr-default-secret-change-in-production';
+function verifyQRSig(productNo, batchNo, packageNo, sig) {
+  if (!sig) return 'missing';
+  const canonical = `p=${productNo}&b=${batchNo}&pkg=${packageNo || ''}`;
+  const expected = crypto.createHmac('sha256', QR_HMAC_SECRET).update(canonical).digest('hex');
+  try {
+    const sigBuf = Buffer.from(sig, 'hex');
+    const expBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length !== expBuf.length) return 'invalid';
+    return crypto.timingSafeEqual(sigBuf, expBuf) ? 'valid' : 'invalid';
+  } catch { return 'invalid'; }
+}
 
 // @route   GET /api/scans
 // @desc    Get all scans (with pagination and filters)
@@ -113,8 +129,33 @@ router.post('/', optionalAuth, async (req, res) => {
       productNo,
       batchNo,
       bagNo,
-      qty
+      qty,
+      sig  // HMAC signature from QR URL — Upgrade 1
     } = req.body;
+
+    // ── Upgrade 1: HMAC Signature Verification (backwards-compatible) ──────
+    const sigStatus = verifyQRSig(productNo, batchNo, bagNo, sig);
+    if (sigStatus === 'invalid') {
+      // Log fraud attempt
+      await ScanLog.create({
+        eventType: 'invalid_sig',
+        productNo: productNo?.toUpperCase(),
+        batchNo,
+        packageNo: bagNo,
+        memberId: memberId?.toUpperCase(),
+        role,
+        signature: 'invalid',
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        notes: 'Counterfeit QR signature rejected'
+      }).catch(() => {});
+      return res.status(403).json({
+        success: false,
+        message: 'Counterfeit QR code detected. Signature invalid.',
+        counterfeit: true
+      });
+    }
+    // ───────────────────────────────────────────────────────────────────
 
     // Check if applicator is registered in Applicator & Hardware Info
     if (role === 'applicator') {
@@ -137,6 +178,19 @@ router.post('/', optionalAuth, async (req, res) => {
     });
 
     if (duplicateScan) {
+      // Log duplicate attempt — Upgrade 5
+      await ScanLog.create({
+        eventType: 'duplicate',
+        productNo: productNo?.toUpperCase(),
+        batchNo,
+        packageNo: bagNo,
+        memberId: memberId?.toUpperCase(),
+        role,
+        signature: sigStatus,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        notes: `Batch already scanned by a ${role}`
+      }).catch(() => {});
       return res.status(400).json({
         success: false,
         message: `This batch number (${batchNo}) has already been scanned by a ${role}`,
@@ -210,7 +264,21 @@ router.post('/', optionalAuth, async (req, res) => {
     // Update matching QRCode status to scanned
     await updateQRCodeStatus(scan);
 
-    // Update scan count if user is authenticated
+    // ── Upgrade 5: Log successful scan event ───────────────────────────────
+    await ScanLog.create({
+      eventType: 'success',
+      productNo: productNo?.toUpperCase(),
+      batchNo,
+      packageNo: bagNo,
+      memberId: memberId?.toUpperCase(),
+      role,
+      signature: sigStatus,
+      city: req.body.location,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    }).catch(() => {});
+    // ───────────────────────────────────────────────────────────────────
+
     if (req.user) {
       const user = await User.findById(req.user._id);
       if (user) {
@@ -245,7 +313,7 @@ router.post('/batch', optionalAuth, async (req, res) => {
       });
     }
 
-    // Check if applicator is registered for all applicator scans in batch
+    // Check if applicator is registered for all applicator scans in batch, and verify HMAC signatures
     for (const scan of scans) {
       if (scan.role === 'applicator') {
         const member = await Member.findOne({ 
@@ -258,6 +326,29 @@ router.post('/batch', optionalAuth, async (req, res) => {
             message: `Applicator ID ${scan.memberId} is not registered. Please register in Applicator & Hardware Info first.`
           });
         }
+      }
+
+      // Upgrade 1: Verify HMAC signature for each scan
+      const sigStatus = verifyQRSig(scan.productNo, scan.batchNo, scan.bagNo, scan.sig);
+      if (sigStatus === 'invalid') {
+        // Log fraud attempt
+        await ScanLog.create({
+          eventType: 'invalid_sig',
+          productNo: scan.productNo?.toUpperCase(),
+          batchNo: scan.batchNo,
+          packageNo: scan.bagNo,
+          memberId: scan.memberId?.toUpperCase(),
+          role: scan.role,
+          signature: 'invalid',
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+          notes: 'Counterfeit QR signature in batch rejected'
+        }).catch(() => {});
+        return res.status(403).json({
+          success: false,
+          message: `Counterfeit QR code detected for batch number ${scan.batchNo}. Signature invalid.`,
+          counterfeit: true
+        });
       }
     }
 
@@ -277,6 +368,21 @@ router.post('/batch', optionalAuth, async (req, res) => {
           batchNo: scan.batchNo,
           bagNo: scan.bagNo
         });
+
+        // Log duplicate attempt — Upgrade 5
+        const sigStatus = verifyQRSig(scan.productNo, scan.batchNo, scan.bagNo, scan.sig);
+        await ScanLog.create({
+          eventType: 'duplicate',
+          productNo: scan.productNo?.toUpperCase(),
+          batchNo: scan.batchNo,
+          packageNo: scan.bagNo,
+          memberId: scan.memberId?.toUpperCase(),
+          role: scan.role,
+          signature: sigStatus,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+          notes: `Batch already scanned by a ${scan.role} (batch submission)`
+        }).catch(() => {});
       } else {
         // Try to get product price and points if not provided
         let productPrice = scan.price;
@@ -310,7 +416,6 @@ router.post('/batch', optionalAuth, async (req, res) => {
                 productPrice = product.price || 0;
               }
             }
-            
           }
         }
 
@@ -344,6 +449,22 @@ router.post('/batch', optionalAuth, async (req, res) => {
     for (const scan of createdScans) {
       await updateMemberFromScan(scan);
       await updateQRCodeStatus(scan);
+
+      // Upgrade 5: Log successful scan event for batch scans
+      const originalScanInput = scans.find(s => s.batchNo === scan.batchNo && s.role === scan.role);
+      const sigStatus = originalScanInput ? verifyQRSig(scan.productNo, scan.batchNo, scan.bagNo, originalScanInput.sig) : 'missing';
+      await ScanLog.create({
+        eventType: 'success',
+        productNo: scan.productNo?.toUpperCase(),
+        batchNo: scan.batchNo,
+        packageNo: scan.bagNo,
+        memberId: scan.memberId?.toUpperCase(),
+        role: scan.role,
+        signature: sigStatus,
+        city: scan.location,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }).catch(() => {});
     }
 
     // Update scan count if user is authenticated
