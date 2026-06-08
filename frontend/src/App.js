@@ -3867,6 +3867,7 @@ function App() {
               {isMainAdmin() && <Tab icon={<People />} label='Co-Admins' value='co-admins' />}
               {hasPermission('canManageUsers') && <Tab icon={<EmojiEvents />} label='Members & Loyalty' value='members' />}
               {hasPermission('canExport') && <Tab icon={<CardGiftcard />} label='Cash Rewards' value='rewards' />}
+              {hasPermission('canViewDashboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
               {hasPermission('canManageApplicators') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
@@ -5507,10 +5508,10 @@ function App() {
                   setLoading(true);
                   try {
                     const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
-                    setCashRewards(response.data.rewards || []);
+                    setCashRewards(response.data.data || []);
                     showNotification('Cash rewards calculated successfully', 'success');
                   } catch (error) {
-                    showNotification(error.response?.data?.error || 'Failed to calculate rewards', 'error');
+                    showNotification(error.response?.data?.message || 'Failed to calculate rewards', 'error');
                   }
                   setLoading(false);
                 }}
@@ -5524,7 +5525,7 @@ function App() {
                   setLoading(true);
                   try {
                     const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
-                    setCashRewards(response.data.rewards || []);
+                    setCashRewards(response.data.data || []);
                   } catch (error) {
                     showNotification('Failed to load rewards', 'error');
                   }
@@ -5533,6 +5534,47 @@ function App() {
               >
                 Refresh
               </Button>
+              {cashRewards.length > 0 && (
+                <Button
+                  variant='outlined'
+                  color='success'
+                  startIcon={<FileDownload />}
+                  onClick={() => {
+                    const wb = XLSX.utils.book_new();
+                    const monthName = new Date(selectedYear, selectedMonth - 1).toLocaleString('default', { month: 'long' });
+                    const wsData = [
+                      ['MEGAKEM CASH REWARDS REPORT'],
+                      [`Month: ${monthName} ${selectedYear}`],
+                      ['Generated:', new Date().toLocaleString()],
+                      [],
+                      ['Member ID', 'Member Name', 'Role', 'Total Purchase (Rs.)', 'Cash Reward (Rs.)', 'Status', 'Paid Date'],
+                      ...cashRewards.map(r => [
+                        r.memberId,
+                        r.memberName,
+                        r.role === 'applicator' ? 'Applicator' : 'Hardware',
+                        r.totalPurchaseValue || 0,
+                        r.cashReward || 0,
+                        r.rewardPaid ? 'PAID' : r.rewardCalculated ? 'CALCULATED' : 'PENDING',
+                        r.rewardPaidDate ? new Date(r.rewardPaidDate).toLocaleDateString() : ''
+                      ]),
+                      [],
+                      ['SUMMARY', ''],
+                      ['Total Members', cashRewards.length],
+                      ['Total Purchases', cashRewards.reduce((s, r) => s + (r.totalPurchaseValue || 0), 0)],
+                      ['Total Rewards', cashRewards.reduce((s, r) => s + (r.cashReward || 0), 0)],
+                      ['Paid', cashRewards.filter(r => r.rewardPaid).length],
+                      ['Unpaid', cashRewards.filter(r => !r.rewardPaid).length],
+                    ];
+                    const ws = XLSX.utils.aoa_to_sheet(wsData);
+                    ws['!cols'] = [{ wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 12 }, { wch: 14 }];
+                    XLSX.utils.book_append_sheet(wb, ws, `${monthName} ${selectedYear}`);
+                    XLSX.writeFile(wb, `cash-rewards-${monthName}-${selectedYear}.xlsx`);
+                    showNotification('Cash rewards exported to Excel!', 'success');
+                  }}
+                >
+                  Export Excel
+                </Button>
+              )}
             </Box>
 
             {loading ? (
@@ -5650,7 +5692,7 @@ function App() {
                                       });
                                       // Refresh the list
                                       const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
-                                      setCashRewards(response.data.rewards || []);
+                                      setCashRewards(response.data.data || []);
                                       showNotification('Reward marked as paid', 'success');
                                     } catch (error) {
                                       showNotification('Failed to mark as paid', 'error');
@@ -5722,6 +5764,151 @@ function App() {
               </Paper>
             )}
           </Box>}
+
+          {/* Leaderboard Admin Tab */}
+          {adminTab === 'leaderboard-admin' && (() => {
+            const sortedByPoints = [...members].sort((a, b) => (b.points || 0) - (a.points || 0));
+            const sortedByScans = [...members].sort((a, b) => (b.totalScans || 0) - (a.totalScans || 0));
+            const totalPointsAll = members.reduce((s, m) => s + (m.points || 0), 0);
+            const applicators = members.filter(m => m.role === 'applicator');
+            const hardwares = members.filter(m => m.role !== 'applicator');
+            return (
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+                  <Typography variant='h5' fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <EmojiEvents sx={{ color: '#FFD700' }} /> Member Leaderboard
+                  </Typography>
+                  <Chip label={`${members.length} Members`} color='primary' variant='outlined' />
+                </Box>
+
+                {/* Summary Stats */}
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <EmojiEvents sx={{ fontSize: 40, mb: 1, opacity: 0.9 }} />
+                        <Typography variant='h4' fontWeight={700}>{totalPointsAll.toLocaleString()}</Typography>
+                        <Typography variant='body2' sx={{ opacity: 0.9 }}>Total Points Issued</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Person sx={{ fontSize: 40, mb: 1, opacity: 0.9 }} />
+                        <Typography variant='h4' fontWeight={700}>{applicators.length}</Typography>
+                        <Typography variant='body2' sx={{ opacity: 0.9 }}>Applicators</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <People sx={{ fontSize: 40, mb: 1, opacity: 0.9 }} />
+                        <Typography variant='h4' fontWeight={700}>{hardwares.length}</Typography>
+                        <Typography variant='body2' sx={{ opacity: 0.9 }}>Hardwares</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', color: 'white' }}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <TrendingUp sx={{ fontSize: 40, mb: 1, opacity: 0.9 }} />
+                        <Typography variant='h4' fontWeight={700}>{members.reduce((s, m) => s + (m.totalScans || 0), 0).toLocaleString()}</Typography>
+                        <Typography variant='body2' sx={{ opacity: 0.9 }}>Total Scans</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                {/* Top 10 Table */}
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant='h6' fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <EmojiEvents sx={{ color: '#FFD700' }} /> Top 10 by Loyalty Points
+                        </Typography>
+                        <TableContainer>
+                          <Table size='small'>
+                            <TableHead>
+                              <TableRow sx={{ bgcolor: 'grey.100' }}>
+                                <TableCell sx={{ fontWeight: 700 }}>#</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>Member</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
+                                <TableCell align='right' sx={{ fontWeight: 700 }}>Points</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {sortedByPoints.slice(0, 10).map((m, i) => (
+                                <TableRow key={m._id} sx={{ bgcolor: i === 0 ? '#FFF9E6' : i === 1 ? '#F5F5F5' : i === 2 ? '#FFF0E6' : 'transparent' }}>
+                                  <TableCell>
+                                    <Box sx={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem',
+                                      background: i === 0 ? 'linear-gradient(135deg,#FFD700,#FFA500)' : i === 1 ? 'linear-gradient(135deg,#C0C0C0,#999)' : i === 2 ? 'linear-gradient(135deg,#CD7F32,#A0522D)' : '#eee',
+                                      color: i < 3 ? 'white' : 'text.primary'
+                                    }}>
+                                      {i < 3 ? ['🥇','🥈','🥉'][i] : i + 1}
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant='body2' fontWeight={600}>{m.memberName || m.memberId}</Typography>
+                                    <Typography variant='caption' color='text.secondary'>{m.memberId}</Typography>
+                                  </TableCell>
+                                  <TableCell><Chip label={m.role === 'applicator' ? 'App' : 'HW'} size='small' color={m.role === 'applicator' ? 'warning' : 'info'} /></TableCell>
+                                  <TableCell align='right'><Typography fontWeight={700} color='success.main'>{(m.points || 0).toLocaleString()}</Typography></TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant='h6' fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <ShowChart sx={{ color: '#4facfe' }} /> Top 10 by Total Scans
+                        </Typography>
+                        <TableContainer>
+                          <Table size='small'>
+                            <TableHead>
+                              <TableRow sx={{ bgcolor: 'grey.100' }}>
+                                <TableCell sx={{ fontWeight: 700 }}>#</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>Member</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>Tier</TableCell>
+                                <TableCell align='right' sx={{ fontWeight: 700 }}>Scans</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {sortedByScans.slice(0, 10).map((m, i) => (
+                                <TableRow key={m._id} sx={{ bgcolor: i === 0 ? '#FFF9E6' : i === 1 ? '#F5F5F5' : i === 2 ? '#FFF0E6' : 'transparent' }}>
+                                  <TableCell>
+                                    <Box sx={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem',
+                                      background: i === 0 ? 'linear-gradient(135deg,#FFD700,#FFA500)' : i === 1 ? 'linear-gradient(135deg,#C0C0C0,#999)' : i === 2 ? 'linear-gradient(135deg,#CD7F32,#A0522D)' : '#eee',
+                                      color: i < 3 ? 'white' : 'text.primary'
+                                    }}>
+                                      {i < 3 ? ['🥇','🥈','🥉'][i] : i + 1}
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant='body2' fontWeight={600}>{m.memberName || m.memberId}</Typography>
+                                    <Typography variant='caption' color='text.secondary'>{m.memberId}</Typography>
+                                  </TableCell>
+                                  <TableCell><Chip label={getTierDisplayName(m.tier)} size='small' sx={{ bgcolor: m.tier === 'gold' ? '#FFD700' : m.tier === 'silver' ? '#C0C0C0' : m.tier === 'platinum' ? '#E5E4E2' : '#CD7F32', color: 'text.primary', fontWeight: 700 }} /></TableCell>
+                                  <TableCell align='right'><Typography fontWeight={700} color='primary.main'>{(m.totalScans || 0).toLocaleString()}</Typography></TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </Box>
+            );
+          })()}
 
           {adminTab === 'products' && <Box>
               <Box sx={{ mb: 2 }}>
@@ -6191,6 +6378,22 @@ function App() {
                             )}
                             <TableCell>
                               <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Tooltip title='View Profile'>
+                                  <IconButton
+                                    size='small'
+                                    color='info'
+                                    onClick={() => {
+                                      if (applicator.memberId) {
+                                        setMemberId(applicator.memberId);
+                                        setView('profile');
+                                      } else {
+                                        showNotification('No member ID linked to this record', 'warning');
+                                      }
+                                    }}
+                                  >
+                                    <Person />
+                                  </IconButton>
+                                </Tooltip>
                                 <Tooltip title='Edit'>
                                   <IconButton 
                                     size='small' 
