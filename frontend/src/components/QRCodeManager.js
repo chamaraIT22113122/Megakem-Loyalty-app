@@ -592,6 +592,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         });
 
         onShowNotification(`Deleted ${response.data.deleted} QR codes`, 'success');
+        setSelectedForPrint([]);
         loadData();
       } catch (error) {
         onShowNotification('Error deleting QR codes: ' + (error.response?.data?.error || error.message), 'error');
@@ -977,6 +978,14 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               onClick={() => setOpenPrintConfigDialog(true)}
             >
               Print Labels
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={() => deleteQRCodes(selectedForPrint)}
+            >
+              Delete Selected ({selectedForPrint.length})
             </Button>
           </>
         )}
