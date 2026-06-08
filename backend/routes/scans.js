@@ -179,28 +179,6 @@ router.post('/', optionalAuth, async (req, res) => {
         productPrice = product.price || 0;
       }
       
-      // Calculate loyalty points based on product configuration
-      if (product) {
-        // Check if product has pack-size specific points
-        if (product.pointsPerPackSize && product.pointsPerPackSize.length > 0 && qty) {
-          const packPoints = product.pointsPerPackSize.find(ps => 
-            ps.packSize.toUpperCase() === qty.toUpperCase()
-          );
-          if (packPoints) {
-            productPoints = packPoints.points || 0;
-          }
-        }
-        
-        // If no pack-size points, check for fixed points per product
-        if (productPoints === 0 && product.pointsPerProduct !== null && product.pointsPerProduct !== undefined) {
-          productPoints = product.pointsPerProduct;
-        }
-        
-        // If no fixed points, use price-based calculation (1 point per 1000 Rs)
-        if (productPoints === 0 && productPrice > 0) {
-          productPoints = Math.floor(productPrice / 1000);
-        }
-      }
     }
 
     const scanData = {
@@ -213,8 +191,11 @@ router.post('/', optionalAuth, async (req, res) => {
       bagNo,
       qty,
       price: productPrice || 0,
-      points: productPoints
+      points: 0
     };
+
+    // Calculate loyalty points based on product and loyalty configuration
+    scanData.points = await calculatePointsForScan(scanData);
 
     // Add user ID if authenticated
     if (req.user) {
@@ -330,31 +311,20 @@ router.post('/batch', optionalAuth, async (req, res) => {
               }
             }
             
-            // Calculate points
-            if (product.pointsPerPackSize && product.pointsPerPackSize.length > 0 && scan.qty) {
-              const packPoints = product.pointsPerPackSize.find(ps => 
-                ps.packSize.toUpperCase() === scan.qty.toUpperCase()
-              );
-              if (packPoints) {
-                productPoints = packPoints.points || 0;
-              }
-            }
-            
-            if (productPoints === 0 && product.pointsPerProduct !== null && product.pointsPerProduct !== undefined) {
-              productPoints = product.pointsPerProduct;
-            }
-            
-            if (productPoints === 0 && productPrice > 0) {
-              productPoints = Math.floor(productPrice / 1000);
-            }
           }
         }
 
-        validScans.push({
+        const currentScan = {
           ...scan,
           memberId: scan.memberId.toUpperCase(),
-          price: productPrice || 0,
-          points: productPoints,
+          price: productPrice || 0
+        };
+
+        const calculatedPoints = await calculatePointsForScan(currentScan);
+
+        validScans.push({
+          ...currentScan,
+          points: calculatedPoints,
           userId: req.user ? req.user._id : undefined
         });
       }
@@ -519,21 +489,26 @@ async function calculatePointsForScan(scan) {
 
     let basePoints = 0;
 
-    // Calculate base points based on method
-    if (pointsConfig.method === 'product_based' && product) {
-      // Use product-specific points
-      if (product.pointsPerProduct) {
-        basePoints = product.pointsPerProduct;
-      } else if (product.pointsPerPackSize && scan.qty) {
+    // Check product specific points first
+    if (product) {
+      // Check pack size specific points first
+      if (product.pointsPerPackSize && product.pointsPerPackSize.length > 0 && scan.qty) {
         const packSizePoints = product.pointsPerPackSize.find(p => 
-          p.packSize.toLowerCase() === scan.qty.toLowerCase()
+          p.packSize.toUpperCase() === scan.qty.toUpperCase()
         );
         if (packSizePoints) {
-          basePoints = packSizePoints.points;
+          basePoints = packSizePoints.points || 0;
         }
       }
-    } else if (pointsConfig.method === 'price_based' && scan.price) {
-      // Price-based calculation
+
+      // Check fixed product points
+      if (basePoints === 0 && product.pointsPerProduct !== null && product.pointsPerProduct !== undefined) {
+        basePoints = product.pointsPerProduct;
+      }
+    }
+
+    // If pointsConfig method is price_based OR if basePoints is still 0 (fallback)
+    if ((pointsConfig.method === 'price_based' || basePoints === 0) && scan.price) {
       basePoints = Math.floor(scan.price / (pointsConfig.priceDivisor || 1000));
     }
 

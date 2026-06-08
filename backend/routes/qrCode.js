@@ -78,6 +78,50 @@ function extractDateFromBatch(batchNo) {
   return null;
 }
 
+// Helper to format the batch number as [ProductCode] [BatchNo] [MfgDate] [PkgNo]
+function getFormattedBatch(productNo, batchNo, mfgDate, packageNo) {
+  if (!batchNo) return '';
+
+  const cleanProduct = (productNo || '').trim().toUpperCase();
+  const cleanBatch = (batchNo || '').trim();
+  const cleanPkg = (packageNo || 'STD').trim();
+
+  // If the batch number is already fully formatted (contains >= 4 space-separated parts or underscores), return it unchanged
+  const spaceParts = cleanBatch.split(/\s+/);
+  const underscoreParts = cleanBatch.split('_');
+  if (spaceParts.length >= 4 || underscoreParts.length >= 4) {
+    return cleanBatch;
+  }
+
+  // Format date to DDMMYY
+  let dateObj = mfgDate ? new Date(mfgDate) : null;
+  if (!dateObj || isNaN(dateObj.getTime())) {
+    dateObj = extractDateFromBatch(cleanBatch);
+  }
+  if (!dateObj || isNaN(dateObj.getTime())) {
+    dateObj = new Date(); // Fallback to current date
+  }
+
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = String(dateObj.getFullYear()).slice(-2);
+  const dateStr = `${day}${month}${year}`;
+
+  // Pad batch number to 3 digits (e.g. 1 -> 001) if numeric
+  let paddedBatch = cleanBatch;
+  if (/^\d+$/.test(cleanBatch)) {
+    paddedBatch = cleanBatch.padStart(3, '0');
+  }
+
+  // Pad package number to 3 digits (e.g. 20 -> 020) if numeric
+  let paddedPkg = cleanPkg;
+  if (/^\d+$/.test(cleanPkg)) {
+    paddedPkg = cleanPkg.padStart(3, '0');
+  }
+
+  return `${cleanProduct} ${paddedBatch} ${dateStr} ${paddedPkg}`;
+}
+
 // Generate QR code for products
 router.post('/generate', protect, qrAdmin, async (req, res) => {
   try {
@@ -114,18 +158,21 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
       finalExpDate.setFullYear(finalExpDate.getFullYear() + 2);
     }
 
-    const baseUrl = process.env.FRONTEND_URL_PROD || process.env.FRONTEND_URL || 'https://chamarait22113122.github.io/Megakem-Loyalty-app';
+    const baseUrl = 'https://chamarait22113122.github.io/Megakem-Loyalty-app';
     const generatedQRs = [];
 
     for (const productId of productIds) {
       const product = await Product.findById(productId);
       if (!product) continue;
 
-      // Create unique QR ID
-      const qrId = `${product.productNo}-${batchNo}-${packageNo || 'STD'}-${Date.now()}`;
+      // Format batch to: [ProductNo] [BatchNo] [DateCode] [PackageNo]
+      const formattedBatch = getFormattedBatch(product.productNo, batchNo, finalMfgDate, packageNo);
+
+      // Create unique QR ID - replace spaces with underscores for ID uniqueness
+      const qrId = `${product.productNo}-${formattedBatch.replace(/\s+/g, '_')}-${packageNo || 'STD'}-${Date.now()}`;
       
       // Create QR link without path to prevent 404s on GitHub Pages
-      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(batchNo)}&pkg=${encodeURIComponent(packageNo || '')}`;
+      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(formattedBatch)}&pkg=${encodeURIComponent(packageNo || '')}`;
 
       // Generate QR code as data URL
       const qrDataUrl = await QRCode.toDataURL(qrLink, {
@@ -142,7 +189,7 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
         product: productId,
         productName: product.name,
         productNo: product.productNo,
-        batchNo,
+        batchNo: formattedBatch,
         packageNo,
         manufactureDate: finalMfgDate,
         expiryDate: finalExpDate,
@@ -391,19 +438,24 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       });
     }
 
-    const baseUrl = process.env.FRONTEND_URL_PROD || process.env.FRONTEND_URL || 'https://chamarait22113122.github.io/Megakem-Loyalty-app';
+    const baseUrl = 'https://chamarait22113122.github.io/Megakem-Loyalty-app';
     const qrRecords = [];
 
     // Generate in chunks with the database to avoid memory issues and long transactions
     for (let i = start; i <= end; i++) {
       const pNo = `${packageNoPrefix}${i}`;
-      const qrId = `${product.productNo}-${batchNo}-${pNo}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      
+      // Format batch to: [ProductNo] [BatchNo] [DateCode] [PackageNo]
+      const formattedBatch = getFormattedBatch(product.productNo, batchNo, finalMfgDate, pNo);
+
+      // Create unique QR ID - replace spaces with underscores for ID uniqueness
+      const qrId = `${product.productNo}-${formattedBatch.replace(/\s+/g, '_')}-${pNo}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       
       // The user wants the link and batch info in the QR without triggering 404s
-      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(batchNo)}&pkg=${encodeURIComponent(pNo)}`;
+      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(formattedBatch)}&pkg=${encodeURIComponent(pNo)}`;
       
       // Pipe delimited data as secondary info or for the scanner app
-      const pipeData = `${product.productNo}|${product.name}|${batchNo}|${pNo}|${product.packSize || 'N/A'}`;
+      const pipeData = `${product.productNo}|${product.name}|${formattedBatch}|${pNo}|${product.packSize || 'N/A'}`;
 
       const qrDataUrl = await QRCode.toDataURL(qrLink, {
         errorCorrectionLevel: 'H',
@@ -416,7 +468,7 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
         product: productId,
         productName: product.name,
         productNo: product.productNo,
-        batchNo,
+        batchNo: formattedBatch,
         packageNo: pNo,
         manufactureDate: finalMfgDate,
         expiryDate: finalExpDate,

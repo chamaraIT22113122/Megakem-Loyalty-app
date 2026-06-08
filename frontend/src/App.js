@@ -510,12 +510,35 @@ function App() {
     const stored = localStorage.getItem('user');
     return stored ? JSON.parse(stored) : null;
   });
-  const [view, setView] = useState('welcome');
-  const [role, setRole] = useState('applicator');
-  const [memberId, setMemberId] = useState('');
-  const [memberName, setMemberName] = useState('');
-  const [location, setLocation] = useState('');
-  const [cart, setCart] = useState([]);
+  const [role, setRole] = useState(() => localStorage.getItem('user_role') || 'applicator');
+  const [memberId, setMemberId] = useState(() => localStorage.getItem('user_member_id') || '');
+  const [memberName, setMemberName] = useState(() => localStorage.getItem('user_member_name') || '');
+  const [location, setLocation] = useState(() => localStorage.getItem('user_location') || '');
+  const [cart, setCart] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem('user_cart');
+      return savedCart ? JSON.parse(savedCart) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [view, setView] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hasParams = params.get('b') || params.get('batch') || params.get('batchNo') || params.get('p') || params.get('product') || params.get('code');
+    const savedRole = localStorage.getItem('user_role');
+    const savedMemberId = localStorage.getItem('user_member_id');
+    
+    if (hasParams) {
+      if (savedRole && savedMemberId) {
+        return 'cart';
+      }
+      return 'welcome';
+    }
+    if (savedRole && savedMemberId) {
+      return 'cart';
+    }
+    return 'welcome';
+  });
   const [pendingScan, setPendingScan] = useState(null);
   const [scanHistory, setScanHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -577,6 +600,33 @@ function App() {
   const [userStats, setUserStats] = useState(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
+  const [memberTierFilter, setMemberTierFilter] = useState('all');
+  const [memberSortKey, setMemberSortKey] = useState('points-desc');
+
+  // Local storage persistence for scan user session and cart
+  useEffect(() => {
+    if (role) localStorage.setItem('user_role', role);
+    else localStorage.removeItem('user_role');
+  }, [role]);
+
+  useEffect(() => {
+    if (memberId) localStorage.setItem('user_member_id', memberId);
+    else localStorage.removeItem('user_member_id');
+  }, [memberId]);
+
+  useEffect(() => {
+    if (memberName) localStorage.setItem('user_member_name', memberName);
+    else localStorage.removeItem('user_member_name');
+  }, [memberName]);
+
+  useEffect(() => {
+    if (location) localStorage.setItem('user_location', location);
+    else localStorage.removeItem('user_location');
+  }, [location]);
+
+  useEffect(() => {
+    localStorage.setItem('user_cart', JSON.stringify(cart));
+  }, [cart]);
   const [coAdminSearchQuery, setCoAdminSearchQuery] = useState('');
   const [rewardSearchQuery, setRewardSearchQuery] = useState('');
   const [applicatorSearchQuery, setApplicatorSearchQuery] = useState('');
@@ -781,8 +831,11 @@ function App() {
   const parseBatchInfo = (batchNo) => {
     if (!batchNo) return null;
     
-    // Try to parse format with underscores: "MKL46_001_050525_001"
+    // Try to parse format with underscores first
     let parts = batchNo.trim().split('_');
+    if (parts.length < 4) {
+      parts = batchNo.trim().split(/\s+/);
+    }
     
     if (parts.length === 4) {
       const [productCode, materialBatch, dateCode, packNo] = parts;
@@ -868,6 +921,22 @@ function App() {
       
       console.log('Parsed QR data:', parsedData);
       setPendingScan(parsedData);
+
+      // Check if session exists, if so redirect to cart to append it
+      const savedRole = localStorage.getItem('user_role');
+      const savedMemberId = localStorage.getItem('user_member_id');
+      if (savedRole && savedMemberId) {
+        setView('cart');
+      } else {
+        setView('welcome');
+      }
+
+      // Clear query parameters from URL to prevent duplication on refresh
+      try {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (e) {
+        console.error('Failed to clear URL parameters:', e);
+      }
 
       // Call backend to record this QR scan event automatically
       const recordScanEvent = async () => {
@@ -1363,7 +1432,7 @@ function App() {
       if (error.response?.data?.duplicates) {
         showNotification(error.response.data.message, 'error');
       } else {
-        showNotification(error.response?.data?.message || 'Transfer failed', 'error');
+        showNotification(getUserFriendlyError(error), 'error');
       }
     }
     finally { setLoading(false); }
@@ -1386,7 +1455,7 @@ function App() {
       showNotification('Admin login successful!', 'success');
     } catch (error) {
       console.error('Admin login error:', error);
-      showNotification(error.response?.data?.message || 'Invalid admin credentials', 'error');
+      showNotification(getUserFriendlyError(error), 'error');
     } finally {
       setLoading(false);
     }
@@ -1422,7 +1491,7 @@ function App() {
       setUserLoginPassword('');
     } catch (error) {
       console.error('Login error:', error);
-      showNotification(error.response?.data?.message || 'Invalid email or password', 'error');
+      showNotification(getUserFriendlyError(error), 'error');
     } finally {
       setLoading(false);
     }
@@ -4725,166 +4794,258 @@ function App() {
                         </Button>
                       );
                     })}
+                    </Box>
+                    <Button 
+                      size='small' 
+                      onClick={() => setCurrentPage(currentPage + 1)} 
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
                   </Box>
-                  <Button 
-                    size='small' 
-                    onClick={() => setCurrentPage(currentPage + 1)} 
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
-                </Box>
-              )}
-            </>
-          )}
-        </>
-      );
-    })()}
-          </Box>}
+                )}
+              </>
+            )}
+          </>
+        );
+      })()}
+    </Box>}
 
-          {adminTab === 'members' && <Box>
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-              <Box>
-                <Typography variant='h6' sx={{ fontWeight: 700 }}>MEMBERS & LOYALTY</Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  {(() => {
-                    // Calculate stats based on members who have scans
-                    const membersWithScans = members.filter(m => scanHistory.some(s => s.memberId === m.memberId));
-                    const applicatorsCount = membersWithScans.filter(m => m.role === 'applicator').length;
-                    const customersCount = membersWithScans.filter(m => m.role === 'customer').length;
-                    return `Total: ${membersWithScans.length} | Applicators: ${applicatorsCount} | Hardwares: ${customersCount}`;
-                  })()}
-                </Typography>
-              </Box>
-              <Button
-                variant='contained'
-                startIcon={<Settings />}
-                onClick={() => {
-                  setLoyaltyConfigTab(0);
-                  setLoyaltyConfigDialog({ open: true });
-                }}
-                sx={{
-                  background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)',
-                  boxShadow: '0 4px 14px 0 rgba(0,51,102,0.25)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #001a33 0%, #003366 100%)',
-                    transform: 'translateY(-2px)'
-                  }
-                }}
-              >
-                Loyalty & Tier Config
-              </Button>
-            </Box>
-            <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-              <TextField 
-                size='small' 
-                placeholder='Search by member ID, name, phone...' 
-                value={memberSearchQuery}
-                onChange={(e) => setMemberSearchQuery(e.target.value)}
-                sx={{ flexGrow: 1, minWidth: 200 }}
-                InputProps={{
-                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
-                }}
-              />
-              <ToggleButtonGroup
-                size='small'
-                value={memberRoleFilter}
-                exclusive
-                onChange={(e, newVal) => {
-                  if (newVal !== null) {
-                    setMemberRoleFilter(newVal);
-                  }
-                }}
-                sx={{
-                  bgcolor: 'background.paper',
-                  boxShadow: '0 2px 8px rgba(0,51,102,0.05)',
-                  borderRadius: '12px',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  '& .MuiToggleButton-root': {
-                    px: { xs: 1.5, sm: 2.5 },
-                    py: 0.75,
-                    border: 'none',
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    color: 'text.secondary',
-                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                    '&.Mui-selected': {
-                      bgcolor: 'primary.lighter',
-                      color: 'primary.main',
-                      '&:hover': {
-                        bgcolor: 'primary.lighter'
-                      }
+        {adminTab === 'members' && (() => {
+          // Compute real-time stats and sort list
+          let filteredMembers = members.filter(m => {
+            const hasScans = scanHistory.some(s => s.memberId === m.memberId);
+            const matchesSearch = !memberSearchQuery || 
+              m.memberId?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+              m.memberName?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+              m.phone?.toLowerCase().includes(memberSearchQuery.toLowerCase());
+            const matchesRole = memberRoleFilter === 'all' || m.role === memberRoleFilter;
+            const matchesTier = memberTierFilter === 'all' || m.tier === memberTierFilter;
+            return hasScans && matchesSearch && matchesRole && matchesTier;
+          });
+
+          // Map stats for sorting
+          const membersWithStats = filteredMembers.map(m => {
+            const memberScans = scanHistory.filter(s => s.memberId === m.memberId);
+            const actualTotalScans = memberScans.length;
+            const actualTotalAmount = memberScans.reduce((sum, s) => sum + (s.price || 0), 0);
+            const actualTotalPoints = memberScans.reduce((sum, s) => sum + (s.points || 0), 0);
+            return {
+              member: m,
+              scansCount: actualTotalScans,
+              totalAmount: actualTotalAmount,
+              totalPoints: actualTotalPoints
+            };
+          });
+
+          // Sort members
+          membersWithStats.sort((a, b) => {
+            if (memberSortKey === 'points-desc') return b.totalPoints - a.totalPoints;
+            if (memberSortKey === 'points-asc') return a.totalPoints - b.totalPoints;
+            if (memberSortKey === 'scans-desc') return b.scansCount - a.scansCount;
+            if (memberSortKey === 'scans-asc') return a.scansCount - b.scansCount;
+            if (memberSortKey === 'amount-desc') return b.totalAmount - a.totalAmount;
+            if (memberSortKey === 'name-asc') return (a.member.memberName || '').localeCompare(b.member.memberName || '');
+            if (memberSortKey === 'name-desc') return (b.member.memberName || '').localeCompare(b.member.memberName || '');
+            if (memberSortKey === 'id-asc') return (a.member.memberId || '').localeCompare(b.member.memberId || '');
+            return 0;
+          });
+
+          return (
+            <Box>
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                <Box>
+                  <Typography variant='h6' sx={{ fontWeight: 700 }}>MEMBERS & LOYALTY</Typography>
+                  <Typography variant='body2' color='text.secondary'>
+                    Total: {filteredMembers.length} | Applicators: {filteredMembers.filter(m => m.role === 'applicator').length} | Hardwares: {filteredMembers.filter(m => m.role === 'customer').length}
+                  </Typography>
+                </Box>
+                <Button
+                  variant='contained'
+                  startIcon={<Settings />}
+                  onClick={() => {
+                    setLoyaltyConfigTab(0);
+                    setLoyaltyConfigDialog({ open: true });
+                  }}
+                  sx={{
+                    background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)',
+                    boxShadow: '0 4px 14px 0 rgba(0,51,102,0.25)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #001a33 0%, #003366 100%)',
+                      transform: 'translateY(-2px)'
                     }
-                  }
-                }}
-              >
-                <ToggleButton value='all'>All Members</ToggleButton>
-                <ToggleButton value='applicator'>Applicator</ToggleButton>
-                <ToggleButton value='customer'>Hardware</ToggleButton>
-              </ToggleButtonGroup>
-              {(memberSearchQuery || memberRoleFilter !== 'all') && (
-                <Button 
-                  size='small' 
-                  onClick={() => { 
-                    setMemberSearchQuery(''); 
-                    setMemberRoleFilter('all');
                   }}
                 >
-                  Clear Filters
+                  Loyalty & Tier Config
                 </Button>
-              )}
-            </Box>
-            <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>Member ID</strong></TableCell>
-                    <TableCell><strong>Name</strong></TableCell>
-                    <TableCell><strong>Role</strong></TableCell>
-                    <TableCell><strong>Tier</strong></TableCell>
-                    <TableCell><strong>Total Scans</strong></TableCell>
-                    <TableCell><strong>Total Amount (Rs.)</strong></TableCell>
-                    <TableCell><strong>Total Points</strong></TableCell>
-                    <TableCell><strong>Actions</strong></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(() => {
-                    // Filter to only show members who have scans in scanHistory
-                    let filteredMembers = members.filter(m => {
-                      const hasScans = scanHistory.some(s => s.memberId === m.memberId);
-                      const matchesSearch = !memberSearchQuery || 
-                        m.memberId?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-                        m.memberName?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-                        m.phone?.toLowerCase().includes(memberSearchQuery.toLowerCase());
-                      const matchesRole = memberRoleFilter === 'all' || m.role === memberRoleFilter;
-                      return hasScans && matchesSearch && matchesRole;
-                    });
-
-                    if (filteredMembers.length === 0) {
-                      return (
-                        <TableRow>
-                          <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                            <Typography variant='body1' color='text.secondary'>
-                              {members.length === 0 
-                                ? 'No members found. Members are created automatically when they scan products.'
-                                : 'No members match your filters.'}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      );
+              </Box>
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                <TextField 
+                  size='small' 
+                  placeholder='Search by member ID, name, phone...' 
+                  value={memberSearchQuery}
+                  onChange={(e) => setMemberSearchQuery(e.target.value)}
+                  sx={{ flexGrow: 1, minWidth: 200 }}
+                  InputProps={{
+                    startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+                  }}
+                />
+                <ToggleButtonGroup
+                  size='small'
+                  value={memberRoleFilter}
+                  exclusive
+                  onChange={(e, newVal) => {
+                    if (newVal !== null) {
+                      setMemberRoleFilter(newVal);
                     }
+                  }}
+                  sx={{
+                    bgcolor: 'background.paper',
+                    boxShadow: '0 2px 8px rgba(0,51,102,0.05)',
+                    borderRadius: '12px',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    '& .MuiToggleButton-root': {
+                      px: { xs: 1.5, sm: 2.5 },
+                      py: 0.75,
+                      border: 'none',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      color: 'text.secondary',
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      '&.Mui-selected': {
+                        bgcolor: 'primary.lighter',
+                        color: 'primary.main',
+                        '&:hover': {
+                          bgcolor: 'primary.lighter'
+                        }
+                      }
+                    }
+                  }}
+                >
+                  <ToggleButton value='all'>All Members</ToggleButton>
+                  <ToggleButton value='applicator'>Applicator</ToggleButton>
+                  <ToggleButton value='customer'>Hardware</ToggleButton>
+                </ToggleButtonGroup>
 
-                    return filteredMembers.map(m => {
-                      // Calculate real-time stats from scanHistory
-                      const memberScans = scanHistory.filter(s => s.memberId === m.memberId);
-                      const actualTotalScans = memberScans.length;
-                      const actualTotalAmount = memberScans.reduce((sum, s) => sum + (s.price || 0), 0);
-                      // Calculate total points from all scans
-                      const actualTotalPoints = memberScans.reduce((sum, s) => sum + (s.points || 0), 0);
-                      
-                      return (
+                <FormControl size='small' sx={{ minWidth: 130 }}>
+                  <InputLabel id="member-tier-filter-label">Tier</InputLabel>
+                  <Select
+                    labelId="member-tier-filter-label"
+                    value={memberTierFilter}
+                    label="Tier"
+                    onChange={(e) => setMemberTierFilter(e.target.value)}
+                  >
+                    <MenuItem value='all'>All Tiers</MenuItem>
+                    <MenuItem value='bronze'>Bronze</MenuItem>
+                    <MenuItem value='silver'>Silver</MenuItem>
+                    <MenuItem value='gold'>Gold</MenuItem>
+                    <MenuItem value='platinum'>Platinum</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl size='small' sx={{ minWidth: 160 }}>
+                  <InputLabel id="member-sort-label">Sort By</InputLabel>
+                  <Select
+                    labelId="member-sort-label"
+                    value={memberSortKey}
+                    label="Sort By"
+                    onChange={(e) => setMemberSortKey(e.target.value)}
+                  >
+                    <MenuItem value='points-desc'>Points: High to Low</MenuItem>
+                    <MenuItem value='points-asc'>Points: Low to High</MenuItem>
+                    <MenuItem value='scans-desc'>Total Scans: High to Low</MenuItem>
+                    <MenuItem value='scans-asc'>Total Scans: Low to High</MenuItem>
+                    <MenuItem value='amount-desc'>Total Amount: High to Low</MenuItem>
+                    <MenuItem value='name-asc'>Name: A to Z</MenuItem>
+                    <MenuItem value='name-desc'>Name: Z to A</MenuItem>
+                    <MenuItem value='id-asc'>Member ID: A to Z</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <Button
+                  variant='outlined'
+                  startIcon={<GetApp />}
+                  onClick={() => {
+                    if (membersWithStats.length === 0) {
+                      showNotification('No member data to export', 'warning');
+                      return;
+                    }
+                    
+                    const wb = XLSX.utils.book_new();
+                    const wsData = [
+                      ['Megakem Loyalty Members Report'],
+                      ['Generated:', new Date().toLocaleString()],
+                      [],
+                      ['Member ID', 'Name', 'Phone', 'Role', 'Tier', 'Total Scans', 'Total Amount (Rs.)', 'Total Points'],
+                      ...membersWithStats.map(item => [
+                        item.member.memberId,
+                        item.member.memberName,
+                        item.member.phone || '',
+                        item.member.role === 'applicator' ? 'Applicator' : 'Hardware',
+                        getTierDisplayName(item.member.tier),
+                        item.scansCount,
+                        item.totalAmount,
+                        item.totalPoints
+                      ])
+                    ];
+                    
+                    const ws = XLSX.utils.aoa_to_sheet(wsData);
+                    ws['!cols'] = [
+                      { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 15 }
+                    ];
+                    
+                    XLSX.utils.book_append_sheet(wb, ws, 'Members');
+                    XLSX.writeFile(wb, `megakem_members_${new Date().toISOString().split('T')[0]}.xlsx`);
+                    showNotification('Member list exported successfully!', 'success');
+                  }}
+                  disabled={membersWithStats.length === 0}
+                  size='small'
+                >
+                  Export Excel
+                </Button>
+
+                {(memberSearchQuery || memberRoleFilter !== 'all' || memberTierFilter !== 'all') && (
+                  <Button 
+                    size='small' 
+                    onClick={() => { 
+                      setMemberSearchQuery(''); 
+                      setMemberRoleFilter('all');
+                      setMemberTierFilter('all');
+                      setMemberSortKey('points-desc');
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </Box>
+              <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Member ID</strong></TableCell>
+                      <TableCell><strong>Name</strong></TableCell>
+                      <TableCell><strong>Role</strong></TableCell>
+                      <TableCell><strong>Tier</strong></TableCell>
+                      <TableCell><strong>Total Scans</strong></TableCell>
+                      <TableCell><strong>Total Amount (Rs.)</strong></TableCell>
+                      <TableCell><strong>Total Points</strong></TableCell>
+                      <TableCell><strong>Actions</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {membersWithStats.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                          <Typography variant='body1' color='text.secondary'>
+                            {members.length === 0 
+                              ? 'No members found. Members are created automatically when they scan products.'
+                              : 'No members match your filters.'}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      membersWithStats.map(({ member: m, scansCount, totalAmount, totalPoints }) => (
                         <TableRow key={m._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
                           <TableCell>
                             <Typography variant='body2' fontWeight={600}>{m.memberId}</Typography>
@@ -4917,11 +5078,11 @@ function App() {
                             />
                           </TableCell>
                           <TableCell>
-                            <Typography variant='body2' fontWeight={600}>{actualTotalScans}</Typography>
+                            <Typography variant='body2' fontWeight={600}>{scansCount}</Typography>
                           </TableCell>
                           <TableCell>
                             <Chip 
-                              label={`Rs. ${actualTotalAmount.toLocaleString()}`}
+                              label={`Rs. ${totalAmount.toLocaleString()}`}
                               size='small' 
                               color='primary' 
                               sx={{ fontWeight: 700, fontSize: '0.875rem' }}
@@ -4929,7 +5090,7 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Chip 
-                              label={`${actualTotalPoints.toLocaleString()} pts`}
+                              label={`${totalPoints.toLocaleString()} pts`}
                               size='small' 
                               color='success' 
                               sx={{ fontWeight: 700, fontSize: '0.875rem' }}
@@ -4950,13 +5111,14 @@ function App() {
                             </IconButton>
                           </TableCell>
                         </TableRow>
-                      );
-                    });
-                  })()}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>}
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          );
+        })()}
 
           {adminTab === 'co-admins' && isMainAdmin() && <Box>
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
