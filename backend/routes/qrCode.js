@@ -310,7 +310,7 @@ router.get('/', protect, qrAdmin, async (req, res) => {
 // Get batch summary (for tracking printed ranges)
 router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
   try {
-    const batchSummary = await QRCodeModel.aggregate([
+    const rawSummary = await QRCodeModel.aggregate([
       {
         $group: {
           _id: '$batchNo',
@@ -327,35 +327,72 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
           lastPrintDate: {
             $max: '$printedDate'
           },
-          // Add expiry detection (Upgrade 5)
-          minExpiryDate: { $min: '$expiryDate' },
-          productCount: { $push: '$productNo' }
+          minExpiryDate: { $min: '$expiryDate' }
         }
-      },
-      // Compute isExpired and scanRate in a projection stage
-      {
-        $addFields: {
-          isExpired: {
-            $cond: [
-              { $and: [
-                { $ne: ['$minExpiryDate', null] },
-                { $lt: ['$minExpiryDate', new Date()] }
-              ]},
-              true,
-              false
-            ]
-          },
-          scanRate: {
-            $cond: [
-              { $gt: ['$totalQRs', 0] },
-              { $round: [{ $multiply: [{ $divide: ['$scanned', '$totalQRs'] }, 100] }, 1] },
-              0
-            ]
-          }
-        }
-      },
-      { $sort: { lastPrintDate: -1 } }
+      }
     ]);
+
+    // Group raw summary by prefix (excluding package number)
+    const grouped = {};
+    rawSummary.forEach(item => {
+      const batchNo = item._id || '';
+      let prefix = batchNo;
+      
+      const parts = batchNo.trim().split(/[_\s]+/);
+      if (parts.length >= 4) {
+        const delimiter = batchNo.includes('_') ? '_' : ' ';
+        prefix = parts.slice(0, 3).join(delimiter);
+      } else if (parts.length === 5) {
+        prefix = parts.slice(0, 4).join(' ');
+      }
+
+      if (!grouped[prefix]) {
+        grouped[prefix] = {
+          _id: prefix,
+          totalQRs: 0,
+          printed: 0,
+          scanned: 0,
+          generated: 0,
+          lastPrintDate: null,
+          minExpiryDate: null
+        };
+      }
+
+      grouped[prefix].totalQRs += item.totalQRs;
+      grouped[prefix].printed += item.printed;
+      grouped[prefix].scanned += item.scanned;
+      grouped[prefix].generated += item.generated;
+      
+      if (item.lastPrintDate) {
+        const itemDate = new Date(item.lastPrintDate);
+        if (!grouped[prefix].lastPrintDate || itemDate > new Date(grouped[prefix].lastPrintDate)) {
+          grouped[prefix].lastPrintDate = item.lastPrintDate;
+        }
+      }
+      
+      if (item.minExpiryDate) {
+        const itemDate = new Date(item.minExpiryDate);
+        if (!grouped[prefix].minExpiryDate || itemDate < new Date(grouped[prefix].minExpiryDate)) {
+          grouped[prefix].minExpiryDate = item.minExpiryDate;
+        }
+      }
+    });
+
+    const batchSummary = Object.values(grouped).map(batch => {
+      const minExpiry = batch.minExpiryDate ? new Date(batch.minExpiryDate) : null;
+      return {
+        ...batch,
+        isExpired: minExpiry ? minExpiry < new Date() : false,
+        scanRate: batch.totalQRs > 0 ? Math.round((batch.scanned / batch.totalQRs) * 100 * 10) / 10 : 0
+      };
+    });
+
+    // Sort by lastPrintDate desc
+    batchSummary.sort((a, b) => {
+      if (!a.lastPrintDate) return 1;
+      if (!b.lastPrintDate) return -1;
+      return new Date(b.lastPrintDate) - new Date(a.lastPrintDate);
+    });
 
     res.json(batchSummary);
   } catch (error) {

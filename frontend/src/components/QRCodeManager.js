@@ -818,8 +818,27 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     setQuantity(1);
   };
 
+  const getUniqueBatchesCount = (qrs) => {
+    const unique = new Set();
+    qrs.forEach(qr => {
+      const batchNo = qr.batchNo || '';
+      let prefix = batchNo;
+      const parts = batchNo.trim().split(/[_\s]+/);
+      if (parts.length >= 4) {
+        const delimiter = batchNo.includes('_') ? '_' : ' ';
+        prefix = parts.slice(0, 3).join(delimiter);
+      } else if (parts.length === 5) {
+        prefix = parts.slice(0, 4).join(' ');
+      }
+      if (prefix) {
+        unique.add(prefix);
+      }
+    });
+    return unique.size;
+  };
+
   const filteredQRCodes = qrCodes.filter(qr => {
-    if (filterBatch && qr.batchNo !== filterBatch) return false;
+    if (filterBatch && !(qr.batchNo || '').toLowerCase().includes(filterBatch.toLowerCase())) return false;
     if (filterStatus && qr.status !== filterStatus) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -866,7 +885,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="h6" color="textSecondary">Batches</Typography>
-            <Typography variant="h4" color="info.main">{batchSummary.length}</Typography>
+            <Typography variant="h4" color="info.main">{getUniqueBatchesCount(filteredQRCodes)}</Typography>
           </Paper>
         </Grid>
       </Grid>
@@ -1501,21 +1520,16 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
               }}
             />
-            <FormControl sx={{ minWidth: 200 }}>
-              <InputLabel>Filter by Batch</InputLabel>
-              <Select
-                value={filterBatch}
-                onChange={(e) => setFilterBatch(e.target.value)}
-                label="Filter by Batch"
-              >
-                <MenuItem value="">All Batches</MenuItem>
-                {batchSummary.map(batch => (
-                  <MenuItem key={batch._id} value={batch._id}>
-                    {batch._id} ({batch.totalQRs} QRs)
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <TextField 
+              size="small"
+              placeholder="Filter by Batch..."
+              value={filterBatch}
+              onChange={(e) => setFilterBatch(e.target.value)}
+              sx={{ minWidth: 200, flexGrow: 1 }}
+              InputProps={{
+                startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
+              }}
+            />
             <FormControl sx={{ minWidth: 200 }}>
               <InputLabel>Filter by Status</InputLabel>
               <Select
