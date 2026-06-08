@@ -1583,13 +1583,34 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     </TableCell>
                     <TableCell>{qr.printedDate ? new Date(qr.printedDate).toLocaleDateString() : '-'}</TableCell>
                     <TableCell>
-                      <Tooltip title="Download">
+                      <Tooltip title="Download QR Image">
                         <IconButton
                           size="small"
                           onClick={() => downloadQRAsImage(qr)}
                           color="primary"
                         >
                           <Download fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Print Single Label">
+                        <IconButton
+                          size="small"
+                          color="warning"
+                          onClick={() => {
+                            // Print just this single QR code label immediately
+                            printQRLabels([qr._id]);
+                          }}
+                        >
+                          <Print fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Download ZPL (Thermal Printer)">
+                        <IconButton
+                          size="small"
+                          color="info"
+                          onClick={() => generateZPL([qr._id])}
+                        >
+                          <GetApp fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Delete">

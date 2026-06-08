@@ -2866,14 +2866,10 @@ function App() {
                   const searchParam = isPhone 
                     ? { phone: searchPhone.trim() } 
                     : { memberId: searchMemberId.toUpperCase().trim() };
-                  console.log('Searching with:', searchParam);
                   const response = await scansAPI.getAll(searchParam);
-                  console.log('Full API response:', response);
-                  console.log('Response data:', response.data);
                   
                   // Handle nested data structure from backend
                   const results = Array.isArray(response.data) ? response.data : (response.data?.data || []);
-                  console.log('Parsed results:', results);
                   
                   setMemberHistory(results);
                   if (results.length === 0) {
@@ -4509,7 +4505,7 @@ function App() {
                       );
                     })()}
                   </Box>
-                  <TableContainer>
+                  <TableContainer sx={{ overflowX: 'auto' }}>
                     <Table size='small'>
                       <TableHead>
                         <TableRow>
@@ -5592,7 +5588,7 @@ function App() {
                 </Typography>
               </Paper>
             ) : (
-              <TableContainer component={Paper}>
+              <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
                 <Table>
                   <TableHead>
                     <TableRow>
@@ -5829,7 +5825,7 @@ function App() {
                         <Typography variant='h6' fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <EmojiEvents sx={{ color: '#FFD700' }} /> Top 10 by Loyalty Points
                         </Typography>
-                        <TableContainer>
+                        <TableContainer sx={{ overflowX: 'auto' }}>
                           <Table size='small'>
                             <TableHead>
                               <TableRow sx={{ bgcolor: 'grey.100' }}>
@@ -5870,7 +5866,7 @@ function App() {
                         <Typography variant='h6' fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <ShowChart sx={{ color: '#4facfe' }} /> Top 10 by Total Scans
                         </Typography>
-                        <TableContainer>
+                        <TableContainer sx={{ overflowX: 'auto' }}>
                           <Table size='small'>
                             <TableHead>
                               <TableRow sx={{ bgcolor: 'grey.100' }}>
@@ -5943,7 +5939,6 @@ function App() {
                 <Button size='small' onClick={() => setProductSearchQuery('')}>Clear</Button>
               )}
             </Box>
-            {console.log('🏷️ Rendering Products tab, products array:', products, 'Count:', products.length)}
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table><TableHead><TableRow><TableCell>Product Name</TableCell><TableCell>Product Code</TableCell><TableCell>Pack Size</TableCell><TableCell>Price (LKR)</TableCell><TableCell>Loyalty Points</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
                 <TableBody>
@@ -7585,7 +7580,7 @@ function App() {
                 Tier-by-Tier Calculation
               </Typography>
 
-              <TableContainer component={Paper} variant='outlined'>
+              <TableContainer component={Paper} variant='outlined' sx={{ overflowX: 'auto' }}>
                 <Table size='small'>
                   <TableHead>
                     <TableRow>
@@ -8323,7 +8318,7 @@ function App() {
                   <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <People /> Top Active Members
                   </Typography>
-                  <TableContainer component={Paper}>
+                  <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
                     <Table size='small'>
                       <TableHead>
                         <TableRow sx={{ bgcolor: 'grey.100' }}>
@@ -8766,7 +8761,7 @@ function App() {
                   </Typography>
 
                   {dailyReport.scans && dailyReport.scans.length > 0 ? (
-                    <TableContainer component={Paper}>
+                    <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
                       <Table size='small'>
                         <TableHead>
                           <TableRow sx={{ bgcolor: 'grey.100' }}>
@@ -8988,7 +8983,7 @@ function App() {
         <DialogContent sx={{ mt: 2 }}>
           {/* Locations View */}
           {expandedCardDialog.type === 'locations' && (
-            <TableContainer component={Paper}>
+            <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table size='small'>
                 <TableHead>
                   <TableRow sx={{ bgcolor: 'grey.100' }}>
@@ -9031,7 +9026,7 @@ function App() {
 
           {/* Products View */}
           {expandedCardDialog.type === 'products' && (
-            <TableContainer component={Paper}>
+            <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table size='small'>
                 <TableHead>
                   <TableRow sx={{ bgcolor: 'grey.100' }}>
@@ -9075,7 +9070,7 @@ function App() {
           {/* Price Estimation View */}
           {expandedCardDialog.type === 'priceEstimation' && (
             <>
-              <TableContainer component={Paper}>
+              <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
                 <Table size='small'>
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'grey.100' }}>
