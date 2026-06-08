@@ -158,7 +158,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [printShowBatch, setPrintShowBatch] = useState(true);
   const [printShowPkg, setPrintShowPkg] = useState(true);
   const [printShowDate, setPrintShowDate] = useState(true);
-  const [printShowExpiry, setPrintShowExpiry] = useState(false);
+  const [printShowExpiry, setPrintShowExpiry] = useState(true);
 
   useEffect(() => {
     if (printPaperSize === 'a4') {
@@ -657,12 +657,48 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       <body>
     `;
 
+    const getFormattedDate = (dateVal) => {
+      if (!dateVal) return null;
+      if (dateVal instanceof Date) {
+        return dateVal.toLocaleDateString();
+      }
+      const dateStr = String(dateVal);
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+        return dateStr;
+      }
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString();
+      }
+      return dateStr;
+    };
+
     for (let i = 0; i < qrs.length; i += itemsPerPage) {
       const pageQRs = qrs.slice(i, i + itemsPerPage);
       html += `<div class="page">`;
       
       pageQRs.forEach(qr => {
-        const parsedDate = extractDateFromBatch(qr.batchNo);
+        const mfgDateToShow = qr.manufactureDate 
+          ? getFormattedDate(qr.manufactureDate) 
+          : extractDateFromBatch(qr.batchNo);
+          
+        let expDateToShow = qr.expiryDate ? getFormattedDate(qr.expiryDate) : null;
+        if (!expDateToShow && mfgDateToShow) {
+          const parts = mfgDateToShow.split('/');
+          if (parts.length === 3) {
+            const day = parts[0];
+            const month = parts[1];
+            const year = parseInt(parts[2], 10);
+            expDateToShow = `${day}/${month}/${year + 2}`;
+          } else {
+            const d = new Date(mfgDateToShow);
+            if (!isNaN(d.getTime())) {
+              d.setFullYear(d.getFullYear() + 2);
+              expDateToShow = d.toLocaleDateString();
+            }
+          }
+        }
+
         html += `
           <div class="label">
             ${printShowProdName ? `<div class="product-header">${qr.productName}</div>` : ''}
@@ -672,8 +708,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             <div class="batch-info">
               ${printShowBatch ? `BATCH: <strong>${qr.batchNo}</strong><br>` : ''}
               ${printShowPkg ? `PKG: <strong>${qr.packageNo || '-'}</strong>` : ''}
-              ${printShowDate && parsedDate ? `<br>DATE: <strong>${parsedDate}</strong>` : ''}
-              ${printShowExpiry && qr.expiryDate ? `<br>EXP: <strong>${new Date(qr.expiryDate).toLocaleDateString()}</strong>` : ''}
+              ${printShowDate && mfgDateToShow ? `<br>MFG DATE: <strong>${mfgDateToShow}</strong>` : ''}
+              ${printShowExpiry && expDateToShow ? `<br>EXP DATE: <strong>${expDateToShow}</strong>` : ''}
             </div>
             <div class="scan-text">SCAN ME</div>
             <div style="font-size: 6.5pt; margin-top: 0.5mm; text-align: center; width: 100%;">Megakem Loyalty System</div>
