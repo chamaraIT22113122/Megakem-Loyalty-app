@@ -838,7 +838,18 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   };
 
   const filteredQRCodes = qrCodes.filter(qr => {
-    if (filterBatch && !(qr.batchNo || '').toLowerCase().includes(filterBatch.toLowerCase())) return false;
+    if (filterBatch) {
+      const cleanBatchNo = (qr.batchNo || '').trim();
+      const parts = cleanBatchNo.split(/[_\s]+/);
+      const actualBatchNo = parts.length >= 2 ? parts[1] : cleanBatchNo;
+      
+      const query = filterBatch.trim().toLowerCase();
+      const batchLower = actualBatchNo.toLowerCase();
+      const fullBatchLower = cleanBatchNo.toLowerCase();
+      
+      const isMatch = batchLower.includes(query) || (query.length > 3 && fullBatchLower.includes(query));
+      if (!isMatch) return false;
+    }
     if (filterStatus && qr.status !== filterStatus) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
