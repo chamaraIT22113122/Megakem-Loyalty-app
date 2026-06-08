@@ -715,6 +715,8 @@ function App() {
   const [continuousScan, setContinuousScan] = useState(false);
   const [scanCount, setScanCount] = useState(0);
   const html5QrCodeRef = useRef(null); // Raw Html5Qrcode instance for torch access
+  const stopPromiseRef = useRef(null); // Track camera stop promise to prevent race conditions
+
 
   // Load applicator info from database when user session is available
   useEffect(() => {
@@ -1071,53 +1073,70 @@ function App() {
 
   const initializeScanner = () => {
     if (!window.Html5Qrcode) return;
-    
-    const container = document.getElementById('reader');
-    if (!container) {
-      console.warn('QR reader element not found');
-      return;
-    }
-    container.innerHTML = '';
 
-    // Use raw Html5Qrcode class for full camera track access
-    const html5QrCode = new window.Html5Qrcode('reader');
-    html5QrCodeRef.current = html5QrCode;
+    const startCamera = () => {
+      const container = document.getElementById('reader');
+      if (!container) {
+        console.warn('QR reader element not found');
+        return;
+      }
+      container.innerHTML = '';
 
-    const config = {
-      fps: 12,
-      qrbox: { width: 260, height: 260 },
-      aspectRatio: 1.0,
-      rememberLastUsedCamera: true
+      // Use raw Html5Qrcode class for full camera track access
+      const html5QrCode = new window.Html5Qrcode('reader');
+      html5QrCodeRef.current = html5QrCode;
+      scannerRef.current = html5QrCode;
+
+      const config = {
+        fps: 12,
+        qrbox: { width: 260, height: 260 },
+        aspectRatio: 1.0,
+        rememberLastUsedCamera: true
+      };
+
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        config,
+        async (decodedText) => {
+          // Upgrade 3: Sound + Haptic feedback on success
+          playScanBeep();
+          if (navigator.vibrate) navigator.vibrate(120);
+
+          if (continuousScan) {
+            // Continuous mode: process scan but keep camera running
+            setScanCount(prev => prev + 1);
+            await handleScan(decodedText);
+            // Pause briefly to avoid double-scanning same code
+            html5QrCode.pause(true);
+            setTimeout(() => {
+              try { html5QrCode.resume(); } catch (e) {}
+            }, 1500);
+          } else {
+            // One-shot mode: stop camera and go to cart
+            if (html5QrCodeRef.current) {
+              stopPromiseRef.current = html5QrCodeRef.current.stop().then(() => {
+                stopPromiseRef.current = null;
+              }).catch(() => {
+                stopPromiseRef.current = null;
+              });
+              html5QrCodeRef.current = null;
+            }
+            await handleScan(decodedText);
+          }
+        },
+        () => { /* QR scan failure — ignore per-frame errors */ }
+      ).catch(err => console.warn('Camera start error:', err));
     };
 
-    html5QrCode.start(
-      { facingMode: 'environment' },
-      config,
-      async (decodedText) => {
-        // Upgrade 3: Sound + Haptic feedback on success
-        playScanBeep();
-        if (navigator.vibrate) navigator.vibrate(120);
-
-        if (continuousScan) {
-          // Continuous mode: process scan but keep camera running
-          setScanCount(prev => prev + 1);
-          await handleScan(decodedText);
-          // Pause briefly to avoid double-scanning same code
-          html5QrCode.pause(true);
-          setTimeout(() => {
-            try { html5QrCode.resume(); } catch (e) {}
-          }, 1500);
-        } else {
-          // One-shot mode: stop camera and go to cart
-          await html5QrCode.stop().catch(() => {});
-          html5QrCodeRef.current = null;
-          await handleScan(decodedText);
+    if (stopPromiseRef.current) {
+      stopPromiseRef.current.finally(() => {
+        if (window.Html5Qrcode && document.getElementById('reader')) {
+          startCamera();
         }
-      },
-      () => { /* QR scan failure — ignore per-frame errors */ }
-    ).catch(err => console.warn('Camera start error:', err));
-
-    scannerRef.current = html5QrCode;
+      });
+    } else {
+      startCamera();
+    }
   };
 
   useEffect(() => {
@@ -1135,11 +1154,14 @@ function App() {
     }
     return () => {
       if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.stop().catch(() => {});
+        stopPromiseRef.current = html5QrCodeRef.current.stop().then(() => {
+          stopPromiseRef.current = null;
+        }).catch(() => {
+          stopPromiseRef.current = null;
+        });
         html5QrCodeRef.current = null;
       }
-      if (scannerRef.current && scannerRef.current !== html5QrCodeRef.current) {
-        scannerRef.current.clear?.().catch(() => {});
+      if (scannerRef.current) {
         scannerRef.current = null;
       }
     };
@@ -1393,8 +1415,7 @@ function App() {
             batch: batchNo || qrString,
             bag: bagNo || packNo || '001',
             qty: finalPackSize,
-            price: product.price || 0,
-            sig: urlSig
+            price: product.price || 0
           };
           
           showNotification(`Added ${product.name} (${finalPackSize}) - Rs. ${product.price?.toLocaleString() || '0'}`, 'success');
@@ -1410,8 +1431,7 @@ function App() {
             bag: bagNo || packNo || 'N/A',
             id: productCode,
             qty: packSize ? packSize : '1kg',
-            price: 0,
-            sig: urlSig
+            price: 0
           };
           
           showNotification(
@@ -1425,7 +1445,9 @@ function App() {
       
       const newItem = { ...data, tempId: Date.now() + Math.random() };
       setCart(prev => [...prev, newItem]);
-      setView('cart');
+      if (!continuousScan) {
+        setView('cart');
+      }
     } catch (e) {
       console.error('Scan error:', e);
       showNotification('Scan Error', 'error');
@@ -1487,8 +1509,7 @@ function App() {
         bagNo: item.bag, 
         qty: item.qty,
         price: item.price || 0,
-        location: finalLocation || '',
-        sig: item.sig
+        location: finalLocation || '' 
       }));
       const response = await scansAPI.createBatch(scansData);
       

@@ -44,7 +44,8 @@ const scanLogSchema = new mongoose.Schema({
   notes: String,
   timestamp: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true
   }
 });
 
