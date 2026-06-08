@@ -432,7 +432,7 @@ router.put('/mark-printed', protect, qrAdmin, async (req, res) => {
 // (/scan-logs, /settings/printers, /record-scan) are not swallowed by it.
 
 // Delete QR codes
-router.delete('/', protect, qrAdmin, async (req, res) => {
+router.delete('/', protect, qrAdmin, hasPermission('canDelete'), async (req, res) => {
   try {
     const { qrIds } = req.body;
 

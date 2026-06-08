@@ -113,6 +113,16 @@ const extractDateFromBatch = (batchNo) => {
 };
 
 const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts }) => {
+  const isMainAdmin = userInfo && (userInfo.email === 'admin@megakem.com' || (userInfo.role === 'admin' && !userInfo.permissions));
+
+  const hasPermission = (permission) => {
+    if (isMainAdmin) return true;
+    if (userInfo && userInfo.permissions) {
+      return userInfo.permissions[permission] === true;
+    }
+    return false;
+  };
+
   const [loading, setLoading] = useState(false);
   const [qrCodes, setQRCodes] = useState([]);
   const [products, setProducts] = useState(initialProducts || []);
@@ -1009,14 +1019,16 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             >
               Print Labels
             </Button>
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={() => deleteQRCodes(selectedForPrint)}
-            >
-              Delete Selected ({selectedForPrint.length})
-            </Button>
+            {hasPermission('canDelete') && (
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={() => deleteQRCodes(selectedForPrint)}
+              >
+                Delete Selected ({selectedForPrint.length})
+              </Button>
+            )}
           </>
         )}
         <Button
@@ -1295,6 +1307,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   value={printLayoutMode}
                   onChange={(e) => setPrintLayoutMode(e.target.value)}
                   label="Layout Mode"
+                  disabled={!isMainAdmin}
                 >
                   <MenuItem value="roll">Roll / Thermal (Single Label)</MenuItem>
                   <MenuItem value="grid">Sheet / Grid (Stickers on Page)</MenuItem>
@@ -1307,6 +1320,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   value={printPaperSize}
                   onChange={(e) => setPrintPaperSize(e.target.value)}
                   label="Paper / Sheet Size Preset"
+                  disabled={!isMainAdmin}
                 >
                   <MenuItem value="medium">4" x 6" Roll Label</MenuItem>
                   <MenuItem value="small">3" x 3" Roll Label</MenuItem>
@@ -1327,6 +1341,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       value={customPaperWidth}
                       onChange={(e) => setCustomPaperWidth(parseFloat(e.target.value) || 0)}
                       margin="normal"
+                      disabled={!isMainAdmin}
                     />
                   </Grid>
                   <Grid item xs={6}>
@@ -1338,6 +1353,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       value={customPaperHeight}
                       onChange={(e) => setCustomPaperHeight(parseFloat(e.target.value) || 0)}
                       margin="normal"
+                      disabled={!isMainAdmin}
                     />
                   </Grid>
                 </Grid>
@@ -1354,6 +1370,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       value={printColumns}
                       onChange={(e) => setPrintColumns(parseInt(e.target.value) || 1)}
                       margin="normal"
+                      disabled={!isMainAdmin}
                     />
                   </Grid>
                   <Grid item xs={6}>
@@ -1365,6 +1382,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       value={printRows}
                       onChange={(e) => setPrintRows(parseInt(e.target.value) || 1)}
                       margin="normal"
+                      disabled={!isMainAdmin}
                     />
                   </Grid>
                 </Grid>
@@ -1383,6 +1401,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     value={printQRSize}
                     onChange={(e) => setPrintQRSize(parseFloat(e.target.value) || 0)}
                     margin="none"
+                    disabled={!isMainAdmin}
                   />
                 </Grid>
                 <Grid item xs={6}>
@@ -1394,6 +1413,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     value={printLabelPadding}
                     onChange={(e) => setPrintLabelPadding(parseFloat(e.target.value) || 0)}
                     margin="none"
+                    disabled={!isMainAdmin}
                   />
                 </Grid>
                 {printLayoutMode === 'grid' && (
@@ -1406,6 +1426,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       value={printGap}
                       onChange={(e) => setPrintGap(parseFloat(e.target.value) || 0)}
                       margin="none"
+                      disabled={!isMainAdmin}
                     />
                   </Grid>
                 )}
@@ -1423,6 +1444,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     type="number"
                     value={printMarginTop}
                     onChange={(e) => setPrintMarginTop(parseFloat(e.target.value) || 0)}
+                    disabled={!isMainAdmin}
                   />
                 </Grid>
                 <Grid item xs={3}>
@@ -1433,6 +1455,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     type="number"
                     value={printMarginBottom}
                     onChange={(e) => setPrintMarginBottom(parseFloat(e.target.value) || 0)}
+                    disabled={!isMainAdmin}
                   />
                 </Grid>
                 <Grid item xs={3}>
@@ -1443,6 +1466,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     type="number"
                     value={printMarginLeft}
                     onChange={(e) => setPrintMarginLeft(parseFloat(e.target.value) || 0)}
+                    disabled={!isMainAdmin}
                   />
                 </Grid>
                 <Grid item xs={3}>
@@ -1453,6 +1477,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     type="number"
                     value={printMarginRight}
                     onChange={(e) => setPrintMarginRight(parseFloat(e.target.value) || 0)}
+                    disabled={!isMainAdmin}
                   />
                 </Grid>
               </Grid>
@@ -1647,15 +1672,17 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                           <GetApp fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          onClick={() => deleteQRCodes([qr._id])}
-                          color="error"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {hasPermission('canDelete') && (
+                        <Tooltip title="Delete">
+                          <IconButton
+                            size="small"
+                            onClick={() => deleteQRCodes([qr._id])}
+                            color="error"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
