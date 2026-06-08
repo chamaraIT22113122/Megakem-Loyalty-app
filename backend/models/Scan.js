@@ -67,6 +67,19 @@ const scanSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Auto-assign role based on memberId prefix before saving
+scanSchema.pre('save', function(next) {
+  if (this.memberId) {
+    const id = this.memberId.toUpperCase();
+    if (id.startsWith('MA')) {
+      this.role = 'applicator';
+    } else if (id.startsWith('MH') || id.startsWith('CUS-')) {
+      this.role = 'customer';
+    }
+  }
+  next();
+});
+
 // Index for faster queries
 scanSchema.index({ timestamp: -1 });
 scanSchema.index({ memberId: 1 });

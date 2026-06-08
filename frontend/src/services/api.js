@@ -133,6 +133,7 @@ export const membersAPI = {
   updatePoints: (id, points, operation = 'set') => api.put(`/members/${id}/points`, { points, operation }),
   getStats: () => api.get('/members/stats/summary'),
   syncFromScans: () => api.post('/members/sync-from-scans'),
+  fixRoles: () => api.post('/members/fix-roles'),
 };
 
 // Loyalty Configuration API

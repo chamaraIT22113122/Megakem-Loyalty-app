@@ -124,7 +124,6 @@ router.post('/', optionalAuth, async (req, res) => {
     const {
       memberName,
       memberId,
-      role,
       productName,
       productNo,
       batchNo,
@@ -132,6 +131,15 @@ router.post('/', optionalAuth, async (req, res) => {
       qty,
       sig  // HMAC signature from QR URL — Upgrade 1
     } = req.body;
+
+    // Auto-detect role from memberId prefix (MA → applicator, MH/CUS- → customer)
+    const upperMemberId = (memberId || '').toUpperCase().trim();
+    let role = req.body.role || 'applicator';
+    if (upperMemberId.startsWith('MA')) {
+      role = 'applicator';
+    } else if (upperMemberId.startsWith('MH') || upperMemberId.startsWith('CUS-')) {
+      role = 'customer';
+    }
 
     // ── Upgrade 1: HMAC Signature Verification (backwards-compatible) ──────
     const sigStatus = verifyQRSig(productNo, batchNo, bagNo, sig);
@@ -142,7 +150,7 @@ router.post('/', optionalAuth, async (req, res) => {
         productNo: productNo?.toUpperCase(),
         batchNo,
         packageNo: bagNo,
-        memberId: memberId?.toUpperCase(),
+        memberId: upperMemberId,
         role,
         signature: 'invalid',
         ipAddress: req.ip,
@@ -160,7 +168,7 @@ router.post('/', optionalAuth, async (req, res) => {
     // Check if applicator is registered in Applicator & Hardware Info
     if (role === 'applicator') {
       const member = await Member.findOne({ 
-        memberId: memberId.toUpperCase().trim(), 
+        memberId: upperMemberId, 
         role: 'applicator' 
       });
       if (!member) {
@@ -311,6 +319,16 @@ router.post('/batch', optionalAuth, async (req, res) => {
         success: false,
         message: 'Scans array is required'
       });
+    }
+
+    // Auto-detect role from memberId prefix for each scan in the batch
+    for (const scan of scans) {
+      const uid = (scan.memberId || '').toUpperCase().trim();
+      if (uid.startsWith('MA')) {
+        scan.role = 'applicator';
+      } else if (uid.startsWith('MH') || uid.startsWith('CUS-')) {
+        scan.role = 'customer';
+      }
     }
 
     // Check if applicator is registered for all applicator scans in batch

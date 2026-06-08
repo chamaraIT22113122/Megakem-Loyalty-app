@@ -25,10 +25,12 @@ router.get('/', protect, async (req, res) => {
     } else if (isCoAdmin) {
       if (hasUsersPerm) {
         allowed = true;
-      } else if (hasApplicatorsPerm && role === 'applicator') {
+      } else if (hasApplicatorsPerm && (!role || role === 'applicator' || role === 'customer')) {
+        // canManageApplicators covers both Applicators (MA) and Hardwares (MH)
         allowed = true;
       }
-    } else if (role === 'applicator') {
+    } else if (role === 'applicator' || role === 'customer' || !role) {
+      // Allow any authenticated user to fetch applicator/hardware list for scan validation
       allowed = true;
     }
 
@@ -215,7 +217,75 @@ router.post('/sync-from-scans', protect, async (req, res) => {
   }
 });
 
-// @route   GET /api/members/stats/summary
+// @route   POST /api/members/fix-roles
+// @desc    One-time migration: set correct role for all Members and Scans based on memberId prefix
+//          MA* → applicator  |  MH* / CUS-* → customer
+// @access  Private/Admin only
+router.post('/fix-roles', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin access required' });
+    }
+
+    const Scan = require('../models/Scan');
+
+    // Use MongoDB's bulk updateMany — avoids Mongoose pre-save hooks (roles already correct)
+    const memberResults = await Promise.all([
+      // MA* → applicator
+      Member.updateMany(
+        { memberId: { $regex: '^MA', $options: 'i' }, role: { $ne: 'applicator' } },
+        { $set: { role: 'applicator' } }
+      ),
+      // MH* → customer
+      Member.updateMany(
+        { memberId: { $regex: '^MH', $options: 'i' }, role: { $ne: 'customer' } },
+        { $set: { role: 'customer' } }
+      ),
+      // CUS-* → customer
+      Member.updateMany(
+        { memberId: { $regex: '^CUS-', $options: 'i' }, role: { $ne: 'customer' } },
+        { $set: { role: 'customer' } }
+      )
+    ]);
+
+    const scanResults = await Promise.all([
+      Scan.updateMany(
+        { memberId: { $regex: '^MA', $options: 'i' }, role: { $ne: 'applicator' } },
+        { $set: { role: 'applicator' } }
+      ),
+      Scan.updateMany(
+        { memberId: { $regex: '^MH', $options: 'i' }, role: { $ne: 'customer' } },
+        { $set: { role: 'customer' } }
+      ),
+      Scan.updateMany(
+        { memberId: { $regex: '^CUS-', $options: 'i' }, role: { $ne: 'customer' } },
+        { $set: { role: 'customer' } }
+      )
+    ]);
+
+    const membersFixed =
+      (memberResults[0].modifiedCount || 0) +
+      (memberResults[1].modifiedCount || 0) +
+      (memberResults[2].modifiedCount || 0);
+
+    const scansFixed =
+      (scanResults[0].modifiedCount || 0) +
+      (scanResults[1].modifiedCount || 0) +
+      (scanResults[2].modifiedCount || 0);
+
+    await logAction(req, 'FIX_ROLES', 'MEMBERS', { membersFixed, scansFixed });
+
+    res.json({
+      success: true,
+      message: `Role migration complete. Members fixed: ${membersFixed}, Scans fixed: ${scansFixed}`,
+      data: { membersFixed, scansFixed }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+
 // @desc    Get member statistics
 // @access  Private/Admin
 router.get('/stats/summary', protect, async (req, res) => {
@@ -284,11 +354,11 @@ router.get('/:id', protect, async (req, res) => {
       });
     }
 
-    // If co-admin only has applicators permission, they can only view applicators
-    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator') {
+    // If co-admin only has applicators permission, they can only view applicators and hardwares
+    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator' && member.role !== 'customer') {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. You can only view applicator details.'
+        message: 'Access denied. You can only view applicator and hardware details.'
       });
     }
 
@@ -442,19 +512,19 @@ router.post('/', protect, [
       connectedHardware
     } = req.body;
 
-    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && role !== 'applicator') {
+    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && role !== 'applicator' && role !== 'customer') {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. You can only manage applicator accounts.'
+        message: 'Access denied. You can only manage applicator and hardware accounts.'
       });
     }
 
     let member = await Member.findOne({ memberId: memberId.toUpperCase().trim() });
     if (member) {
-      if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator') {
+      if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator' && member.role !== 'customer') {
         return res.status(403).json({
           success: false,
-          message: 'Access denied. You can only manage applicator accounts.'
+          message: 'Access denied. You can only manage applicator and hardware accounts.'
         });
       }
       member.memberName = memberName;
@@ -561,10 +631,10 @@ router.put('/:id', protect, async (req, res) => {
       });
     }
 
-    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator') {
+    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator' && member.role !== 'customer') {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. You can only manage applicator accounts.'
+        message: 'Access denied. You can only manage applicator and hardware accounts.'
       });
     }
 
@@ -664,10 +734,10 @@ router.delete('/:id', protect, async (req, res) => {
       });
     }
 
-    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator') {
+    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator' && member.role !== 'customer') {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. You can only delete applicator accounts.'
+        message: 'Access denied. You can only delete applicator and hardware accounts.'
       });
     }
 

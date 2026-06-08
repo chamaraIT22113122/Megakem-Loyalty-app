@@ -722,7 +722,7 @@ function App() {
   useEffect(() => {
     const fetchApplicators = async () => {
       try {
-        const res = await membersAPI.getAll({ role: 'applicator' });
+        const res = await membersAPI.getAll();
         const mapped = (res.data.data || []).map(m => ({
           _id: m._id,
           name: m.memberName,
@@ -1645,7 +1645,7 @@ function App() {
       const membersPromise = hasUsers
         ? membersAPI.getAll()
         : (hasProducts 
-            ? membersAPI.getAll({ role: 'applicator' }) 
+            ? membersAPI.getAll()
             : Promise.resolve({ data: { data: [] } }));
 
       const usersPromise = isMainAdmin()
@@ -1669,7 +1669,7 @@ function App() {
       const allMembers = membersRes.data?.data || [];
       setMembers(allMembers);
       
-      const applicators = allMembers.filter(m => m.role === 'applicator').map(m => ({
+      const applicators = allMembers.filter(m => m.role === 'applicator' || m.role === 'customer').map(m => ({
         _id: m._id,
         name: m.memberName,
         memberId: m.memberId,
@@ -1708,7 +1708,7 @@ function App() {
       if (hasUsers) {
         membersRes = await membersAPI.getAll();
       } else if (hasProducts) {
-        membersRes = await membersAPI.getAll({ role: 'applicator' });
+        membersRes = await membersAPI.getAll();
       } else {
         return; // No permission to load members or applicators
       }
@@ -1716,7 +1716,7 @@ function App() {
       const allMembers = membersRes.data?.data || [];
       setMembers(allMembers);
       
-      const applicators = allMembers.filter(m => m.role === 'applicator').map(m => ({
+      const applicators = allMembers.filter(m => m.role === 'applicator' || m.role === 'customer').map(m => ({
         _id: m._id,
         name: m.memberName,
         memberId: m.memberId,
@@ -2352,7 +2352,32 @@ function App() {
     }
   };
 
-  // Export data with filters
+  const handleFixRoles = async () => {
+    if (!window.confirm(
+      'This will correct the "role" field of ALL existing Members and Scans based on their ID prefix:\n' +
+      '  • MA*** → Applicator\n  • MH*** → Hardware (Customer)\n\n' +
+      'This is a one-time migration. Continue?'
+    )) return;
+
+    setLoading(true);
+    try {
+      const response = await membersAPI.fixRoles();
+      // Reload members after migration
+      await loadAdminData();
+      showNotification(
+        response.data.message || 'Role migration completed successfully!',
+        'success',
+        8000
+      );
+      addToActivityLog('Roles Fixed', response.data.message, 'success');
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to fix roles', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   const handleExportData = async (format = 'csv') => {
     if (!hasPermission('canExport')) {
       showNotification('You do not have permission to export data', 'error');
@@ -5043,6 +5068,19 @@ function App() {
                 >
                   Loyalty & Tier Config
                 </Button>
+                {isMainAdmin() && (
+                  <Button
+                    variant='outlined'
+                    color='warning'
+                    size='small'
+                    onClick={handleFixRoles}
+                    disabled={loading}
+                    title='One-time fix: correct role for all MA->Applicator / MH->Hardware members'
+                    sx={{ whiteSpace: 'nowrap' }}
+                  >
+                    ?? Fix Roles (MA/MH)
+                  </Button>
+                )}
               </Box>
               <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                 <TextField 
@@ -9291,7 +9329,7 @@ function App() {
                   purchaseDate: hardwareFormData.purchaseDate || null,
                   condition: hardwareFormData.condition || 'good',
                   notes: hardwareFormData.notes,
-                  role: 'applicator'
+                  role: 'customer'
                 };
 
                 if (hardwareDialog.data && hardwareDialog.data._id) {
