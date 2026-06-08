@@ -61,6 +61,36 @@ const initializeApp = async () => {
     } catch (error) {
       console.error('⚠️  Error with admin user:', error.message);
     }
+
+    // ── Auto-fix member/scan roles based on memberId prefix ──────────────────
+    // MA* → applicator  |  MH* / CUS-* → customer
+    // Safe to run on every startup (updateMany with $ne guard = no-op when already correct)
+    try {
+      const Member = require('./models/Member');
+      const Scan   = require('./models/Scan');
+
+      const [mApp, mCustMH, mCustCUS, sApp, sCustMH, sCustCUS] = await Promise.all([
+        Member.updateMany({ memberId: { $regex: '^MA', $options: 'i' }, role: { $ne: 'applicator' } }, { $set: { role: 'applicator' } }),
+        Member.updateMany({ memberId: { $regex: '^MH', $options: 'i' }, role: { $ne: 'customer'   } }, { $set: { role: 'customer'   } }),
+        Member.updateMany({ memberId: { $regex: '^CUS-', $options: 'i' }, role: { $ne: 'customer' } }, { $set: { role: 'customer'   } }),
+        Scan.updateMany(  { memberId: { $regex: '^MA', $options: 'i' }, role: { $ne: 'applicator' } }, { $set: { role: 'applicator' } }),
+        Scan.updateMany(  { memberId: { $regex: '^MH', $options: 'i' }, role: { $ne: 'customer'   } }, { $set: { role: 'customer'   } }),
+        Scan.updateMany(  { memberId: { $regex: '^CUS-', $options: 'i' }, role: { $ne: 'customer' } }, { $set: { role: 'customer'   } }),
+      ]);
+
+      const membersFixed = (mApp.modifiedCount || 0) + (mCustMH.modifiedCount || 0) + (mCustCUS.modifiedCount || 0);
+      const scansFixed   = (sApp.modifiedCount || 0) + (sCustMH.modifiedCount || 0) + (sCustCUS.modifiedCount || 0);
+
+      if (membersFixed > 0 || scansFixed > 0) {
+        console.log(`🔧 Role migration: fixed ${membersFixed} member(s) and ${scansFixed} scan(s) (MA→applicator, MH→customer)`);
+      } else {
+        console.log('✅ Role migration: all member/scan roles are already correct');
+      }
+    } catch (roleFixError) {
+      console.error('⚠️  Error during role auto-fix:', roleFixError.message);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
   } catch (error) {
     console.error('❌ FATAL: Database initialization failed:', error.message);
     process.exit(1);
