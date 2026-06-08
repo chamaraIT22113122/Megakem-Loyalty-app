@@ -158,11 +158,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [printRows, setPrintRows] = useState(7);
   const [printGap, setPrintGap] = useState(4); // mm
   const [printLabelPadding, setPrintLabelPadding] = useState(2); // mm
-  const [printShowProdName, setPrintShowProdName] = useState(true);
-  const [printShowBatch, setPrintShowBatch] = useState(true);
-  const [printShowPkg, setPrintShowPkg] = useState(true);
-  const [printShowDate, setPrintShowDate] = useState(true);
-  const [printShowExpiry, setPrintShowExpiry] = useState(true);
+  // Label content is fixed: QR → BATCH → MFG DATE → EXP DATE → SCAN ME → (MWTC ONLY)
 
   useEffect(() => {
     if (printPaperSize === 'a4') {
@@ -283,24 +279,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               backgroundColor: '#fafafa'
             }}
           >
-            {printShowProdName && (
-              <Typography 
-                sx={{ 
-                  fontSize: `${Math.max(4, 8 * scale * 0.3)}px`, 
-                  fontWeight: 'bold', 
-                  lineHeight: 1, 
-                  textTransform: 'uppercase',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  width: '100%',
-                  textAlign: 'center',
-                  mb: 0.5
-                }}
-              >
-                {item.productName}
-              </Typography>
-            )}
+
             <Box 
               sx={{ 
                 width: `${printQRSize * scale}px`, 
@@ -319,16 +298,15 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               />
             </Box>
             <Box sx={{ width: '100%', textAlign: 'center', mt: 0.5 }}>
-              {printShowBatch && (
-                <Typography sx={{ fontSize: `${Math.max(3.5, 6 * scale * 0.35)}px`, lineHeight: 1 }}>
-                  B: {item.batchNo.substring(0, 15)}...
-                </Typography>
-              )}
-              {printShowPkg && (
-                <Typography sx={{ fontSize: `${Math.max(3.5, 6 * scale * 0.35)}px`, lineHeight: 1 }}>
-                  PKG: {item.packageNo || '-'}
-                </Typography>
-              )}
+              <Typography sx={{ fontSize: `${Math.max(3.5, 6 * scale * 0.35)}px`, lineHeight: 1 }}>
+                BATCH: {item.batchNo.substring(0, 18)}
+              </Typography>
+              <Typography sx={{ fontSize: `${Math.max(3.5, 5 * scale * 0.35)}px`, lineHeight: 1 }}>
+                MFG DATE: –
+              </Typography>
+              <Typography sx={{ fontSize: `${Math.max(3.5, 5 * scale * 0.35)}px`, lineHeight: 1 }}>
+                EXP DATE: –
+              </Typography>
             </Box>
             <Typography 
               sx={{ 
@@ -354,7 +332,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 lineHeight: 1
               }}
             >
-              Megakem Loyalty System
+              (MWTC ONLY)
             </Typography>
           </Box>
         ))}
@@ -795,18 +773,16 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
         html += `
           <div class="label">
-            ${printShowProdName ? `<div class="product-header">${qr.productName}</div>` : ''}
             <div class="qr-container">
               <img src="${qr.qrData}" alt="QR">
             </div>
             <div class="batch-info">
-              ${printShowBatch ? `BATCH: <strong>${qr.batchNo}</strong><br>` : ''}
-              ${printShowPkg ? `PKG: <strong>${qr.packageNo || '-'}</strong>` : ''}
-              ${printShowDate && mfgDateToShow ? `<br>MFG DATE: <strong>${mfgDateToShow}</strong>` : ''}
-              ${printShowExpiry && expDateToShow ? `<br>EXP DATE: <strong>${expDateToShow}</strong>` : ''}
+              BATCH: <strong>${qr.batchNo}</strong><br>
+              ${mfgDateToShow ? `MFG DATE: <strong>${mfgDateToShow}</strong><br>` : ''}
+              ${expDateToShow ? `EXP DATE: <strong>${expDateToShow}</strong>` : ''}
             </div>
             <div class="scan-text">SCAN ME</div>
-            <div style="font-size: 6.5pt; margin-top: 0.5mm; text-align: center; width: 100%;">Megakem Loyalty System</div>
+            <div style="font-size: 6.5pt; margin-top: 0.5mm; text-align: center; width: 100%;">(MWTC ONLY)</div>
           </div>
         `;
       });
@@ -1443,40 +1419,16 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               </Grid>
 
               <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 2 }} gutterBottom color="primary">
-                Label Content Details
+                Fixed Label Format
               </Typography>
-              <Grid container spacing={0}>
-                <Grid item xs={6}>
-                  <FormControlLabel
-                    control={<Checkbox checked={printShowProdName} onChange={(e) => setPrintShowProdName(e.target.checked)} />}
-                    label="Product Name"
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <FormControlLabel
-                    control={<Checkbox checked={printShowBatch} onChange={(e) => setPrintShowBatch(e.target.checked)} />}
-                    label="Batch Number"
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <FormControlLabel
-                    control={<Checkbox checked={printShowPkg} onChange={(e) => setPrintShowPkg(e.target.checked)} />}
-                    label="Package Number"
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <FormControlLabel
-                    control={<Checkbox checked={printShowDate} onChange={(e) => setPrintShowDate(e.target.checked)} />}
-                    label="Mfg Date"
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <FormControlLabel
-                    control={<Checkbox checked={printShowExpiry} onChange={(e) => setPrintShowExpiry(e.target.checked)} />}
-                    label="Expiry Date"
-                  />
-                </Grid>
-              </Grid>
+              <Box sx={{ pl: 1 }}>
+                <Typography variant="body2" color="text.secondary">✅ QR Code</Typography>
+                <Typography variant="body2" color="text.secondary">✅ Batch Number</Typography>
+                <Typography variant="body2" color="text.secondary">✅ MFG Date</Typography>
+                <Typography variant="body2" color="text.secondary">✅ Expiry Date</Typography>
+                <Typography variant="body2" color="text.secondary">✅ SCAN ME</Typography>
+                <Typography variant="body2" color="text.secondary">✅ (MWTC ONLY)</Typography>
+              </Box>
             </Grid>
 
             {/* Right Column: Live Layout Preview */}

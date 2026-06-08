@@ -2839,7 +2839,7 @@ function App() {
               </Box>
               <TextField 
                 fullWidth 
-                label='Phone Number (for Customers)' 
+                label='Phone Number (for Hardwares)' 
                 placeholder='e.g., 0712345678' 
               value={searchPhone} 
               onChange={(e) => {
@@ -2940,7 +2940,7 @@ function App() {
                       🎉 Monthly Purchase Summary
                     </Typography>
                     <Chip 
-                      label={memberHistory.filter(s => s.role === 'applicator').length > 0 ? 'Applicator' : 'Customer'} 
+                      label={memberHistory.filter(s => s.role === 'applicator').length > 0 ? 'Applicator' : 'Hardware'} 
                       sx={{ 
                         bgcolor: 'secondary.main', 
                         color: '#fff',
@@ -3563,7 +3563,7 @@ function App() {
                                 <Typography variant="h6" fontWeight={700}>{member.memberName || member.memberId}</Typography>
                                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                                   <Chip 
-                                    label={member.role === 'applicator' ? 'Applicator' : 'Customer'} 
+                                    label={member.role === 'applicator' ? 'Applicator' : 'Hardware'} 
                                     size="small" 
                                     color={member.role === 'applicator' ? 'warning' : 'info'}
                                   />
@@ -3607,7 +3607,7 @@ function App() {
           <Box sx={{ position: 'absolute', top: { xs: 60, sm: 80 }, left: 0, right: 0, zIndex: 5, px: 2 }}>
             <Paper elevation={3} sx={{ bgcolor: 'rgba(255,255,255,0.95)', p: { xs: 1.5, sm: 2 }, borderRadius: 2, backdropFilter: 'blur(10px)' }}>
               <Typography variant='subtitle2' fontWeight='bold' color='primary' gutterBottom sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
-                {role === 'applicator' ? 'Waterproofing Technician - Instructions:' : 'Customer - Instructions:'}
+                {role === 'applicator' ? 'Waterproofing Technician - Instructions:' : 'Hardware - Instructions:'}
               </Typography>
               <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
                 📱 Scan QR code on product bags OR use manual entry below
@@ -3739,7 +3739,7 @@ function App() {
               </Box>
             )}
             <Grid container spacing={{ xs: 1.5, sm: 2.5 }}>
-              {role === 'customer' && <Grid item xs={12}><TextField fullWidth label='Customer Name' variant='outlined' value={memberName} onChange={(e) => setMemberName(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>}
+              {role === 'customer' && <Grid item xs={12}><TextField fullWidth label='Hardware Name' variant='outlined' value={memberName} onChange={(e) => setMemberName(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>}
               <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? 'Phone Number' : 'Member ID'} placeholder={role === 'customer' ? 'e.g. 0712345678' : 'e.g. APP-001'} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
               <Grid item xs={12}>
                 <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }}>
@@ -6660,7 +6660,7 @@ function App() {
                   <Typography variant='body2' color='text.secondary' gutterBottom>
                     Member: <strong>{pointsDialog.user.memberName || pointsDialog.user.memberId}</strong> ({pointsDialog.user.memberId})
                     {pointsDialog.user.role && (
-                      <Chip label={pointsDialog.user.role === 'applicator' ? 'Applicator' : 'Customer'} size='small' color={pointsDialog.user.role === 'applicator' ? 'warning' : 'info'} sx={{ ml: 1 }} />
+                      <Chip label={pointsDialog.user.role === 'applicator' ? 'Applicator' : 'Hardware'} size='small' color={pointsDialog.user.role === 'applicator' ? 'warning' : 'info'} sx={{ ml: 1 }} />
                     )}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
@@ -7522,7 +7522,7 @@ function App() {
                           ['Unique Active Members', dailyReport.summary.uniqueMembers],
                           ['Unique Products Scanned', dailyReport.summary.uniqueProducts],
                           ['Applicators', dailyReport.summary.roleBreakdown?.applicator || 0],
-                          ['Customers', dailyReport.summary.roleBreakdown?.customer || 0],
+                          ['Hardwares', dailyReport.summary.roleBreakdown?.customer || 0],
                           [],
                           ['PERFORMANCE INDICATORS', ''],
                           ...(dailyReport.summary.totalScans > 0 ? [
@@ -7622,7 +7622,7 @@ function App() {
                             ['MEMBER STATISTICS', ''],
                             ['Total Active Members', dailyReport.summary.uniqueMembers],
                             ['Total Applicators', dailyReport.summary.roleBreakdown?.applicator || 0],
-                            ['Total Customers', dailyReport.summary.roleBreakdown?.customer || 0],
+                            ['Total Hardwares', dailyReport.summary.roleBreakdown?.customer || 0],
                             ['Most Active Member', dailyReport.topMembers[0]?.memberName],
                             ['Top Member Scans', dailyReport.topMembers[0]?.count],
                             ['Average Scans per Member', (dailyReport.summary.totalScans / dailyReport.summary.uniqueMembers).toFixed(2)]
@@ -7802,7 +7802,7 @@ function App() {
                               (dailyReport.summary.roleBreakdown?.applicator || 0) >= (previousDayReport.summary.roleBreakdown?.applicator || 0) ? 'Improved' : 'Declined'
                             ],
                             [
-                              'Customers',
+                              'Hardwares',
                               previousDayReport.summary.roleBreakdown?.customer || 0,
                               dailyReport.summary.roleBreakdown?.customer || 0,
                               (dailyReport.summary.roleBreakdown?.customer || 0) - (previousDayReport.summary.roleBreakdown?.customer || 0),
@@ -7950,7 +7950,7 @@ function App() {
                               sx={{ fontSize: '0.7rem', height: 20 }}
                             />
                             <Chip 
-                              label={`${dailyReport.summary.roleBreakdown?.customer || 0} Customers`}
+                              label={`${dailyReport.summary.roleBreakdown?.customer || 0} Hardwares`}
                               size='small'
                               color='info'
                               sx={{ fontSize: '0.7rem', height: 20 }}
@@ -8288,7 +8288,7 @@ function App() {
                                 'Selected Day': dailyReport.summary.roleBreakdown?.applicator || 0
                               },
                               {
-                                metric: 'Customers',
+                                metric: 'Hardwares',
                                 'Previous Day': previousDayReport.summary.roleBreakdown?.customer || 0,
                                 'Selected Day': dailyReport.summary.roleBreakdown?.customer || 0
                               }
@@ -8472,7 +8472,7 @@ function App() {
                               <Pie
                                 data={[
                                   { name: 'Applicators', value: dailyReport.summary.roleBreakdown?.applicator || 0, color: '#f59e0b' },
-                                  { name: 'Customers', value: dailyReport.summary.roleBreakdown?.customer || 0, color: '#00B4D8' }
+                                  { name: 'Hardwares', value: dailyReport.summary.roleBreakdown?.customer || 0, color: '#00B4D8' }
                                 ]}
                                 cx='50%'
                                 cy='50%'
@@ -8484,7 +8484,7 @@ function App() {
                               >
                                 {[
                                   { name: 'Applicators', value: dailyReport.summary.roleBreakdown?.applicator || 0, color: '#f59e0b' },
-                                  { name: 'Customers', value: dailyReport.summary.roleBreakdown?.customer || 0, color: '#00B4D8' }
+                                  { name: 'Hardwares', value: dailyReport.summary.roleBreakdown?.customer || 0, color: '#00B4D8' }
                                 ].map((entry, index) => (
                                   <Cell key={`cell-${index}`} fill={entry.color} />
                                 ))}
