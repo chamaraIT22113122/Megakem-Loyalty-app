@@ -394,7 +394,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       }
       // QR code module (BQ = QR code, N=normal, 2=model 2, 6=magnification factor)
       zpl += `^FO190,30^BQN,2,5^FDQA,${qr.qrLink || ''}^FS\n`;
-      zpl += `^FO30,175^ADN,16,8^FDMegakem Loyalty System^FS\n`;
+      zpl += `^FO30,175^ADN,16,8^FD(MWTC MEMBERS ONLY)^FS\n`;
       zpl += `^XZ\n`;
     });
 
