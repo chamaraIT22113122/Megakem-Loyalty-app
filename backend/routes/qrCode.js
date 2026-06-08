@@ -312,8 +312,69 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
   try {
     const batchSummary = await QRCodeModel.aggregate([
       {
+        $project: {
+          productNo: 1,
+          status: 1,
+          printedDate: 1,
+          expiryDate: 1,
+          batchNo: 1,
+          packageNo: 1,
+          baseBatchNo: {
+            $let: {
+              vars: {
+                parts: { $split: ["$batchNo", " "] }
+              },
+              in: {
+                $cond: {
+                  if: { $gt: [{ $size: "$$parts" }, 1] },
+                  then: {
+                    $reduce: {
+                      input: { $slice: ["$$parts", 0, { $subtract: [{ $size: "$$parts" }, 1] }] },
+                      initialValue: "",
+                      in: {
+                        $cond: {
+                          if: { $eq: ["$$value", ""] },
+                          then: "$$this",
+                          else: { $concat: ["$$value", " ", "$$this"] }
+                        }
+                      }
+                    }
+                  },
+                  else: {
+                    $let: {
+                      vars: {
+                        partsUnder: { $split: ["$batchNo", "_"] }
+                      },
+                      in: {
+                        $cond: {
+                          if: { $gt: [{ $size: "$$partsUnder" }, 1] },
+                          then: {
+                            $reduce: {
+                              input: { $slice: ["$$partsUnder", 0, { $subtract: [{ $size: "$$partsUnder" }, 1] }] },
+                              initialValue: "",
+                              in: {
+                                $cond: {
+                                  if: { $eq: ["$$value", ""] },
+                                  then: "$$this",
+                                  else: { $concat: ["$$value", "_", "$$this"] }
+                                }
+                              }
+                            }
+                          },
+                          else: "$batchNo"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
         $group: {
-          _id: '$batchNo',
+          _id: '$baseBatchNo',
           totalQRs: { $sum: 1 },
           printed: {
             $sum: { $cond: [{ $eq: ['$status', 'printed'] }, 1, 0] }
