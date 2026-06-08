@@ -391,21 +391,8 @@ router.put('/mark-printed', protect, qrAdmin, async (req, res) => {
   }
 });
 
-// Get QR code by ID for printing
-router.get('/:id', protect, qrAdmin, async (req, res) => {
-  try {
-    const qrCode = await QRCodeModel.findById(req.params.id)
-      .populate('product');
-
-    if (!qrCode) {
-      return res.status(404).json({ error: 'QR code not found' });
-    }
-
-    res.json(qrCode);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// NOTE: /:id route moved to BOTTOM of file so named sub-routes
+// (/scan-logs, /settings/printers, /record-scan) are not swallowed by it.
 
 // Delete QR codes
 router.delete('/', protect, qrAdmin, async (req, res) => {
@@ -734,6 +721,23 @@ router.get('/scan-logs', protect, qrAdmin, async (req, res) => {
         pages: Math.ceil(total / parseInt(limit))
       }
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get QR code by ID for printing
+// ⚠️ MUST stay LAST among GET routes — wildcard /:id swallows any named route below it
+router.get('/:id', protect, qrAdmin, async (req, res) => {
+  try {
+    const qrCode = await QRCodeModel.findById(req.params.id)
+      .populate('product');
+
+    if (!qrCode) {
+      return res.status(404).json({ error: 'QR code not found' });
+    }
+
+    res.json(qrCode);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
