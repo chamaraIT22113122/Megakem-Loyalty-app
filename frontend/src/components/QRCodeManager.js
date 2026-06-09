@@ -46,7 +46,9 @@ import {
   Refresh,
   FilterList,
   GetApp,
-  Close
+  Close,
+  Save,
+  Lock
 } from '@mui/icons-material';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -170,8 +172,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [printLabelPadding, setPrintLabelPadding] = useState(2); // mm
   // Label content is fixed: QR → BATCH → MFG DATE → EXP DATE → SCAN ME → (MWTC MEMBERS ONLY)
 
-  useEffect(() => {
-    if (printPaperSize === 'a4') {
+  const handlePaperSizeChange = (val) => {
+    setPrintPaperSize(val);
+    if (val === 'a4') {
       setPrintLayoutMode('grid');
       setCustomPaperWidth(210);
       setCustomPaperHeight(297);
@@ -184,7 +187,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setPrintQRSize(25);
       setPrintGap(4);
       setPrintLabelPadding(2);
-    } else if (printPaperSize === 'letter') {
+    } else if (val === 'letter') {
       setPrintLayoutMode('grid');
       setCustomPaperWidth(215.9);
       setCustomPaperHeight(279.4);
@@ -197,7 +200,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setPrintQRSize(28);
       setPrintGap(4);
       setPrintLabelPadding(2);
-    } else if (printPaperSize === 'medium') {
+    } else if (val === 'medium') {
       setPrintLayoutMode('roll');
       setCustomPaperWidth(101.6);
       setCustomPaperHeight(152.4);
@@ -210,7 +213,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setPrintQRSize(50);
       setPrintGap(0);
       setPrintLabelPadding(4);
-    } else if (printPaperSize === 'small') {
+    } else if (val === 'small') {
       setPrintLayoutMode('roll');
       setCustomPaperWidth(76.2);
       setCustomPaperHeight(76.2);
@@ -224,7 +227,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setPrintGap(0);
       setPrintLabelPadding(3);
     }
-  }, [printPaperSize]);
+  };
 
   const renderLivePreview = () => {
     const paperW = printPaperSize === 'custom' ? customPaperWidth : (printPaperSize === 'a4' ? 210 : (printPaperSize === 'letter' ? 215.9 : (printPaperSize === 'medium' ? 101.6 : 76.2)));
@@ -497,8 +500,65 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         const productsResponse = await api.get('/products');
         setProducts(productsResponse.data.data || []);
       }
+
+      // Fetch print layout configuration
+      try {
+        const layoutResponse = await qrCodesAPI.getPrintLayout();
+        if (layoutResponse.data && layoutResponse.data.data) {
+          const cfg = layoutResponse.data.data;
+          if (cfg.printerModel) setPrinterModel(cfg.printerModel);
+          if (cfg.printSize) setPrintSize(cfg.printSize);
+          if (cfg.layout) setLayout(cfg.layout);
+          if (cfg.dpi) setDpi(cfg.dpi);
+          if (cfg.printLayoutMode) setPrintLayoutMode(cfg.printLayoutMode);
+          if (cfg.printPaperSize) setPrintPaperSize(cfg.printPaperSize);
+          if (cfg.customPaperWidth !== undefined) setCustomPaperWidth(cfg.customPaperWidth);
+          if (cfg.customPaperHeight !== undefined) setCustomPaperHeight(cfg.customPaperHeight);
+          if (cfg.printMarginTop !== undefined) setPrintMarginTop(cfg.printMarginTop);
+          if (cfg.printMarginBottom !== undefined) setPrintMarginBottom(cfg.printMarginBottom);
+          if (cfg.printMarginLeft !== undefined) setPrintMarginLeft(cfg.printMarginLeft);
+          if (cfg.printMarginRight !== undefined) setPrintMarginRight(cfg.printMarginRight);
+          if (cfg.printQRSize !== undefined) setPrintQRSize(cfg.printQRSize);
+          if (cfg.printColumns !== undefined) setPrintColumns(cfg.printColumns);
+          if (cfg.printRows !== undefined) setPrintRows(cfg.printRows);
+          if (cfg.printGap !== undefined) setPrintGap(cfg.printGap);
+          if (cfg.printLabelPadding !== undefined) setPrintLabelPadding(cfg.printLabelPadding);
+        }
+      } catch (err) {
+        console.error('Error loading print layout:', err);
+      }
     } catch (error) {
       onShowNotification('Error loading data: ' + (error.response?.data?.error || error.message), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const savePrintLayout = async () => {
+    try {
+      setLoading(true);
+      await qrCodesAPI.savePrintLayout({
+        printerModel,
+        printSize,
+        layout,
+        dpi,
+        printLayoutMode,
+        printPaperSize,
+        customPaperWidth,
+        customPaperHeight,
+        printMarginTop,
+        printMarginBottom,
+        printMarginLeft,
+        printMarginRight,
+        printQRSize,
+        printColumns,
+        printRows,
+        printGap,
+        printLabelPadding
+      });
+      onShowNotification('Print layout options saved successfully', 'success');
+    } catch (error) {
+      onShowNotification('Error saving print layout: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
       setLoading(false);
     }
@@ -1288,10 +1348,41 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         maxWidth="md" 
         fullWidth
       >
-        <DialogTitle sx={{ fontWeight: 'bold', background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
+        <DialogTitle sx={{ fontWeight: 'bold', background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white', display: 'flex', alignItems: 'center', gap: 1 }}>
+          {!isMainAdmin && <Lock sx={{ fontSize: 22, opacity: 0.85 }} />}
           Sticker & Print Settings
+          {!isMainAdmin && (
+            <Chip
+              label="Read-Only"
+              size="small"
+              sx={{
+                ml: 'auto',
+                bgcolor: 'rgba(255,255,255,0.18)',
+                color: 'white',
+                fontWeight: 'bold',
+                fontSize: '0.7rem',
+                height: 24,
+                border: '1px solid rgba(255,255,255,0.35)',
+              }}
+            />
+          )}
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
+          {!isMainAdmin && (
+            <Alert
+              severity="info"
+              icon={<Lock fontSize="inherit" />}
+              sx={{
+                mb: 3,
+                fontWeight: 'bold',
+                bgcolor: '#e3f2fd',
+                border: '1px solid #90caf9',
+                '& .MuiAlert-icon': { color: '#1565c0' },
+              }}
+            >
+              🔒 Read-Only — These print layout settings are managed by the main administrator. You can view and use the current configuration, but changes are restricted.
+            </Alert>
+          )}
           <Alert severity="warning" sx={{ mb: 3, fontWeight: 'bold' }}>
             Printer Alignment Guide: In the browser print pop-up, set "Margins" to "None" and uncheck "Headers and footers" (found in "More settings") to align sticker sheets perfectly.
           </Alert>
@@ -1318,7 +1409,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 <InputLabel>Paper / Sheet Size Preset</InputLabel>
                 <Select
                   value={printPaperSize}
-                  onChange={(e) => setPrintPaperSize(e.target.value)}
+                  onChange={(e) => handlePaperSizeChange(e.target.value)}
                   label="Paper / Sheet Size Preset"
                   disabled={!isMainAdmin}
                 >
@@ -1528,6 +1619,17 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           >
             Download ZPL (Zebra Native)
           </Button>
+          {isMainAdmin && (
+            <Button
+              onClick={savePrintLayout}
+              variant="contained"
+              color="success"
+              startIcon={<Save />}
+              disabled={loading}
+            >
+              Save Layout
+            </Button>
+          )}
           <Button 
             onClick={() => {
               setOpenPrintConfigDialog(false);

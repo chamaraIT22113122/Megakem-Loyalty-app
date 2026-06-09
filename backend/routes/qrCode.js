@@ -5,7 +5,8 @@ const crypto = require('crypto');
 const QRCodeModel = require('../models/QRCode');
 const ScanLog = require('../models/ScanLog');
 const Product = require('../models/Product');
-const { protect, qrAdmin, hasPermission } = require('../middleware/auth');
+const { protect, qrAdmin, hasPermission, admin } = require('../middleware/auth');
+const PrintLayoutConfig = require('../models/PrintLayoutConfig');
 
 // ─── HMAC Signature Helpers (Upgrade 1: Anti-Fraud) ─────────────────────────
 const QR_HMAC_SECRET = process.env.QR_HMAC_SECRET || 'megakem-qr-default-secret-change-in-production';
@@ -758,6 +759,45 @@ router.get('/scan-logs', protect, qrAdmin, async (req, res) => {
         pages: Math.ceil(total / parseInt(limit))
       }
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// @route   GET /api/qr-codes/settings/print-layout
+// @desc    Get the saved print layout config settings
+// @access  Private (Main Admin & Co-Admins with QR access)
+router.get('/settings/print-layout', protect, qrAdmin, async (req, res) => {
+  try {
+    const config = await PrintLayoutConfig.getConfig();
+    res.json({ success: true, data: config });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// @route   PUT /api/qr-codes/settings/print-layout
+// @desc    Update the print layout config settings
+// @access  Private (Main Admin Only)
+router.put('/settings/print-layout', protect, admin, async (req, res) => {
+  try {
+    const config = await PrintLayoutConfig.getConfig();
+    
+    const fields = [
+      'printerModel', 'printSize', 'layout', 'dpi', 'printLayoutMode',
+      'printPaperSize', 'customPaperWidth', 'customPaperHeight',
+      'printMarginTop', 'printMarginBottom', 'printMarginLeft', 'printMarginRight',
+      'printQRSize', 'printColumns', 'printRows', 'printGap', 'printLabelPadding'
+    ];
+    
+    fields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        config[field] = req.body[field];
+      }
+    });
+    
+    await config.save();
+    res.json({ success: true, data: config });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
