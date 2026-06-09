@@ -183,7 +183,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [printRows, setPrintRows] = useState(7);
   const [printGap, setPrintGap] = useState(4); // mm
   const [printLabelPadding, setPrintLabelPadding] = useState(2); // mm
-  // Label content is fixed: QR → BATCH → MFG DATE → EXP DATE → SCAN ME → (MWTC MEMBERS ONLY)
+  // Label content is fixed: QR → BATCH → MFG DATE → EXP DATE → BLACK AREA → MRP
 
   const handlePaperSizeChange = (val) => {
     setPrintPaperSize(val);
@@ -414,7 +414,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       // QR code module (BQ = QR code, N=normal, 2=model 2, 6=magnification factor)
       zpl += `^FO190,30^BQN,2,5^FDQA,${qr.qrLink || ''}^FS\n`;
       zpl += `^FO30,170^GB200,6,6,B^FS\n`;
-      zpl += `^FO30,182^ADN,20,10^FDMRP: Rs. ${getProductPrice(qr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}^FS\n`;
+      zpl += `^FO30,182^ADN,20,10^FDMRP: Rs. ${(getProductPrice(qr) || 1500).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}^FS\n`;
       zpl += `^XZ\n`;
     });
 
@@ -864,7 +864,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               ${expDateToShow ? `EXP DATE: <strong>${expDateToShow}</strong>` : ''}
             </div>
             <div class="black-area"></div>
-            <div class="mrp-text">MRP: Rs. ${getProductPrice(qr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div class="mrp-text">MRP: Rs. ${(getProductPrice(qr) || 1500).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
         `;
       });
