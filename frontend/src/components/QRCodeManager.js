@@ -125,6 +125,19 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     return false;
   };
 
+  const getProductPrice = (qr) => {
+    if (!qr || !products || products.length === 0) return 0;
+    const prodId = qr.product?._id || qr.product;
+    if (prodId) {
+      const product = products.find(p => p._id === prodId);
+      if (product) return product.price || 0;
+    }
+    const product = products.find(p => 
+      p.productNo && qr.productNo && p.productNo.toUpperCase() === qr.productNo.toUpperCase()
+    );
+    return product ? (product.price || 0) : 0;
+  };
+
   const [loading, setLoading] = useState(false);
   const [qrCodes, setQRCodes] = useState([]);
   const [products, setProducts] = useState(initialProducts || []);
@@ -321,31 +334,24 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 EXP DATE: –
               </Typography>
             </Box>
-            <Typography 
+            <Box 
               sx={{ 
-                fontSize: `${Math.max(4, 9 * scale * 0.35)}px`, 
-                fontWeight: 'bold', 
-                letterSpacing: '0.5px',
-                borderTop: '1px solid #000',
-                pt: 0.1,
-                width: '80%',
-                textAlign: 'center',
+                width: '80%', 
+                height: `${Math.max(1.5, 4 * scale * 0.35)}px`, 
+                backgroundColor: '#000', 
                 mt: 0.5,
-                lineHeight: 1
-              }}
-            >
-              SCAN ME
-            </Typography>
+                mb: 0.5
+              }} 
+            />
             <Typography 
               sx={{ 
-                fontSize: `${Math.max(3, 5 * scale * 0.35)}px`, 
-                color: 'text.secondary',
+                fontSize: `${Math.max(4.5, 8 * scale * 0.35)}px`, 
+                fontWeight: 'bold', 
                 textAlign: 'center',
-                mt: 0.1,
                 lineHeight: 1
               }}
             >
-              (MWTC MEMBERS ONLY)
+              MRP: Rs. {(getProductPrice(item) || 1500).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Typography>
           </Box>
         ))}
@@ -407,7 +413,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       }
       // QR code module (BQ = QR code, N=normal, 2=model 2, 6=magnification factor)
       zpl += `^FO190,30^BQN,2,5^FDQA,${qr.qrLink || ''}^FS\n`;
-      zpl += `^FO30,175^ADN,16,8^FD(MWTC MEMBERS ONLY)^FS\n`;
+      zpl += `^FO30,170^GB200,6,6,B^FS\n`;
+      zpl += `^FO30,182^ADN,20,10^FDMRP: Rs. ${getProductPrice(qr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}^FS\n`;
       zpl += `^XZ\n`;
     });
 
@@ -783,14 +790,18 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             width: 100%;
             overflow: hidden;
           }
-          .scan-text { 
-            font-weight: bold; 
-            margin-top: 1mm; 
-            font-size: 10pt; 
-            letter-spacing: 1px;
-            border-top: 1px solid #000;
-            padding-top: 0.5mm;
-            width: 80%;
+          .black-area {
+            background-color: #000;
+            width: 85%;
+            height: 1.5mm;
+            margin: 1.5mm auto 1mm auto;
+          }
+          .mrp-text {
+            font-weight: bold;
+            font-size: 8.5pt;
+            margin-top: 0.5mm;
+            text-align: center;
+            width: 100%;
           }
           @media print {
             .label { border: none; }
@@ -852,8 +863,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               ${mfgDateToShow ? `MFG DATE: <strong>${mfgDateToShow}</strong><br>` : ''}
               ${expDateToShow ? `EXP DATE: <strong>${expDateToShow}</strong>` : ''}
             </div>
-            <div class="scan-text">SCAN ME</div>
-            <div style="font-size: 6.5pt; margin-top: 0.5mm; text-align: center; width: 100%;">(MWTC MEMBERS ONLY)</div>
+            <div class="black-area"></div>
+            <div class="mrp-text">MRP: Rs. ${getProductPrice(qr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
         `;
       });
@@ -1581,8 +1592,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 <Typography variant="body2" color="text.secondary">✅ Batch Number</Typography>
                 <Typography variant="body2" color="text.secondary">✅ MFG Date</Typography>
                 <Typography variant="body2" color="text.secondary">✅ Expiry Date</Typography>
-                <Typography variant="body2" color="text.secondary">✅ SCAN ME</Typography>
-                <Typography variant="body2" color="text.secondary">✅ (MWTC MEMBERS ONLY)</Typography>
+                <Typography variant="body2" color="text.secondary">✅ black area (future updates)</Typography>
+                <Typography variant="body2" color="text.secondary">✅ MRP</Typography>
               </Box>
             </Grid>
 
