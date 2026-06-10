@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/Megakem-Loyalty-app/static/css/main.e6e25ce1.css",
-    "main.js": "/Megakem-Loyalty-app/static/js/main.4487e516.js",
+    "main.js": "/Megakem-Loyalty-app/static/js/main.9bd7f13d.js",
     "static/js/82.b99c05cf.chunk.js": "/Megakem-Loyalty-app/static/js/82.b99c05cf.chunk.js",
     "static/js/239.57732ca3.chunk.js": "/Megakem-Loyalty-app/static/js/239.57732ca3.chunk.js",
     "static/media/MegakemLogo.png": "/Megakem-Loyalty-app/static/media/MegakemLogo.f9d1032af7adb880423c.png",
@@ -10,6 +10,6 @@
   },
   "entrypoints": [
     "static/css/main.e6e25ce1.css",
-    "static/js/main.4487e516.js"
+    "static/js/main.9bd7f13d.js"
   ]
 }
