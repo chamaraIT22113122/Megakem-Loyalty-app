@@ -2382,8 +2382,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Bag/Package Number"
-                      required
+                      label="Bag/Package Number (Optional)"
                       value={manualScanForm.bagNo}
                       onChange={(e) => setManualScanForm({...manualScanForm, bagNo: e.target.value})}
                       placeholder="e.g., 020"
@@ -2447,7 +2446,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       <Button
                         variant="contained"
                         color="primary"
-                        disabled={manualScanLoading || !manualScanForm.memberName || !manualScanForm.memberId || !manualScanForm.productNo || !manualScanForm.batchNo || !manualScanForm.bagNo || !manualScanForm.qty}
+                        disabled={manualScanLoading || !manualScanForm.memberName || !manualScanForm.memberId || !manualScanForm.productNo || !manualScanForm.batchNo || !manualScanForm.qty}
                         onClick={async () => {
                           setManualScanLoading(true);
                           try {
