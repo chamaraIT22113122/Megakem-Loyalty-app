@@ -14,13 +14,15 @@ import {
   Paper,
   Chip,
   CircularProgress,
-  Tooltip
+  Tooltip,
+  IconButton
 } from '@mui/material';
 import {
   Refresh,
   CheckCircle,
   Cancel,
-  Notifications
+  Notifications,
+  Delete
 } from '@mui/icons-material';
 import api from '../services/api';
 
@@ -66,6 +68,20 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
       if (onRequestsChanged) onRequestsChanged();
     } catch (error) {
       onShowNotification('Error rejecting request: ' + (error.response?.data?.error || error.message), 'error');
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this request from history?')) return;
+    try {
+      setLoading(true);
+      await api.delete(`/qr-codes/reprint-requests/${id}`);
+      onShowNotification('Reprint request deleted successfully', 'success');
+      loadRequests();
+      if (onRequestsChanged) onRequestsChanged();
+    } catch (error) {
+      onShowNotification('Error deleting request: ' + (error.response?.data?.error || error.message), 'error');
       setLoading(false);
     }
   };
@@ -171,9 +187,20 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
                               </Button>
                             </Box>
                           ) : (
-                            <Typography variant="caption" color="textSecondary">
-                              Resolved {req.approvedAt && `on ${new Date(req.approvedAt).toLocaleDateString()}`}
-                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+                              <Typography variant="caption" color="textSecondary">
+                                Resolved {req.approvedAt && `on ${new Date(req.approvedAt).toLocaleDateString()}`}
+                              </Typography>
+                              <Tooltip title="Delete Request from History">
+                                <IconButton 
+                                  size="small" 
+                                  color="error" 
+                                  onClick={() => handleDelete(req._id)}
+                                >
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
                           )}
                         </TableCell>
                       </TableRow>

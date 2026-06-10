@@ -930,7 +930,21 @@ router.put('/reprint-requests/:id/reject', protect, admin, async (req, res) => {
   }
 });
 
-// @route   POST /api/qr-codes/reprint-requests/consume
+// @route   DELETE /api/qr-codes/reprint-requests/:id
+// @desc    Delete a reprint request (Main Admin only)
+// @access  Private/Admin (Main Admin Only)
+router.delete('/reprint-requests/:id', protect, admin, async (req, res) => {
+  try {
+    const request = await ReprintRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ error: 'Reprint request not found' });
+    }
+    await request.deleteOne();
+    res.json({ success: true, message: 'Reprint request deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // @desc    Consume an approved reprint request (called when co-admin prints)
 // @access  Private/Co-Admin with QR Access
 router.post('/reprint-requests/consume', protect, qrAdmin, async (req, res) => {
