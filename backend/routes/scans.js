@@ -476,6 +476,37 @@ router.delete('/:id', protect, hasPermission('canDelete'), async (req, res) => {
 
     await scan.deleteOne();
 
+    // Update the corresponding member's points and totalScans
+    const member = await Member.findOne({ memberId: scan.memberId.toUpperCase() });
+    if (member) {
+      member.points = Math.max(0, member.points - (scan.points || 0));
+      member.totalScans = Math.max(0, member.totalScans - 1);
+      
+      // Also adjust monthly purchase if applicable
+      if (scan.role === 'applicator' && scan.price && scan.price > 0) {
+        const scanDate = scan.timestamp || new Date();
+        const year = scanDate.getFullYear();
+        const month = scanDate.getMonth() + 1;
+        const purchaseIndex = member.monthlyPurchases.findIndex(
+          p => p.year === year && p.month === month
+        );
+        if (purchaseIndex >= 0) {
+          member.monthlyPurchases[purchaseIndex].totalPurchaseValue = Math.max(
+            0,
+            member.monthlyPurchases[purchaseIndex].totalPurchaseValue - scan.price
+          );
+          member.monthlyPurchases[purchaseIndex].rewardCalculated = false;
+          member.monthlyPurchases[purchaseIndex].cashReward = 0;
+        }
+      }
+      
+      const config = await LoyaltyConfig.getConfig().catch(() => null);
+      if (config) {
+        member.updateTier(config.tierThresholds);
+      }
+      await member.save();
+    }
+
     res.json({
       success: true,
       message: 'Scan deleted successfully'

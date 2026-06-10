@@ -138,6 +138,20 @@ router.post('/sync-from-scans', protect, async (req, res) => {
     let updated = 0;
     const memberMap = new Map();
 
+    // Reset points, totalScans and monthlyPurchases for all members first
+    await Member.updateMany(
+      {},
+      { 
+        $set: { 
+          points: 0, 
+          totalScans: 0,
+          monthlyPurchases: [],
+          totalCashRewards: 0,
+          tier: 'bronze'
+        } 
+      }
+    );
+
     // First pass: aggregate all scans by member
     for (const scan of allScans) {
       const memberId = scan.memberId.toUpperCase();
