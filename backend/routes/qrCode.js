@@ -591,7 +591,8 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       message: `Generated ${savedCodes.length} QR codes for batch ${batchNo}`,
       count: savedCodes.length,
       range: `${packageNoPrefix}${start} to ${packageNoPrefix}${end}`,
-      batchNo
+      batchNo,
+      qrCodes: savedCodes
     });
   } catch (error) {
     console.error('Bulk QR generation error:', error);

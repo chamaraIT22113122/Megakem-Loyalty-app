@@ -614,6 +614,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setOpenGenerateDialog(false);
       resetForm();
       loadData();
+      if (!isMainAdmin && response.data.qrCodes && response.data.qrCodes.length > 0) {
+        printQRLabels(response.data.qrCodes);
+      }
     } catch (error) {
       onShowNotification('Error: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
@@ -651,6 +654,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setOpenBulkDialog(false);
       resetForm();
       loadData();
+      if (!isMainAdmin && response.data.qrCodes && response.data.qrCodes.length > 0) {
+        printQRLabels(response.data.qrCodes);
+      }
     } catch (error) {
       onShowNotification('Error: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
@@ -707,9 +713,14 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     link.click();
   };
 
-  const printQRLabels = async (qrIds) => {
+  const printQRLabels = async (qrIdsOrObjects) => {
     try {
-      const qrsToPrint = qrCodes.filter(qr => qrIds.includes(qr._id));
+      let qrsToPrint;
+      if (qrIdsOrObjects.length > 0 && typeof qrIdsOrObjects[0] === 'object') {
+        qrsToPrint = qrIdsOrObjects;
+      } else {
+        qrsToPrint = qrCodes.filter(qr => qrIdsOrObjects.includes(qr._id));
+      }
       
       const printWindow = window.open('', '_blank');
       const html = generatePrintHTML(qrsToPrint);
@@ -1105,7 +1116,13 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               variant="contained"
               color="info"
               startIcon={<Print />}
-              onClick={() => setOpenPrintConfigDialog(true)}
+              onClick={() => {
+                if (isMainAdmin) {
+                  setOpenPrintConfigDialog(true);
+                } else {
+                  printQRLabels(selectedForPrint);
+                }
+              }}
             >
               Print Labels
             </Button>
