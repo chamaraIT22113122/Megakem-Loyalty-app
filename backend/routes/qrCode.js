@@ -182,6 +182,7 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
       manufactureDate,
       expiryDate,
       customLink,
+      description,
       printerModel = 'Zebra ZD320',
       printSettings
     } = req.body;
@@ -242,6 +243,7 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
         expiryDate: finalExpDate,
         qrLink,
         customLink,
+        description,
         qrData: qrDataUrl,
         printerModel,
         printSettings: printSettings || {
@@ -465,6 +467,7 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       manufactureDate,
       expiryDate,
       customLink,
+      description,
       printerModel = 'Zebra ZD320',
       printSettings
     } = req.body;
@@ -569,6 +572,7 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
         expiryDate: finalExpDate,
         qrLink,
         customLink,
+        description,
         qrData: qrDataUrl,
         printerModel,
         printSettings: printSettings || {

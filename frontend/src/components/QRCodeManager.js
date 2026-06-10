@@ -158,7 +158,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [endNo, setEndNo] = useState(100);
   const [manufactureDate, setManufactureDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
-  const [customLink, setCustomLink] = useState('');
+  const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(100);
   const [selectedProduct, setSelectedProduct] = useState('');
   
@@ -334,10 +334,23 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 EXP DATE: –
               </Typography>
             </Box>
+            <Typography 
+              sx={{ 
+                fontSize: `${Math.max(3.5, 6 * scale * 0.35)}px`, 
+                lineHeight: 1,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                textTransform: 'uppercase',
+                mt: 0.5,
+                height: `${Math.max(3.5, 6 * scale * 0.35)}px`
+              }}
+            >
+              {item.description || ' '}
+            </Typography>
             <Box 
               sx={{ 
                 width: '80%', 
-                height: `${Math.max(1.5, 4 * scale * 0.35)}px`, 
+                height: '1px', 
                 backgroundColor: '#000', 
                 mt: 0.5,
                 mb: 0.5
@@ -413,8 +426,11 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       }
       // QR code module (BQ = QR code, N=normal, 2=model 2, 6=magnification factor)
       zpl += `^FO190,30^BQN,2,5^FDQA,${qr.qrLink || ''}^FS\n`;
-      zpl += `^FO30,170^GB200,6,6,B^FS\n`;
-      zpl += `^FO30,182^ADN,20,10^FDMRP: Rs. ${(getProductPrice(qr) || 1500).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}^FS\n`;
+      if (qr.description) {
+        zpl += `^FO30,162^ADN,16,8^FD${qr.description.toUpperCase().substring(0, 30)}^FS\n`;
+      }
+      zpl += `^FO30,178^GB200,2,2,B^FS\n`;
+      zpl += `^FO30,185^ADN,20,10^FDMRP: Rs. ${(getProductPrice(qr) || 1500).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}^FS\n`;
       zpl += `^XZ\n`;
     });
 
@@ -585,7 +601,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         packageNo,
         manufactureDate: manufactureDate ? new Date(manufactureDate).toISOString() : null,
         expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
-        customLink,
+        description,
         printerModel,
         printSettings: {
           size: printSize,
@@ -622,7 +638,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         batchNo,
         manufactureDate: manufactureDate ? new Date(manufactureDate).toISOString() : null,
         expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
-        customLink,
+        description,
         printerModel,
         printSettings: {
           size: printSize,
@@ -863,7 +879,10 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               ${mfgDateToShow ? `MFG DATE: <strong>${mfgDateToShow}</strong><br>` : ''}
               ${expDateToShow ? `EXP DATE: <strong>${expDateToShow}</strong>` : ''}
             </div>
-            <div class="black-area"></div>
+            <div class="description-area" style="font-size: 7pt; font-weight: bold; height: 4.5mm; margin-top: 1mm; text-transform: uppercase; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${qr.description ? qr.description : '&nbsp;'}
+            </div>
+            <div class="divider-line" style="border-top: 1px solid #000; width: 85%; margin: 1mm auto 0.5mm auto;"></div>
             <div class="mrp-text">MRP: Rs. ${(getProductPrice(qr) || 1500).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
         `;
@@ -895,7 +914,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     setPackageNo('');
     setManufactureDate('');
     setExpiryDate('');
-    setCustomLink('');
+    setDescription('');
     setQuantity(1);
   };
 
@@ -1152,11 +1171,12 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           />
           <TextField
             fullWidth
-            label="Custom Link (Optional)"
-            value={customLink}
-            onChange={(e) => setCustomLink(e.target.value)}
+            label="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             margin="normal"
-            placeholder="https://yourdomain.com/product?id=123"
+            placeholder="e.g., MWTC Members Only, Authorized Dealers Only"
+            helperText="Text displayed on QR label (blank if empty)"
           />
           
           <FormControl fullWidth margin="normal">
@@ -1281,6 +1301,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             InputLabelProps={{ shrink: true }}
           />
 
+
+
           <Grid container spacing={2}>
             <Grid item xs={4}>
               <TextField
@@ -1322,12 +1344,12 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
           <TextField
             fullWidth
-            label="Custom Link"
-            value={customLink}
-            onChange={(e) => setCustomLink(e.target.value)}
+            label="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             margin="normal"
-            placeholder="https://yourdomain.com"
-            helperText="Optional: Override default product scan link"
+            placeholder="e.g., MWTC Members Only, Authorized Dealers Only"
+            helperText="Text displayed on QR label (blank if empty)"
           />
 
           <Typography variant="subtitle2" sx={{ mt: 3, mb: 2 }}>Printer Settings</Typography>
@@ -1592,7 +1614,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 <Typography variant="body2" color="text.secondary">✅ Batch Number</Typography>
                 <Typography variant="body2" color="text.secondary">✅ MFG Date</Typography>
                 <Typography variant="body2" color="text.secondary">✅ Expiry Date</Typography>
-                <Typography variant="body2" color="text.secondary">✅ black area (future updates)</Typography>
+                <Typography variant="body2" color="text.secondary">✅ Description</Typography>
                 <Typography variant="body2" color="text.secondary">✅ MRP</Typography>
               </Box>
             </Grid>

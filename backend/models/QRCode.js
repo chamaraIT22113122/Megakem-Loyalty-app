@@ -25,6 +25,7 @@ const qrCodeSchema = new mongoose.Schema({
     required: true
   },
   customLink: String,
+  description: String,
   qrData: String, // Base64 encoded QR image
   status: {
     type: String,
