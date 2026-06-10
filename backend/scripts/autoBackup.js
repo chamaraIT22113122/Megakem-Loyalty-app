@@ -3,7 +3,24 @@ const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
 const dns = require('dns');
+const crypto = require('crypto');
 require('dotenv').config();
+
+// Backup Encryption Settings
+const BACKUP_ENCRYPTION_KEY = process.env.BACKUP_ENCRYPTION_KEY || 'megakem-backup-key-change-in-production-123456';
+const ALGORITHM = 'aes-256-cbc';
+const ENCRYPTION_KEY = crypto.createHash('sha256').update(BACKUP_ENCRYPTION_KEY).digest();
+
+/**
+ * Encrypt text helper
+ */
+function encrypt(text) {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return iv.toString('hex') + ':' + encrypted;
+}
 
 // DNS fix for MongoDB Atlas
 dns.setDefaultResultOrder('ipv4first');
@@ -17,7 +34,7 @@ if (!fs.existsSync(BACKUP_DIR)) {
 }
 
 /**
- * Perform a full database backup to JSON
+ * Perform a full database backup to JSON (Encrypted)
  */
 const performBackup = async () => {
   console.log('📦 Starting automatic database backup...');
@@ -41,11 +58,14 @@ const performBackup = async () => {
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `backup-${timestamp}.json`;
+    const fileName = `backup-${timestamp}.enc`;
     const filePath = path.join(BACKUP_DIR, fileName);
 
-    fs.writeFileSync(filePath, JSON.stringify(backupData, null, 2));
-    console.log(`✅ Backup completed successfully: ${fileName}`);
+    const serializedData = JSON.stringify(backupData);
+    const encryptedData = encrypt(serializedData);
+
+    fs.writeFileSync(filePath, encryptedData, 'utf8');
+    console.log(`✅ Backup completed and encrypted successfully: ${fileName}`);
 
     // Cleanup old backups (keep last 7 days)
     cleanupOldBackups();

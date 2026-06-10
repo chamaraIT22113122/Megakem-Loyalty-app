@@ -2,6 +2,29 @@ const fs = require('fs').promises;
 const path = require('path');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const crypto = require('crypto');
+
+// Backup Encryption Settings (must match autoBackup.js)
+const BACKUP_ENCRYPTION_KEY = process.env.BACKUP_ENCRYPTION_KEY || 'megakem-backup-key-change-in-production-123456';
+const ALGORITHM = 'aes-256-cbc';
+const ENCRYPTION_KEY = crypto.createHash('sha256').update(BACKUP_ENCRYPTION_KEY).digest();
+
+/**
+ * Decrypt text helper
+ */
+function decrypt(text) {
+  try {
+    const parts = text.split(':');
+    const iv = Buffer.from(parts.shift(), 'hex');
+    const encryptedText = Buffer.from(parts.join(':'), 'hex');
+    const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
+    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (err) {
+    throw new Error('Decryption failed. Please check your BACKUP_ENCRYPTION_KEY. Details: ' + err.message);
+  }
+}
 
 /**
  * Recursively converts string representation of ObjectIds and Dates to proper BSON types
@@ -41,10 +64,28 @@ const convertTypes = (obj) => {
  */
 const restoreBackup = async (connection) => {
   try {
-    const backupPath = path.join(__dirname, '../backups/backup-2026-05-04T11-16-41-559Z.json');
+    const backupDir = path.join(__dirname, '../backups');
+    const files = await fs.readdir(backupDir);
+    const backupFiles = files.filter(f => f.startsWith('backup-') && (f.endsWith('.json') || f.endsWith('.enc')));
+
+    if (backupFiles.length === 0) {
+      console.warn('⚠️ No backup files found in backups directory.');
+      return;
+    }
+
+    // Sort by name (timestamp format ensures correct lexical sorting)
+    backupFiles.sort();
+    const latestBackupFile = backupFiles[backupFiles.length - 1];
+    const backupPath = path.join(backupDir, latestBackupFile);
     console.log(`📂 Reading backup from ${backupPath}...`);
     
-    const dataStr = await fs.readFile(backupPath, 'utf8');
+    let dataStr = await fs.readFile(backupPath, 'utf8');
+
+    if (latestBackupFile.endsWith('.enc')) {
+      console.log('🔑 Decrypting encrypted backup file...');
+      dataStr = decrypt(dataStr);
+    }
+    
     const backupData = JSON.parse(dataStr);
     
     if (!backupData.collections) {

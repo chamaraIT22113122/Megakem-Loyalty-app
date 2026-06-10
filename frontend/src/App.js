@@ -619,6 +619,7 @@ function App() {
   const [lastUpdateTime, setLastUpdateTime] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [userStats, setUserStats] = useState(null);
+  const [visibleLeaderboardLimit, setVisibleLeaderboardLimit] = useState(10);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
   const [memberTierFilter, setMemberTierFilter] = useState('all');
@@ -1480,6 +1481,9 @@ function App() {
       
       const newItem = { ...data, tempId: Date.now() + Math.random() };
       setCart(prev => [...prev, newItem]);
+      if (navigator.vibrate) {
+        navigator.vibrate(100);
+      }
       if (!continuousScan) {
         setView('cart');
       }
@@ -1492,6 +1496,7 @@ function App() {
   const handleRemoveItem = (tempId) => setCart(prev => prev.filter(item => item.tempId !== tempId));
 
   const handleSubmitAll = async () => {
+    let previousTier = 'bronze';
     if (!user) {
       // Try to create anonymous session if user is missing
       await createAnonymousSession(1);
@@ -1505,7 +1510,7 @@ function App() {
     setLoading(true);
     let finalMemberName = memberName;
     let finalLocation = location;
-
+ 
     try {
       if (role === 'customer') {
         if (!memberName.trim()) {
@@ -1525,11 +1530,12 @@ function App() {
         } catch (err) {
           console.error('Error fetching applicator for validation:', err);
         }
-
+ 
         if (!applicator) {
           setLoading(false);
           return showNotification(`Applicator ID ${memberId} is not registered. Please register in Applicator & Hardware Info first.`, 'error', 5000);
         }
+        previousTier = applicator.tier || 'bronze';
         finalMemberName = applicator.memberName || memberId.toUpperCase();
         finalLocation = location || applicator.location || '';
       }
@@ -1547,6 +1553,29 @@ function App() {
         location: finalLocation || '' 
       }));
       const response = await scansAPI.createBatch(scansData);
+      
+      // Check for tier upgrade post-submission
+      let upgraded = false;
+      if (role === 'applicator') {
+        try {
+          const res = await membersAPI.getAll({ role: 'applicator', search: memberId.toUpperCase().trim() });
+          const allFetched = res.data.data || [];
+          const updatedApplicator = allFetched.find(m => m.memberId.toUpperCase() === memberId.toUpperCase().trim());
+          if (updatedApplicator && updatedApplicator.tier !== previousTier) {
+            upgraded = true;
+            if (navigator.vibrate) {
+              navigator.vibrate([200, 100, 200, 100, 300]);
+            }
+            showNotification(`🎉 Tier Upgraded to ${(updatedApplicator.tier || 'bronze').toUpperCase()}!`, 'success', 8000);
+          }
+        } catch (err) {
+          console.error('Error checking for tier upgrade:', err);
+        }
+      }
+ 
+      if (!upgraded && navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
       
       // Refresh dashboard immediately after submission
       await refreshScanHistory();
@@ -3816,67 +3845,96 @@ function App() {
               // Use members data sorted by total scans for leaderboard
               const sortedMembers = [...members].sort((a, b) => (b.totalScans || 0) - (a.totalScans || 0));
               return sortedMembers.length > 0 ? (
-                <Grid container spacing={2}>
-                  {sortedMembers.slice(0, 10).map((member, index) => (
-                    <Grid item xs={12} key={member._id}>
-                      <Card sx={{ 
-                        border: index < 3 ? '2px solid' : member.memberId === memberId?.toUpperCase() ? '2px solid' : 'none',
-                        borderColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : member.memberId === memberId?.toUpperCase() ? 'primary.main' : 'transparent',
-                        background: index < 3 ? `linear-gradient(135deg, ${index === 0 ? '#FFF9E6' : index === 1 ? '#F5F5F5' : '#FFF0E6'} 0%, white 100%)` : 
-                                   member.memberId === memberId?.toUpperCase() ? 'primary.lighter' : 'white'
-                      }}>
-                        <CardContent>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <Box sx={{ 
-                                width: 50, 
-                                height: 50, 
-                                borderRadius: '50%', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                background: index === 0 ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)' : 
-                                           index === 1 ? 'linear-gradient(135deg, #C0C0C0 0%, #999999 100%)' : 
-                                           index === 2 ? 'linear-gradient(135deg, #CD7F32 0%, #B8860B 100%)' : 
-                                           'linear-gradient(135deg, #003366 0%, #4A90A4 100%)',
-                                color: 'white',
-                                fontWeight: 700,
-                                fontSize: '1.5rem'
-                              }}>
-                                {index < 3 ? <EmojiEvents /> : index + 1}
+                <>
+                  <Grid container spacing={2}>
+                    {sortedMembers.slice(0, visibleLeaderboardLimit).map((member, index) => (
+                      <Grid item xs={12} key={member._id}>
+                        <Card sx={{ 
+                          border: index < 3 ? '2px solid' : member.memberId === memberId?.toUpperCase() ? '2px solid' : 'none',
+                          borderColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : member.memberId === memberId?.toUpperCase() ? 'primary.main' : 'transparent',
+                          background: index < 3 ? `linear-gradient(135deg, ${index === 0 ? '#FFF9E6' : index === 1 ? '#F5F5F5' : '#FFF0E6'} 0%, white 100%)` : 
+                                     member.memberId === memberId?.toUpperCase() ? 'primary.lighter' : 'white'
+                        }}>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Box sx={{ 
+                                  width: 50, 
+                                  height: 50, 
+                                  borderRadius: '50%', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  background: index === 0 ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)' : 
+                                             index === 1 ? 'linear-gradient(135deg, #C0C0C0 0%, #999999 100%)' : 
+                                             index === 2 ? 'linear-gradient(135deg, #CD7F32 0%, #B8860B 100%)' : 
+                                             'linear-gradient(135deg, #003366 0%, #4A90A4 100%)',
+                                  color: 'white',
+                                  fontWeight: 700,
+                                  fontSize: '1.5rem'
+                                }}>
+                                  {index < 3 ? <EmojiEvents /> : index + 1}
+                                </Box>
+                                <Box>
+                                  <Typography variant="h6" fontWeight={700}>{member.memberName || member.memberId}</Typography>
+                                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                    <Chip 
+                                      label={member.role === 'applicator' ? 'Applicator' : 'Hardware'} 
+                                      size="small" 
+                                      color={member.role === 'applicator' ? 'warning' : 'info'}
+                                    />
+                                    {member.memberId === memberId?.toUpperCase() && (
+                                      <Chip label="You" size="small" color="primary" />
+                                    )}
+                                  </Box>
+                                </Box>
                               </Box>
-                              <Box>
-                                <Typography variant="h6" fontWeight={700}>{member.memberName || member.memberId}</Typography>
-                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                                  <Chip 
-                                    label={member.role === 'applicator' ? 'Applicator' : 'Hardware'} 
-                                    size="small" 
-                                    color={member.role === 'applicator' ? 'warning' : 'info'}
-                                  />
-                                  {member.memberId === memberId?.toUpperCase() && (
-                                    <Chip label="You" size="small" color="primary" />
-                                  )}
+                              <Box sx={{ textAlign: 'right' }}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                                    <EmojiEvents sx={{ fontSize: '1rem', color: 'success.main' }} />
+                                    <Typography variant="h6" fontWeight={700} color="success.main">{member.points || 0}</Typography>
+                                  </Box>
+                                  <Typography variant="caption" color="text.secondary">Loyalty Points</Typography>
+                                  <Divider sx={{ my: 0.5 }} />
+                                  <Typography variant="h6" fontWeight={600} color="primary">{member.totalScans || 0}</Typography>
+                                  <Typography variant="caption" color="text.secondary">Total Scans</Typography>
                                 </Box>
                               </Box>
                             </Box>
-                            <Box sx={{ textAlign: 'right' }}>
-                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
-                                  <EmojiEvents sx={{ fontSize: '1rem', color: 'success.main' }} />
-                                  <Typography variant="h6" fontWeight={700} color="success.main">{member.points || 0}</Typography>
-                                </Box>
-                                <Typography variant="caption" color="text.secondary">Loyalty Points</Typography>
-                                <Divider sx={{ my: 0.5 }} />
-                                <Typography variant="h6" fontWeight={600} color="primary">{member.totalScans || 0}</Typography>
-                                <Typography variant="caption" color="text.secondary">Total Scans</Typography>
-                              </Box>
-                            </Box>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                  {sortedMembers.length > visibleLeaderboardLimit && (
+                    <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                      <Button 
+                        variant='outlined' 
+                        size='medium'
+                        onClick={() => setVisibleLeaderboardLimit(prev => prev + 10)}
+                        sx={{
+                          borderRadius: '12px',
+                          px: 4,
+                          py: 1,
+                          fontWeight: 600,
+                          borderWidth: 2,
+                          borderColor: 'primary.main',
+                          color: 'primary.main',
+                          transition: 'all 0.3s',
+                          '&:hover': {
+                            borderWidth: 2,
+                            bgcolor: 'primary.main',
+                            color: 'white',
+                            transform: 'scale(1.02)'
+                          }
+                        }}
+                      >
+                        Load More
+                      </Button>
+                    </Box>
+                  )}
+                </>
               ) : (
                 <Card>
                   <CardContent sx={{ textAlign: 'center', py: 6 }}>
@@ -3908,6 +3966,57 @@ function App() {
           </Box>
           <Box sx={{ flexGrow: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#000', minHeight: { xs: '300px', sm: '400px' } }}>
             <div id='reader' style={{ width: '100%', height: '100%' }}></div>
+            
+            {/* Visual Scanner Overlay */}
+            <Box sx={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              zIndex: 2
+            }}>
+              {/* Aiming Reticle (Neon box) */}
+              <Box sx={{
+                width: { xs: 200, sm: 260 },
+                height: { xs: 200, sm: 260 },
+                border: '2px dashed rgba(164, 210, 51, 0.4)',
+                borderRadius: '16px',
+                position: 'relative',
+                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.55)', // Darken outer area
+                transition: 'all 0.3s'
+              }}>
+                {/* Bounding box corners (Thicker neon borders) */}
+                <Box sx={{ position: 'absolute', top: -2, left: -2, width: 24, height: 24, borderTop: '4px solid #A4D233', borderLeft: '4px solid #A4D233', borderTopLeftRadius: '16px' }} />
+                <Box sx={{ position: 'absolute', top: -2, right: -2, width: 24, height: 24, borderTop: '4px solid #A4D233', borderRight: '4px solid #A4D233', borderTopRightRadius: '16px' }} />
+                <Box sx={{ position: 'absolute', bottom: -2, left: -2, width: 24, height: 24, borderBottom: '4px solid #A4D233', borderLeft: '4px solid #A4D233', borderBottomLeftRadius: '16px' }} />
+                <Box sx={{ position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderBottom: '4px solid #A4D233', borderRight: '4px solid #A4D233', borderBottomRightRadius: '16px' }} />
+
+                {/* Laser Scanning Animation Line */}
+                <Box sx={{
+                  position: 'absolute',
+                  left: '5%',
+                  width: '90%',
+                  height: '3px',
+                  background: 'linear-gradient(90deg, transparent, #A4D233, transparent)',
+                  boxShadow: '0 0 8px #A4D233',
+                  animation: 'scanLaser 2.5s linear infinite',
+                  '@keyframes scanLaser': {
+                    '0%': { top: '10%' },
+                    '50%': { top: '90%' },
+                    '100%': { top: '10%' }
+                  }
+                }} />
+
+                {/* Center Crosshairs */}
+                <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ position: 'absolute', width: 10, height: 2, bgcolor: 'rgba(164, 210, 51, 0.6)' }} />
+                  <Box sx={{ position: 'absolute', width: 2, height: 10, bgcolor: 'rgba(164, 210, 51, 0.6)' }} />
+                </Box>
+              </Box>
+            </Box>
+            
             <Box sx={{ position: 'absolute', zIndex: 0, opacity: 0.3, textAlign: 'center' }}><Typography variant='caption' sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Loading Camera...</Typography></Box>
             <IconButton onClick={() => setView('welcome')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, left: { xs: 8, sm: 16 }, zIndex: 10, bgcolor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', transition: 'all 0.3s', '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
             {cart.length > 0 && <Fab variant='extended' size={window.innerWidth < 600 ? 'small' : 'medium'} onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, right: { xs: 8, sm: 16 }, zIndex: 10, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white', fontWeight: 700, boxShadow: '0 6px 20px rgba(164,210,51,0.4)', animation: 'bounce 2s ease-in-out infinite', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }, '&:hover': { background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1.5, sm: 2 } }}>View Cart ({cart.length})</Fab>}
@@ -5762,11 +5871,10 @@ function App() {
                 return matchesSearch && matchesStartDate && matchesEndDate;
               });
               
-              // Pagination
+              // Infinite Scroll Slicing
               const indexOfLastScan = currentPage * scansPerPage;
-              const indexOfFirstScan = indexOfLastScan - scansPerPage;
-              const currentScans = filteredScans.slice(indexOfFirstScan, indexOfLastScan);
-              const totalPages = Math.ceil(filteredScans.length / scansPerPage);
+              const currentScans = filteredScans.slice(0, indexOfLastScan);
+              const hasMore = indexOfLastScan < filteredScans.length;
               
               return (
                 <>
@@ -5786,7 +5894,7 @@ function App() {
                     <>
                       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Typography variant='body2' color='text.secondary'>
-                          Showing {indexOfFirstScan + 1}-{Math.min(indexOfLastScan, filteredScans.length)} of {filteredScans.length} scans
+                          Showing {Math.min(currentScans.length, filteredScans.length)} of {filteredScans.length} scans
                         </Typography>
                       </Box>
                       {currentScans.map((item, i) => <Card key={item._id || i} sx={{ mb: 2, borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
@@ -5857,49 +5965,33 @@ function App() {
                 </CardContent>
               </Card>)}
               
-              {totalPages > 1 && (
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 1, alignItems: 'center' }}>
+              {hasMore && (
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
                   <Button 
-                    size='small' 
-                    onClick={() => setCurrentPage(currentPage - 1)} 
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
+                    variant='outlined'
+                    size='medium' 
+                    onClick={() => setCurrentPage(prev => prev + 1)} 
+                    sx={{
+                      borderRadius: '12px',
+                      px: 4,
+                      py: 1,
+                      fontWeight: 600,
+                      borderWidth: 2,
+                      borderColor: 'primary.main',
+                      color: 'primary.main',
+                      transition: 'all 0.3s',
+                      '&:hover': {
+                        borderWidth: 2,
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                        transform: 'scale(1.02)'
                       }
-                      return (
-                        <Button
-                          key={pageNum}
-                          size='small'
-                          variant={currentPage === pageNum ? 'contained' : 'outlined'}
-                          onClick={() => setCurrentPage(pageNum)}
-                          sx={{ minWidth: 40 }}
-                        >
-                          {pageNum}
-                        </Button>
-                      );
-                    })}
-                    </Box>
-                    <Button 
-                      size='small' 
-                      onClick={() => setCurrentPage(currentPage + 1)} 
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
-                  </Box>
-                )}
+                    }}
+                  >
+                    Load More Scans
+                  </Button>
+                </Box>
+              )}
               </>
             )}
           </>
