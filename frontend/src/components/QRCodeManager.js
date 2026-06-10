@@ -149,6 +149,12 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [openPreviewDialog, setOpenPreviewDialog] = useState(false);
   const [selectedQRCode, setSelectedQRCode] = useState(null);
   
+  // Reprint request states
+  const [reprintRequests, setReprintRequests] = useState([]);
+  const [openReprintDialog, setOpenReprintDialog] = useState(false);
+  const [selectedQRForReprint, setSelectedQRForReprint] = useState(null);
+  const [reprintReason, setReprintReason] = useState('');
+  
   // Form states
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [batchNo, setBatchNo] = useState('');
@@ -550,6 +556,14 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       } catch (err) {
         console.error('Error loading print layout:', err);
       }
+
+      // Fetch reprint requests
+      try {
+        const reprintResponse = await api.get('/qr-codes/reprint-requests');
+        setReprintRequests(reprintResponse.data.data || []);
+      } catch (err) {
+        console.error('Error loading reprint requests:', err);
+      }
     } catch (error) {
       onShowNotification('Error loading data: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
@@ -664,6 +678,54 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     }
   };
 
+  const handleRequestReprint = async () => {
+    if (!selectedQRForReprint || !reprintReason.trim()) {
+      onShowNotification('Please enter a reason for reprint', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await api.post('/qr-codes/reprint-requests', {
+        qrCodeId: selectedQRForReprint._id,
+        reason: reprintReason
+      });
+      onShowNotification('Reprint request submitted to Main Admin successfully', 'success');
+      setOpenReprintDialog(false);
+      loadData();
+    } catch (error) {
+      onShowNotification('Error requesting reprint: ' + (error.response?.data?.error || error.message), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveReprint = async (reqId) => {
+    try {
+      setLoading(true);
+      await api.put(`/qr-codes/reprint-requests/${reqId}/approve`);
+      onShowNotification('Reprint request approved successfully', 'success');
+      loadData();
+    } catch (error) {
+      onShowNotification('Error approving request: ' + (error.response?.data?.error || error.message), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectReprint = async (reqId) => {
+    try {
+      setLoading(true);
+      await api.put(`/qr-codes/reprint-requests/${reqId}/reject`);
+      onShowNotification('Reprint request rejected successfully', 'success');
+      loadData();
+    } catch (error) {
+      onShowNotification('Error rejecting request: ' + (error.response?.data?.error || error.message), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const markAsPrinted = async (qrIds) => {
     try {
       setLoading(true);
@@ -733,6 +795,18 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       }, 250);
       
       onShowNotification('Print dialog opened', 'success');
+
+      // Consume reprint requests if any of the printed QRs had them
+      if (!isMainAdmin) {
+        const printedIds = qrsToPrint.map(q => q._id);
+        try {
+          await api.post('/qr-codes/reprint-requests/consume', { qrIds: printedIds });
+          await api.put('/qr-codes/mark-printed', { qrIds: printedIds, printerModel });
+          loadData();
+        } catch (err) {
+          console.error('Error post-print updates:', err);
+        }
+      }
     } catch (error) {
       onShowNotification('Error preparing print: ' + error.message, 'error');
     }
@@ -988,6 +1062,20 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         QR Code Management
       </Typography>
 
+      {isMainAdmin && reprintRequests.filter(r => r.status === 'pending').length > 0 && (
+        <Alert 
+          severity="warning" 
+          action={
+            <Button color="inherit" size="small" onClick={() => setActiveTab(2)}>
+              View Requests
+            </Button>
+          }
+          sx={{ mb: 3, fontWeight: 'bold' }}
+        >
+          🔔 You have {reprintRequests.filter(r => r.status === 'pending').length} pending reprint request(s) from co-admins.
+        </Alert>
+      )}
+
       {/* Quick Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
@@ -1128,7 +1216,15 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 if (isMainAdmin) {
                   setOpenPrintConfigDialog(true);
                 } else {
-                  printQRLabels(selectedForPrint);
+                  const requireReprint = selectedForPrint.filter(id => {
+                    const qr = qrCodes.find(q => q._id === id);
+                    return qr && qr.status !== 'generated' && !qr.reprintApproved;
+                  });
+                  if (requireReprint.length > 0) {
+                    onShowNotification('Some of the selected QR codes have already been printed. Please request reprint approval for them individually in the table.', 'error');
+                  } else {
+                    printQRLabels(selectedForPrint);
+                  }
                 }
               }}
             >
@@ -1395,6 +1491,36 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           <Button onClick={() => setOpenBulkDialog(false)}>Cancel</Button>
           <Button onClick={generateBulkQRCodes} variant="contained" disabled={loading}>
             {loading ? <CircularProgress size={24} /> : (isMainAdmin ? 'Generate Bulk' : 'Print Bulk')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reprint Request Dialog */}
+      <Dialog open={openReprintDialog} onClose={() => setOpenReprintDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+          ⚠️ Request Reprint Approval
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Typography variant="body2" sx={{ mb: 2 }} color="textSecondary">
+            This QR code (Batch: {selectedQRForReprint?.batchNo}, Pkg: {selectedQRForReprint?.packageNo || 'N/A'}) has already been printed. 
+            Co-admins require reprint approval from the Main Admin to print it again.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            label="Reason for Reprinting"
+            value={reprintReason}
+            onChange={(e) => setReprintReason(e.target.value)}
+            margin="normal"
+            required
+            placeholder="Explain why this QR code needs to be reprinted..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenReprintDialog(false)}>Cancel</Button>
+          <Button onClick={handleRequestReprint} color="warning" variant="contained" disabled={loading || !reprintReason.trim()}>
+            {loading ? <CircularProgress size={24} /> : 'Send Request'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1802,36 +1928,48 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     </TableCell>
                     <TableCell>{qr.printedDate ? new Date(qr.printedDate).toLocaleDateString() : '-'}</TableCell>
                     <TableCell>
-                      <Tooltip title="Download QR Image">
-                        <IconButton
-                          size="small"
-                          onClick={() => downloadQRAsImage(qr)}
-                          color="primary"
-                        >
-                          <Download fontSize="small" />
-                        </IconButton>
+                      {isMainAdmin && (
+                        <Tooltip title="Download QR Image">
+                          <IconButton
+                            size="small"
+                            onClick={() => downloadQRAsImage(qr)}
+                            color="primary"
+                          >
+                            <Download fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      <Tooltip title={qr.reprintPending ? "Reprint Pending Approval" : "Print Single Label"}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="warning"
+                            disabled={qr.reprintPending}
+                            onClick={() => {
+                              if (!isMainAdmin && qr.status !== 'generated' && !qr.reprintApproved) {
+                                setSelectedQRForReprint(qr);
+                                setReprintReason('');
+                                setOpenReprintDialog(true);
+                              } else {
+                                printQRLabels([qr._id]);
+                              }
+                            }}
+                          >
+                            {qr.reprintPending ? '⏳' : <Print fontSize="small" />}
+                          </IconButton>
+                        </span>
                       </Tooltip>
-                      <Tooltip title="Print Single Label">
-                        <IconButton
-                          size="small"
-                          color="warning"
-                          onClick={() => {
-                            // Print just this single QR code label immediately
-                            printQRLabels([qr._id]);
-                          }}
-                        >
-                          <Print fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Download ZPL (Thermal Printer)">
-                        <IconButton
-                          size="small"
-                          color="info"
-                          onClick={() => generateZPL([qr._id])}
-                        >
-                          <GetApp fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {isMainAdmin && (
+                        <Tooltip title="Download ZPL (Thermal Printer)">
+                          <IconButton
+                            size="small"
+                            color="info"
+                            onClick={() => generateZPL([qr._id])}
+                          >
+                            <GetApp fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       {hasPermission('canDelete') && (
                         <Tooltip title="Delete">
                           <IconButton
@@ -1873,9 +2011,21 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       <Card sx={{ mt: 3 }}>
         <CardContent>
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-            <Tabs value={activeTab} onChange={(e, v) => { setActiveTab(v); if (v === 1) loadScanLogs(); }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={(e, v) => { 
+                setActiveTab(v); 
+                if (v === 1) loadScanLogs(); 
+                if (v === 2) loadData();
+              }}
+            >
               <Tab label="Batch Summary" />
               <Tab label={`🔍 Scan Attempt Logs`} />
+              {isMainAdmin && (
+                <Tab 
+                  label={`✉️ Reprint Requests (${reprintRequests.filter(r => r.status === 'pending').length})`} 
+                />
+              )}
             </Tabs>
           </Box>
 
@@ -2019,6 +2169,97 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   </Table>
                 </TableContainer>
               )}
+            </Box>
+          )}
+
+          {/* Tab 2: Reprint Requests */}
+          {activeTab === 2 && isMainAdmin && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                ✉️ Reprint Permission Requests
+              </Typography>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                      <TableCell><strong>Time</strong></TableCell>
+                      <TableCell><strong>Requested By</strong></TableCell>
+                      <TableCell><strong>Product</strong></TableCell>
+                      <TableCell><strong>Batch & Pkg</strong></TableCell>
+                      <TableCell><strong>Reason</strong></TableCell>
+                      <TableCell><strong>Status</strong></TableCell>
+                      <TableCell align="right"><strong>Actions</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {reprintRequests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                          <Typography color="textSecondary">No reprint requests found</Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      reprintRequests.map(req => {
+                        const statusColor = req.status === 'approved' ? 'success'
+                          : req.status === 'rejected' ? 'error'
+                          : req.status === 'pending' ? 'warning'
+                          : 'default';
+                        
+                        return (
+                          <TableRow key={req._id} hover>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {new Date(req.createdAt).toLocaleString()}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {req.requestedByEmail || 'Co-Admin'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {req.qrCode?.productName || '-'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              B: {req.qrCode?.batchNo || '-'} <br />
+                              P: {req.qrCode?.packageNo || '-'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {req.reason}
+                            </TableCell>
+                            <TableCell>
+                              <Chip label={req.status} size="small" color={statusColor} />
+                            </TableCell>
+                            <TableCell align="right">
+                              {req.status === 'pending' && (
+                                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                                  <Button 
+                                    size="small" 
+                                    variant="contained" 
+                                    color="success"
+                                    onClick={() => handleApproveReprint(req._id)}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button 
+                                    size="small" 
+                                    variant="outlined" 
+                                    color="error"
+                                    onClick={() => handleRejectReprint(req._id)}
+                                  >
+                                    Reject
+                                  </Button>
+                                </Box>
+                              )}
+                              {req.status !== 'pending' && (
+                                <Typography variant="caption" color="textSecondary">
+                                  Resolved
+                                </Typography>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </Box>
           )}
         </CardContent>

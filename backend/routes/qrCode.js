@@ -7,6 +7,7 @@ const ScanLog = require('../models/ScanLog');
 const Product = require('../models/Product');
 const { protect, qrAdmin, hasPermission, admin } = require('../middleware/auth');
 const PrintLayoutConfig = require('../models/PrintLayoutConfig');
+const ReprintRequest = require('../models/ReprintRequest');
 
 // ─── HMAC Signature Helpers (Upgrade 1: Anti-Fraud) ─────────────────────────
 const QR_HMAC_SECRET = process.env.QR_HMAC_SECRET || 'megakem-qr-default-secret-change-in-production';
@@ -296,8 +297,23 @@ router.get('/', protect, qrAdmin, async (req, res) => {
 
     const total = await QRCodeModel.countDocuments(filter);
 
+    // Fetch active reprint requests for these QR codes
+    const qrIds = qrCodes.map(q => q._id);
+    const activeRequests = await ReprintRequest.find({ qrCode: { $in: qrIds } });
+
+    const dataWithRequests = qrCodes.map(qr => {
+      const reqObj = activeRequests.find(r => r.qrCode.toString() === qr._id.toString() && r.status === 'approved');
+      const pendingObj = activeRequests.find(r => r.qrCode.toString() === qr._id.toString() && r.status === 'pending');
+      return {
+        ...qr.toObject(),
+        reprintApproved: !!reqObj,
+        reprintPending: !!pendingObj,
+        reprintRequestId: reqObj?._id || pendingObj?._id
+      };
+    });
+
     res.json({
-      data: qrCodes,
+      data: dataWithRequests,
       pagination: {
         total,
         page: parseInt(page),
@@ -764,6 +780,127 @@ router.get('/scan-logs', protect, qrAdmin, async (req, res) => {
         pages: Math.ceil(total / parseInt(limit))
       }
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// @route   POST /api/qr-codes/reprint-requests
+// @desc    Create a reprint request for a QR code
+// @access  Private/Co-Admin with QR Access
+router.post('/reprint-requests', protect, qrAdmin, async (req, res) => {
+  try {
+    const { qrCodeId, reason } = req.body;
+    if (!qrCodeId || !reason) {
+      return res.status(400).json({ error: 'qrCodeId and reason are required' });
+    }
+
+    const qrCode = await QRCodeModel.findById(qrCodeId);
+    if (!qrCode) {
+      return res.status(404).json({ error: 'QR Code not found' });
+    }
+
+    // Check if there is already a pending or approved request
+    const existing = await ReprintRequest.findOne({
+      qrCode: qrCodeId,
+      status: { $in: ['pending', 'approved'] }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: `There is already a ${existing.status} reprint request for this QR code.` });
+    }
+
+    const request = new ReprintRequest({
+      qrCode: qrCodeId,
+      requestedBy: req.user.id,
+      requestedByEmail: req.user.email,
+      reason
+    });
+
+    await request.save();
+    res.status(201).json({ success: true, data: request });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// @route   GET /api/qr-codes/reprint-requests
+// @desc    Get reprint requests
+// @access  Private (Main Admin gets all, Co-Admins get their own)
+router.get('/reprint-requests', protect, qrAdmin, async (req, res) => {
+  try {
+    const isMainAdmin = req.user.email === 'admin@megakem.com' || (req.user.role === 'admin' && !req.user.permissions);
+    
+    let filter = {};
+    if (!isMainAdmin) {
+      filter.requestedBy = req.user.id;
+    }
+
+    const requests = await ReprintRequest.find(filter)
+      .populate('qrCode')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, data: requests });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// @route   PUT /api/qr-codes/reprint-requests/:id/approve
+// @desc    Approve a reprint request (Main Admin only)
+// @access  Private/Admin (Main Admin Only)
+router.put('/reprint-requests/:id/approve', protect, admin, async (req, res) => {
+  try {
+    const request = await ReprintRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ error: 'Reprint request not found' });
+    }
+
+    request.status = 'approved';
+    request.approvedBy = req.user.id;
+    request.approvedAt = new Date();
+
+    await request.save();
+    res.json({ success: true, data: request });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// @route   PUT /api/qr-codes/reprint-requests/:id/reject
+// @desc    Reject a reprint request (Main Admin only)
+// @access  Private/Admin (Main Admin Only)
+router.put('/reprint-requests/:id/reject', protect, admin, async (req, res) => {
+  try {
+    const request = await ReprintRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ error: 'Reprint request not found' });
+    }
+
+    request.status = 'rejected';
+    await request.save();
+    res.json({ success: true, data: request });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// @route   POST /api/qr-codes/reprint-requests/consume
+// @desc    Consume an approved reprint request (called when co-admin prints)
+// @access  Private/Co-Admin with QR Access
+router.post('/reprint-requests/consume', protect, qrAdmin, async (req, res) => {
+  try {
+    const { qrIds } = req.body;
+    if (!qrIds || !Array.isArray(qrIds)) {
+      return res.status(400).json({ error: 'qrIds array is required' });
+    }
+
+    await ReprintRequest.updateMany(
+      { qrCode: { $in: qrIds }, status: 'approved' },
+      { status: 'completed' }
+    );
+
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
