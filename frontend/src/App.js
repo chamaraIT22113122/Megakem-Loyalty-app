@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI } from './services/api';
 import QRCodeManager from './components/QRCodeManager';
+import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 
@@ -1895,6 +1896,7 @@ function App() {
         if (adminTab === 'rewards' && !hasPermission('canExport')) return false;
         if (adminTab === 'products' && !hasPermission('canManageProducts')) return false;
         if (adminTab === 'qr-codes' && !hasPermission('canManageQRCodes')) return false;
+        if (adminTab === 'reprint-requests' && !isMainAdmin()) return false;
         if (adminTab === 'applicator' && !hasPermission('canManageApplicators')) return false;
         return true;
       };
@@ -3866,6 +3868,7 @@ function App() {
               {hasPermission('canViewDashboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
+              {isMainAdmin() && <Tab icon={<Notifications />} label='Reprint Requests' value='reprint-requests' />}
               {hasPermission('canManageApplicators') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
               <Tab icon={<Settings />} label='Profile' value='profile' />
             </Tabs>
@@ -6450,6 +6453,11 @@ function App() {
           {/* QR Printing Tab */}
           {adminTab === 'qr-codes' && <Box>
             <QRCodeManager products={products} onShowNotification={showNotification} userInfo={user} />
+          </Box>}
+
+          {/* Reprint Requests Tab */}
+          {adminTab === 'reprint-requests' && isMainAdmin() && <Box>
+            <ReprintRequestsPanel onShowNotification={showNotification} />
           </Box>}
 
           {/* Profile Settings Tab */}
