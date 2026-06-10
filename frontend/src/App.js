@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
+import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -651,6 +651,7 @@ function App() {
   const [coAdminSearchQuery, setCoAdminSearchQuery] = useState('');
   const [rewardSearchQuery, setRewardSearchQuery] = useState('');
   const [applicatorSearchQuery, setApplicatorSearchQuery] = useState('');
+  const [selectedApplicators, setSelectedApplicators] = useState([]);
   const [applicatorTypeFilter, setApplicatorTypeFilter] = useState('Applicator');
   const [qrCodeSearchQuery, setQrCodeSearchQuery] = useState('');
   const [cashRewards, setCashRewards] = useState([]);
@@ -1783,6 +1784,24 @@ function App() {
       calculateComparison(allScans, products);
     }
   }, [dateFilter, allScans, products, adminAuth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleBulkDelete = async () => {
+    if (selectedApplicators.length === 0) return;
+    if (window.confirm(`Are you sure you want to delete the ${selectedApplicators.length} selected members? This will permanently delete their profiles.`)) {
+      setLoading(true);
+      try {
+        const res = await membersAPI.bulkDelete(selectedApplicators);
+        showNotification(res.data?.message || 'Selected members deleted successfully', 'success');
+        setSelectedApplicators([]); // Reset selection
+        await loadAdminData();
+      } catch (error) {
+        console.error('Error in bulk delete:', error);
+        showNotification(error.response?.data?.message || 'Failed to delete selected members', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   const loadAdminData = async () => {
     if (!adminAuth) return;
@@ -6936,6 +6955,16 @@ function App() {
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 1 }}>
+                {selectedApplicators.length > 0 && (
+                  <Button
+                    variant='contained'
+                    color='error'
+                    startIcon={<Delete />}
+                    onClick={handleBulkDelete}
+                  >
+                    Delete Selected ({selectedApplicators.length})
+                  </Button>
+                )}
                 <Button
                   variant='outlined'
                   startIcon={<FileDownload />}
@@ -7116,7 +7145,10 @@ function App() {
                 size='small' 
                 placeholder='Search by Name, ID, Phone...' 
                 value={applicatorSearchQuery}
-                onChange={(e) => setApplicatorSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setApplicatorSearchQuery(e.target.value);
+                  setSelectedApplicators([]); // Reset selection on search change
+                }}
                 sx={{ flexGrow: 1, minWidth: 200 }}
                 InputProps={{
                   startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
@@ -7129,6 +7161,7 @@ function App() {
                 onChange={(e, newValue) => {
                   if (newValue !== null) {
                     setApplicatorTypeFilter(newValue);
+                    setSelectedApplicators([]); // Reset selection on filter change
                   }
                 }}
                 size="small"
@@ -7141,6 +7174,7 @@ function App() {
                   size='small' 
                   onClick={() => { 
                     setApplicatorSearchQuery(''); 
+                    setSelectedApplicators([]); // Reset selection on clearing filters
                   }}
                 >
                   Clear Filters
@@ -7155,6 +7189,39 @@ function App() {
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ bgcolor: 'grey.100' }}>
+                        <TableCell sx={{ width: 50, p: 0, textAlign: 'center' }}>
+                          {(() => {
+                            const visibleApplicators = applicatorInfo.filter(a => {
+                              const matchesSearch = !applicatorSearchQuery || 
+                                a.name?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
+                                a.memberId?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
+                                a.phoneNumber?.includes(applicatorSearchQuery) || 
+                                a.nic?.toLowerCase().includes(applicatorSearchQuery.toLowerCase());
+                              const matchesType = applicatorTypeFilter === 'all' || 
+                                (applicatorTypeFilter === 'Hardware' ? a.equipment === 'Hardware' : a.equipment !== 'Hardware');
+                              return matchesSearch && matchesType;
+                            });
+                            const isAllSelected = visibleApplicators.length > 0 && visibleApplicators.every(a => selectedApplicators.includes(a._id));
+                            const isSomeSelected = visibleApplicators.length > 0 && visibleApplicators.some(a => selectedApplicators.includes(a._id)) && !isAllSelected;
+
+                            return (
+                              <Checkbox 
+                                indeterminate={isSomeSelected}
+                                checked={isAllSelected}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    const newSelected = [...new Set([...selectedApplicators, ...visibleApplicators.map(a => a._id)])];
+                                    setSelectedApplicators(newSelected);
+                                  } else {
+                                    const newSelected = selectedApplicators.filter(id => !visibleApplicators.find(a => a._id === id));
+                                    setSelectedApplicators(newSelected);
+                                  }
+                                }}
+                                size="small"
+                              />
+                            );
+                          })()}
+                        </TableCell>
                         {applicatorTypeFilter === 'Hardware' ? (
                           <>
                             <TableCell sx={{ fontWeight: 700 }}>Hardware Name</TableCell>
@@ -7186,28 +7253,8 @@ function App() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {applicatorInfo.filter(a => {
-                        const matchesSearch = !applicatorSearchQuery || 
-                          a.name?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
-                          a.memberId?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
-                          a.phoneNumber?.includes(applicatorSearchQuery) || 
-                          a.nic?.toLowerCase().includes(applicatorSearchQuery.toLowerCase());
-                        const matchesType = applicatorTypeFilter === 'all' || 
-                          (applicatorTypeFilter === 'Hardware' ? a.equipment === 'Hardware' : a.equipment !== 'Hardware');
-                        return matchesSearch && matchesType;
-                      }).length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 10 : 11} align='center'>
-                            <Box sx={{ py: 4 }}>
-                              <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-                              <Typography variant='body1' color='text.secondary'>
-                                No information found
-                              </Typography>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        applicatorInfo.filter(a => {
+                      {(() => {
+                        const visibleApplicators = applicatorInfo.filter(a => {
                           const matchesSearch = !applicatorSearchQuery || 
                             a.name?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
                             a.memberId?.toLowerCase().includes(applicatorSearchQuery.toLowerCase()) || 
@@ -7216,142 +7263,176 @@ function App() {
                           const matchesType = applicatorTypeFilter === 'all' || 
                             (applicatorTypeFilter === 'Hardware' ? a.equipment === 'Hardware' : a.equipment !== 'Hardware');
                           return matchesSearch && matchesType;
-                        }).map((applicator, index) => (
-                          <TableRow key={index} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                            {applicatorTypeFilter === 'Hardware' ? (
-                              <>
-                                <TableCell>
-                                  <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
-                                    {applicator.name}
+                        });
+
+                        if (visibleApplicators.length === 0) {
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 11 : 12} align='center'>
+                                <Box sx={{ py: 4 }}>
+                                  <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+                                  <Typography variant='body1' color='text.secondary'>
+                                    No information found
                                   </Typography>
-                                </TableCell>
-                                <TableCell>
-                                  <Chip label={applicator.memberId} size='small' color='primary' />
-                                </TableCell>
-                                <TableCell sx={{ maxWidth: 200, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
-                                  {applicator.hardwareAddress || '-'}
-                                </TableCell>
-                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.phoneNumber || '-'}</TableCell>
-                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.whatsappNumber || '-'}</TableCell>
-                                <TableCell>
-                                  {applicator.contactPersonName ? (
-                                    <Box>
-                                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{applicator.contactPersonName}</Typography>
-                                      {applicator.contactPersonMobile && (
-                                        <Typography variant="caption" color="text.secondary" display="block">
-                                          {applicator.contactPersonMobile}
-                                        </Typography>
-                                      )}
-                                    </Box>
-                                  ) : '-'}
-                                </TableCell>
-                                <TableCell>{applicator.location || '-'}</TableCell>
-                                <TableCell>{applicator.zone || '-'}</TableCell>
-                                <TableCell sx={{ maxWidth: 150, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
-                                  {applicator.notes || '-'}
-                                </TableCell>
-                              </>
-                            ) : (
-                              <>
-                                <TableCell>
-                                  <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
-                                    {applicator.name}
-                                  </Typography>
-                                </TableCell>
-                                <TableCell>
-                                  <Chip label={applicator.memberId} size='small' color='primary' />
-                                </TableCell>
-                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.phoneNumber || '-'}</TableCell>
-                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.whatsappNumber || '-'}</TableCell>
-                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.nic || '-'}</TableCell>
-                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.birthday || '-'}</TableCell>
-                                <TableCell>
-                                  {applicator.connectedHardware ? (
-                                    <Chip 
-                                      label={applicator.connectedHardware} 
-                                      size='small' 
-                                      color='info' 
-                                      variant='outlined' 
-                                      sx={{ fontWeight: 500 }}
-                                    />
-                                  ) : '-'}
-                                </TableCell>
-                                <TableCell>{applicator.location || '-'}</TableCell>
-                                <TableCell>{applicator.zone || '-'}</TableCell>
-                                <TableCell sx={{ maxWidth: 150, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
-                                  {applicator.notes || '-'}
-                                </TableCell>
-                              </>
-                            )}
-                            <TableCell>
-                              <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Tooltip title='View Profile'>
-                                  <IconButton
-                                    size='small'
-                                    color='info'
-                                    onClick={() => {
-                                      if (applicator.memberId) {
-                                        setMemberId(applicator.memberId);
-                                        setView('profile');
-                                      } else {
-                                        showNotification('No member ID linked to this record', 'warning');
-                                      }
-                                    }}
-                                  >
-                                    <Person />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title='Edit'>
-                                  <IconButton 
-                                    size='small' 
-                                    color='primary'
-                                    onClick={() => {
-                                      if (applicator.equipment === 'Hardware') {
-                                        setHardwareFormData(applicator);
-                                        setHardwareDialog({ open: true, data: applicator });
-                                      } else {
-                                        setApplicatorFormData(applicator);
-                                        setApplicatorDialog({ open: true, data: applicator });
-                                      }
-                                    }}
-                                  >
-                                    <Edit />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title='Delete'>
-                                  <IconButton 
-                                    size='small' 
-                                    color='error'
-                                    onClick={async () => {
-                                      if (window.confirm(`Are you sure you want to delete applicator ${applicator.name}?`)) {
-                                        setLoading(true);
-                                        try {
-                                          if (applicator._id) {
-                                            await membersAPI.delete(applicator._id);
-                                            showNotification('Applicator info deleted successfully', 'success');
-                                            await loadAdminData();
-                                          } else {
-                                            const newList = applicatorInfo.filter((_, i) => i !== index);
-                                            setApplicatorInfo(newList);
-                                            showNotification('Applicator info deleted', 'success');
-                                          }
-                                        } catch (error) {
-                                          console.error('Error deleting applicator:', error);
-                                          showNotification(error.response?.data?.message || 'Failed to delete applicator information', 'error');
-                                        } finally {
-                                          setLoading(false);
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+
+                        return visibleApplicators.map((applicator, index) => {
+                          const isSelected = selectedApplicators.includes(applicator._id);
+                          return (
+                            <TableRow key={index} sx={{ '&:hover': { bgcolor: 'action.hover' }, bgcolor: isSelected ? 'rgba(0, 51, 102, 0.04)' : 'inherit' }}>
+                              <TableCell sx={{ p: 0, textAlign: 'center' }}>
+                                <Checkbox 
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedApplicators([...selectedApplicators, applicator._id]);
+                                    } else {
+                                      setSelectedApplicators(selectedApplicators.filter(id => id !== applicator._id));
+                                    }
+                                  }}
+                                  size="small"
+                                />
+                              </TableCell>
+                              {applicatorTypeFilter === 'Hardware' ? (
+                                <>
+                                  <TableCell>
+                                    <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
+                                      {applicator.name}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Chip label={applicator.memberId} size='small' color='primary' />
+                                  </TableCell>
+                                  <TableCell sx={{ maxWidth: 200, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
+                                    {applicator.hardwareAddress || '-'}
+                                  </TableCell>
+                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.phoneNumber || '-'}</TableCell>
+                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.whatsappNumber || '-'}</TableCell>
+                                  <TableCell>
+                                    {applicator.contactPersonName ? (
+                                      <Box>
+                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>{applicator.contactPersonName}</Typography>
+                                        {applicator.contactPersonMobile && (
+                                          <Typography variant="caption" color="text.secondary" display="block">
+                                            {applicator.contactPersonMobile}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    ) : '-'}
+                                  </TableCell>
+                                  <TableCell>{applicator.location || '-'}</TableCell>
+                                  <TableCell>{applicator.zone || '-'}</TableCell>
+                                  <TableCell sx={{ maxWidth: 150, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
+                                    {applicator.notes || '-'}
+                                  </TableCell>
+                                </>
+                              ) : (
+                                <>
+                                  <TableCell>
+                                    <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
+                                      {applicator.name}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Chip label={applicator.memberId} size='small' color='primary' />
+                                  </TableCell>
+                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.phoneNumber || '-'}</TableCell>
+                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.whatsappNumber || '-'}</TableCell>
+                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.nic || '-'}</TableCell>
+                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{applicator.birthday || '-'}</TableCell>
+                                  <TableCell>
+                                    {applicator.connectedHardware ? (
+                                      <Chip 
+                                        label={applicator.connectedHardware} 
+                                        size='small' 
+                                        color='info' 
+                                        variant='outlined' 
+                                        sx={{ fontWeight: 500 }}
+                                      />
+                                    ) : '-'}
+                                  </TableCell>
+                                  <TableCell>{applicator.location || '-'}</TableCell>
+                                  <TableCell>{applicator.zone || '-'}</TableCell>
+                                  <TableCell sx={{ maxWidth: 150, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
+                                    {applicator.notes || '-'}
+                                  </TableCell>
+                                </>
+                              )}
+                              <TableCell>
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <Tooltip title='View Profile'>
+                                    <IconButton
+                                      size='small'
+                                      color='info'
+                                      onClick={() => {
+                                        if (applicator.memberId) {
+                                          setMemberId(applicator.memberId);
+                                          setView('profile');
+                                        } else {
+                                          showNotification('No member ID linked to this record', 'warning');
                                         }
-                                      }
-                                    }}
-                                  >
-                                    <Delete />
-                                  </IconButton>
-                                </Tooltip>
-                              </Box>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
+                                      }}
+                                    >
+                                      <Person />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title='Edit'>
+                                    <IconButton 
+                                      size='small' 
+                                      color='primary'
+                                      onClick={() => {
+                                        if (applicator.equipment === 'Hardware') {
+                                          setHardwareFormData(applicator);
+                                          setHardwareDialog({ open: true, data: applicator });
+                                        } else {
+                                          setApplicatorFormData(applicator);
+                                          setApplicatorDialog({ open: true, data: applicator });
+                                        }
+                                      }}
+                                    >
+                                      <Edit />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title='Delete'>
+                                    <IconButton 
+                                      size='small' 
+                                      color='error'
+                                      onClick={async () => {
+                                        if (window.confirm(`Are you sure you want to delete applicator ${applicator.name}?`)) {
+                                          setLoading(true);
+                                          try {
+                                            if (applicator._id) {
+                                              await membersAPI.delete(applicator._id);
+                                              showNotification('Applicator info deleted successfully', 'success');
+                                              setSelectedApplicators(selectedApplicators.filter(id => id !== applicator._id)); // Remove from selection if deleted
+                                              await loadAdminData();
+                                            } else {
+                                              const newList = applicatorInfo.filter((_, i) => i !== index);
+                                              setApplicatorInfo(newList);
+                                              showNotification('Applicator info deleted', 'success');
+                                            }
+                                          } catch (error) {
+                                            console.error('Error deleting applicator:', error);
+                                            showNotification(error.response?.data?.message || 'Failed to delete applicator information', 'error');
+                                          } finally {
+                                            setLoading(false);
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      <Delete />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        });
+                      })()}
                     </TableBody>
                   </Table>
                 </TableContainer>

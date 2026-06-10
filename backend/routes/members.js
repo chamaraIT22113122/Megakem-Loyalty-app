@@ -781,5 +781,62 @@ router.delete('/:id', protect, async (req, res) => {
   }
 });
 
+// @route   POST /api/members/bulk-delete
+// @desc    Bulk delete members
+// @access  Private/Admin
+router.post('/bulk-delete', protect, async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    const isCoAdmin = req.user.role === 'co-admin';
+    const hasUsersPerm = req.user.permissions?.canManageUsers === true;
+    const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
+
+    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an array of member IDs to delete'
+      });
+    }
+
+    // If co-admin with restricted permission, verify that they are only deleting applicators/hardwares
+    if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm) {
+      const membersToDelete = await Member.find({ _id: { $in: ids } });
+      const nonApplicators = membersToDelete.filter(m => m.role !== 'applicator' && m.role !== 'customer');
+      if (nonApplicators.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You can only delete applicator and hardware accounts.'
+        });
+      }
+    }
+
+    const result = await Member.deleteMany({ _id: { $in: ids } });
+
+    // Audit Log
+    await logAction(req, 'BULK_DELETE_MEMBERS', 'MEMBERS', {
+      count: result.deletedCount,
+      ids: ids
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} member(s)`
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
 

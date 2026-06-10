@@ -134,6 +134,7 @@ export const membersAPI = {
   getStats: () => api.get('/members/stats/summary'),
   syncFromScans: () => api.post('/members/sync-from-scans'),
   fixRoles: () => api.post('/members/fix-roles'),
+  bulkDelete: (ids) => api.post('/members/bulk-delete', { ids }),
 };
 
 // Loyalty Configuration API
