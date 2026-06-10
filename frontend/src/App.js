@@ -1674,12 +1674,11 @@ function App() {
       // Check permissions for conditional fetching
       const hasUsers = hasPermission('canManageUsers');
       const hasProducts = hasPermission('canManageProducts');
+      const hasLeaderboard = hasPermission('canViewLeaderboard');
 
-      const membersPromise = hasUsers
+      const membersPromise = (hasUsers || hasProducts || hasLeaderboard)
         ? membersAPI.getAll()
-        : (hasProducts 
-            ? membersAPI.getAll()
-            : Promise.resolve({ data: { data: [] } }));
+        : Promise.resolve({ data: { data: [] } });
 
       const usersPromise = isMainAdmin()
         ? authAPI.getUsers()
@@ -1766,11 +1765,10 @@ function App() {
     try {
       const hasUsers = hasPermission('canManageUsers');
       const hasProducts = hasPermission('canManageProducts');
+      const hasLeaderboard = hasPermission('canViewLeaderboard');
       
       let membersRes;
-      if (hasUsers) {
-        membersRes = await membersAPI.getAll();
-      } else if (hasProducts) {
+      if (hasUsers || hasProducts || hasLeaderboard) {
         membersRes = await membersAPI.getAll();
       } else {
         return; // No permission to load members or applicators
@@ -1938,7 +1936,12 @@ function App() {
       }
     }
   }, [adminAuth, view]);
-  
+  // Auto-reload members data when new scans are detected to update leaderboard in real-time
+  useEffect(() => {
+    if (adminAuth && scanHistory.length > 0) {
+      reloadMembers();
+    }
+  }, [scanHistory.length, adminAuth]);
   // Auto-refresh dashboard data every 30 seconds when enabled
   useEffect(() => {
     if (autoRefresh && adminAuth && view === 'admin' && adminTab === 'dashboard') {
