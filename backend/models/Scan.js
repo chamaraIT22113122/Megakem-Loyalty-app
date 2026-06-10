@@ -36,7 +36,7 @@ const scanSchema = new mongoose.Schema({
   },
   bagNo: {
     type: String,
-    required: [true, 'Bag number is required']
+    default: ''
   },
   qty: {
     type: String,

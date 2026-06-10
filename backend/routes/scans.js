@@ -129,7 +129,8 @@ router.post('/', optionalAuth, async (req, res) => {
       batchNo,
       bagNo,
       qty,
-      sig  // HMAC signature from QR URL — Upgrade 1
+      sig,  // HMAC signature from QR URL — Upgrade 1
+      location
     } = req.body;
 
     // Auto-detect role from memberId prefix (MA → applicator, MH/CUS- → customer)
@@ -250,10 +251,11 @@ router.post('/', optionalAuth, async (req, res) => {
       productName,
       productNo,
       batchNo,
-      bagNo,
+      bagNo: bagNo || '',
       qty,
       price: productPrice || 0,
-      points: 0
+      points: 0,
+      location: location || ''
     };
 
     // Calculate loyalty points based on product and loyalty configuration
