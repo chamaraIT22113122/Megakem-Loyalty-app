@@ -619,11 +619,16 @@ router.post('/users', protect, async (req, res) => {
     // Set permissions using set() for reliability
     if (permissions) {
       user.set('permissions.canViewDashboard', permissions.canViewDashboard === true);
+      user.set('permissions.canViewScans', permissions.canViewScans === true);
+      user.set('permissions.canManageCoAdmins', permissions.canManageCoAdmins === true);
       user.set('permissions.canDelete', permissions.canDelete === true);
       user.set('permissions.canExport', permissions.canExport === true);
       user.set('permissions.canManageUsers', permissions.canManageUsers === true);
+      user.set('permissions.canViewRewards', permissions.canViewRewards === true);
+      user.set('permissions.canViewLeaderboard', permissions.canViewLeaderboard === true);
       user.set('permissions.canManageProducts', permissions.canManageProducts === true);
       user.set('permissions.canManageQRCodes', permissions.canManageQRCodes === true);
+      user.set('permissions.canManageCoAdminRequests', permissions.canManageCoAdminRequests === true);
       user.set('permissions.canManageApplicators', permissions.canManageApplicators === true);
       user.set('permissions.canPrintQRCodes', permissions.canPrintQRCodes === true);
       user.set('permissions.canViewQRAnalytics', permissions.canViewQRAnalytics === true);
@@ -708,11 +713,16 @@ router.put('/users/:id', protect, async (req, res) => {
         ...(points !== undefined && { points: Math.max(0, points) }),
         ...(permissions !== undefined && {
           'permissions.canViewDashboard': permissions.canViewDashboard === true,
+          'permissions.canViewScans': permissions.canViewScans === true,
+          'permissions.canManageCoAdmins': permissions.canManageCoAdmins === true,
           'permissions.canDelete': permissions.canDelete === true,
           'permissions.canExport': permissions.canExport === true,
           'permissions.canManageUsers': permissions.canManageUsers === true,
+          'permissions.canViewRewards': permissions.canViewRewards === true,
+          'permissions.canViewLeaderboard': permissions.canViewLeaderboard === true,
           'permissions.canManageProducts': permissions.canManageProducts === true,
           'permissions.canManageQRCodes': permissions.canManageQRCodes === true,
+          'permissions.canManageCoAdminRequests': permissions.canManageCoAdminRequests === true,
           'permissions.canManageApplicators': permissions.canManageApplicators === true
         })
       }

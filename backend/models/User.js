@@ -45,6 +45,14 @@ const userSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
+    canViewScans: {
+      type: Boolean,
+      default: false
+    },
+    canManageCoAdmins: {
+      type: Boolean,
+      default: false
+    },
     canDelete: {
       type: Boolean,
       default: false
@@ -57,11 +65,23 @@ const userSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    canViewRewards: {
+      type: Boolean,
+      default: false
+    },
+    canViewLeaderboard: {
+      type: Boolean,
+      default: false
+    },
     canManageProducts: {
       type: Boolean,
       default: false
     },
     canManageQRCodes: {
+      type: Boolean,
+      default: false
+    },
+    canManageCoAdminRequests: {
       type: Boolean,
       default: false
     },

@@ -668,7 +668,20 @@ function App() {
   const [expandedCardDialog, setExpandedCardDialog] = useState({ open: false, type: null, data: [] });
   const [notificationPrefs, setNotificationPrefs] = useState({ email: true, push: true, autoRefresh: true, soundEnabled: false });
   const [activityLog, setActivityLog] = useState([]);
-  const [userPermissions, setUserPermissions] = useState({ canDelete: true, canExport: true, canManageUsers: true, canManageProducts: true, canManageQRCodes: true, canManageApplicators: true });
+  const [userPermissions, setUserPermissions] = useState({
+    canViewDashboard: true,
+    canViewScans: true,
+    canManageCoAdmins: true,
+    canManageUsers: true,
+    canViewRewards: true,
+    canViewLeaderboard: true,
+    canManageProducts: true,
+    canManageQRCodes: true,
+    canManageCoAdminRequests: true,
+    canManageApplicators: true,
+    canDelete: true,
+    canExport: true
+  });
   const [backupPasswordDialog, setBackupPasswordDialog] = useState({ open: false, password: '' });
   const [restorePasswordDialog, setRestorePasswordDialog] = useState({ open: false, password: '', file: null, backupData: null });
   
@@ -1944,22 +1957,27 @@ function App() {
     if (adminAuth && user && view === 'admin') {
       const checkCurrentTab = () => {
         if (adminTab === 'dashboard' && !hasPermission('canViewDashboard')) return false;
-        if (adminTab === 'scans' && !hasPermission('canDelete')) return false;
-        if (adminTab === 'co-admins' && !isMainAdmin()) return false;
+        if (adminTab === 'scans' && !hasPermission('canViewScans')) return false;
+        if (adminTab === 'co-admins' && !hasPermission('canManageCoAdmins')) return false;
         if (adminTab === 'members' && !hasPermission('canManageUsers')) return false;
-        if (adminTab === 'rewards' && !hasPermission('canExport')) return false;
+        if (adminTab === 'rewards' && !hasPermission('canViewRewards')) return false;
+        if (adminTab === 'leaderboard-admin' && !hasPermission('canViewLeaderboard')) return false;
         if (adminTab === 'products' && !hasPermission('canManageProducts')) return false;
         if (adminTab === 'qr-codes' && !hasPermission('canManageQRCodes')) return false;
-        if (adminTab === 'reprint-requests' && !isMainAdmin()) return false;
+        if (adminTab === 'reprint-requests' && !hasPermission('canManageCoAdminRequests')) return false;
         if (adminTab === 'applicator' && !hasPermission('canManageApplicators')) return false;
         return true;
       };
 
       if (!checkCurrentTab()) {
         if (hasPermission('canViewDashboard')) setAdminTab('dashboard');
-        else if (hasPermission('canManageQRCodes')) setAdminTab('qr-codes');
-        else if (hasPermission('canManageProducts')) setAdminTab('products');
+        else if (hasPermission('canViewScans')) setAdminTab('scans');
         else if (hasPermission('canManageUsers')) setAdminTab('members');
+        else if (hasPermission('canViewRewards')) setAdminTab('rewards');
+        else if (hasPermission('canViewLeaderboard')) setAdminTab('leaderboard-admin');
+        else if (hasPermission('canManageProducts')) setAdminTab('products');
+        else if (hasPermission('canManageQRCodes')) setAdminTab('qr-codes');
+        else if (hasPermission('canManageApplicators')) setAdminTab('applicator');
         else setAdminTab('profile');
       }
     }
@@ -3938,14 +3956,14 @@ function App() {
           <Paper sx={{ mb: 2 }}>
             <Tabs value={adminTab} onChange={(e, v) => setAdminTab(v)} variant='scrollable' scrollButtons='auto'>
               {hasPermission('canViewDashboard') && <Tab icon={<DashboardIcon />} label='Dashboard' value='dashboard' />}
-              {hasPermission('canDelete') && <Tab icon={<HistoryIcon />} label='Scans' value='scans' />}
-              {isMainAdmin() && <Tab icon={<People />} label='Co-Admins' value='co-admins' />}
+              {hasPermission('canViewScans') && <Tab icon={<HistoryIcon />} label='Scans' value='scans' />}
+              {hasPermission('canManageCoAdmins') && <Tab icon={<People />} label='Co-Admins' value='co-admins' />}
               {hasPermission('canManageUsers') && <Tab icon={<EmojiEvents />} label='Members & Loyalty' value='members' />}
-              {hasPermission('canExport') && <Tab icon={<CardGiftcard />} label='Cash Rewards' value='rewards' />}
-              {hasPermission('canViewDashboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
+              {hasPermission('canViewRewards') && <Tab icon={<CardGiftcard />} label='Cash Rewards' value='rewards' />}
+              {hasPermission('canViewLeaderboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
-              {isMainAdmin() && (
+              {hasPermission('canManageCoAdminRequests') && (
                 <Tab 
                   icon={
                     <Badge badgeContent={pendingRequestsCount} color="error">
@@ -5634,11 +5652,16 @@ function App() {
                     role: 'admin', 
                     permissions: { 
                       canViewDashboard: false,
+                      canViewScans: false,
+                      canManageCoAdmins: false,
                       canDelete: false, 
                       canExport: false, 
                       canManageUsers: false, 
+                      canViewRewards: false,
+                      canViewLeaderboard: false,
                       canManageProducts: false,
                       canManageQRCodes: false,
+                      canManageCoAdminRequests: false,
                       canManageApplicators: false
                     } 
                   } 
@@ -5684,22 +5707,32 @@ function App() {
                       {u.email === 'admin@megakem.com' ? (
                         <>
                           <Chip label='Dashboard' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Delete' size='small' color='error' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Export' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Users' size='small' color='warning' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Scans' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Co-Admins' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Members & Loyalty' size='small' color='warning' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Cash Rewards' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Leaderboard' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Products' size='small' color='success' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='QR' size='small' color='secondary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Requests' size='small' color='warning' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Applicators' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Delete' size='small' color='error' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Export' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                         </>
                       ) : (
                         <>
                           {u.permissions?.canViewDashboard === true && <Chip label='Dashboard' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canExport === true && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageUsers === true && <Chip label='Users' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canViewScans === true && <Chip label='Scans' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageCoAdmins === true && <Chip label='Co-Admins' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageUsers === true && <Chip label='Members & Loyalty' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canViewRewards === true && <Chip label='Cash Rewards' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canViewLeaderboard === true && <Chip label='Leaderboard' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageProducts === true && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageQRCodes === true && <Chip label='QR' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageCoAdminRequests === true && <Chip label='Requests' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageApplicators === true && <Chip label='Applicators' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canExport === true && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                         </>
                       )}
                     </Box>
@@ -5724,11 +5757,16 @@ function App() {
                             password: '',
                             permissions: {
                               canViewDashboard: u.permissions?.canViewDashboard === true,
+                              canViewScans: u.permissions?.canViewScans === true,
+                              canManageCoAdmins: u.permissions?.canManageCoAdmins === true,
                               canDelete: u.permissions?.canDelete === true,
                               canExport: u.permissions?.canExport === true,
                               canManageUsers: u.permissions?.canManageUsers === true,
+                              canViewRewards: u.permissions?.canViewRewards === true,
+                              canViewLeaderboard: u.permissions?.canViewLeaderboard === true,
                               canManageProducts: u.permissions?.canManageProducts === true,
                               canManageQRCodes: u.permissions?.canManageQRCodes === true,
+                              canManageCoAdminRequests: u.permissions?.canManageCoAdminRequests === true,
                               canManageApplicators: u.permissions?.canManageApplicators === true
                             }
                           } 
@@ -7007,10 +7045,11 @@ function App() {
                 <Security /> Permissions
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, pl: 2 }}>
+                {/* 1. Dashboard */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
                     <Typography variant='body2' fontWeight={600}>Can View Dashboard</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to see overall stats</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Dashboard tab</Typography>
                   </Box>
                   <Switch 
                     checked={userDialog.user?.permissions?.canViewDashboard === true} 
@@ -7027,50 +7066,56 @@ function App() {
                     color='info' 
                   />
                 </Box>
+
+                {/* 2. Scans */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Delete Records</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to delete scans</Typography>
+                    <Typography variant='body2' fontWeight={600}>Can View Scans</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Scans tab</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canDelete === true} 
+                    checked={userDialog.user?.permissions?.canViewScans === true} 
                     onChange={(e) => {
                       const checked = e.target.checked;
                       setUserDialog(prev => ({ 
                         ...prev, 
                         user: { 
                           ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canDelete: checked } 
+                          permissions: { ...(prev.user?.permissions || {}), canViewScans: checked } 
                         } 
                       }));
                     }} 
-                    color='error' 
+                    color='info' 
                   />
                 </Box>
+
+                {/* 3. Co-Admins */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Export Data</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to export reports</Typography>
+                    <Typography variant='body2' fontWeight={600}>Can Manage Co-Admins</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Co-Admins tab</Typography>
                   </Box>
                   <Switch 
-                    checked={userDialog.user?.permissions?.canExport === true} 
+                    checked={userDialog.user?.permissions?.canManageCoAdmins === true} 
                     onChange={(e) => {
                       const checked = e.target.checked;
                       setUserDialog(prev => ({ 
                         ...prev, 
                         user: { 
                           ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canExport: checked } 
+                          permissions: { ...(prev.user?.permissions || {}), canManageCoAdmins: checked } 
                         } 
                       }));
                     }} 
-                    color='primary' 
+                    color='info' 
                   />
                 </Box>
+
+                {/* 4. Members & Loyalty */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Manage Users</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to add/edit users</Typography>
+                    <Typography variant='body2' fontWeight={600}>Can Access Members & Loyalty</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Members & Loyalty tab</Typography>
                   </Box>
                   <Switch 
                     checked={userDialog.user?.permissions?.canManageUsers === true} 
@@ -7087,10 +7132,56 @@ function App() {
                     color='warning' 
                   />
                 </Box>
+
+                {/* 5. Cash Rewards */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can View Cash Rewards</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Cash Rewards tab</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canViewRewards === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canViewRewards: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='primary' 
+                  />
+                </Box>
+
+                {/* 6. Leaderboard */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can View Leaderboard</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Leaderboard tab</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canViewLeaderboard === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canViewLeaderboard: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='info' 
+                  />
+                </Box>
+
+                {/* 7. Products */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
                     <Typography variant='body2' fontWeight={600}>Can Manage Products</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to modify products</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Products tab</Typography>
                   </Box>
                   <Switch 
                     checked={userDialog.user?.permissions?.canManageProducts === true} 
@@ -7107,10 +7198,12 @@ function App() {
                     color='success' 
                   />
                 </Box>
+
+                {/* 8. QR Codes */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
                     <Typography variant='body2' fontWeight={600}>Can Manage QR Codes</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to generate/print QR codes</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the QR Codes tab</Typography>
                   </Box>
                   <Switch 
                     checked={userDialog.user?.permissions?.canManageQRCodes === true} 
@@ -7127,10 +7220,34 @@ function App() {
                     color='secondary' 
                   />
                 </Box>
+
+                {/* 9. Co-Admin Requests */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Manage Applicator & Hardware Information</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to add/edit applicator hardware details</Typography>
+                    <Typography variant='body2' fontWeight={600}>Can Access Co-Admin Requests</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Co-Admin Requests tab</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canManageCoAdminRequests === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canManageCoAdminRequests: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='warning' 
+                  />
+                </Box>
+
+                {/* 10. Applicator & Hardware */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Manage Applicator & Hardware Info</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Applicator & Hardware tab</Typography>
                   </Box>
                   <Switch 
                     checked={userDialog.user?.permissions?.canManageApplicators === true} 
@@ -7145,6 +7262,50 @@ function App() {
                       }));
                     }} 
                     color='info' 
+                  />
+                </Box>
+
+                {/* 11. Delete Records */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Delete Records</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to delete scans in Scans tab</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canDelete === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canDelete: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='error' 
+                  />
+                </Box>
+
+                {/* 12. Export Data */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Export Data</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to export reports and data sheets</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canExport === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canExport: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='primary' 
                   />
                 </Box>
               </Box>
