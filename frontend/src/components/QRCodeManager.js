@@ -1900,6 +1900,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   <TableCell><strong>Package</strong></TableCell>
                   <TableCell><strong>Status</strong></TableCell>
                   <TableCell><strong>Printed</strong></TableCell>
+                  {isMainAdmin && <TableCell><strong>Scan & Reprint Info</strong></TableCell>}
                   <TableCell><strong>Actions</strong></TableCell>
                 </TableRow>
               </TableHead>
@@ -1939,6 +1940,45 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       />
                     </TableCell>
                     <TableCell>{qr.printedDate ? new Date(qr.printedDate).toLocaleDateString() : '-'}</TableCell>
+                    {isMainAdmin && (
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          {qr.reprintCount > 0 && (
+                            <Chip 
+                              label={`Reprinted: ${qr.reprintCount}x`} 
+                              size="small" 
+                              color="warning" 
+                              variant="outlined" 
+                              sx={{ fontWeight: 'bold', alignSelf: 'flex-start' }}
+                            />
+                          )}
+                          {qr.status === 'scanned' ? (
+                            <Box sx={{ pl: 0.5 }}>
+                              <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: 'success.main' }}>
+                                Scanned by: {qr.scannedByMemberId || 'N/A'}
+                              </Typography>
+                              {qr.scannedByMemberName && (
+                                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                                  Name: {qr.scannedByMemberName}
+                                </Typography>
+                              )}
+                              {qr.scanPoints > 0 && (
+                                <Typography variant="caption" sx={{ display: 'block', color: 'primary.main', fontWeight: 'medium' }}>
+                                  Points: +{qr.scanPoints} pts
+                                </Typography>
+                              )}
+                              {qr.scanLocation && (
+                                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                                  Loc: {qr.scanLocation}
+                                </Typography>
+                              )}
+                            </Box>
+                          ) : (
+                            <Typography variant="caption" color="textSecondary">—</Typography>
+                          )}
+                        </Box>
+                      </TableCell>
+                    )}
                     <TableCell>
                       {isMainAdmin && (
                         <Tooltip title="Download QR Image">
@@ -2028,12 +2068,16 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               value={activeTab} 
               onChange={(e, v) => { 
                 setActiveTab(v); 
-                if (v === 1) loadScanLogs(); 
-                if (v === 2) loadData();
+                if (isMainAdmin) {
+                  if (v === 1) loadScanLogs(); 
+                  if (v === 2) loadData();
+                } else {
+                  if (v === 1) loadData();
+                }
               }}
             >
               <Tab label="Batch Summary" />
-              <Tab label={`🔍 Scan Attempt Logs`} />
+              {isMainAdmin && <Tab label={`🔍 Scan Attempt Logs`} />}
               {isMainAdmin && (
                 <Tab 
                   label={`✉️ Reprint Requests (${reprintRequests.filter(r => r.status === 'pending').length})`} 
@@ -2076,7 +2120,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           )}
 
           {/* Tab 1: Scan Attempt Logs */}
-          {activeTab === 1 && (
+          {activeTab === 1 && isMainAdmin && (
             <Box>
               <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                 <FormControl sx={{ minWidth: 180 }} size="small">

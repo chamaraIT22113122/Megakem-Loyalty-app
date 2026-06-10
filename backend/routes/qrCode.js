@@ -301,14 +301,39 @@ router.get('/', protect, qrAdmin, async (req, res) => {
     const qrIds = qrCodes.map(q => q._id);
     const activeRequests = await ReprintRequest.find({ qrCode: { $in: qrIds } });
 
+    // Fetch matching scan records to get member details
+    const Scan = require('../models/Scan');
+    let scans = [];
+    if (qrCodes.length > 0) {
+      const scanQuery = qrCodes.map(q => ({
+        productNo: q.productNo,
+        batchNo: q.batchNo,
+        bagNo: q.packageNo || ''
+      }));
+      scans = await Scan.find({ $or: scanQuery });
+    }
+
     const dataWithRequests = qrCodes.map(qr => {
       const reqObj = activeRequests.find(r => r.qrCode.toString() === qr._id.toString() && r.status === 'approved');
       const pendingObj = activeRequests.find(r => r.qrCode.toString() === qr._id.toString() && r.status === 'pending');
+      const completedRequests = activeRequests.filter(r => r.qrCode.toString() === qr._id.toString() && r.status === 'completed');
+      
+      const matchingScan = scans.find(s => 
+        s.productNo === qr.productNo && 
+        s.batchNo === qr.batchNo && 
+        s.bagNo === (qr.packageNo || '')
+      );
+
       return {
         ...qr.toObject(),
         reprintApproved: !!reqObj,
         reprintPending: !!pendingObj,
-        reprintRequestId: reqObj?._id || pendingObj?._id
+        reprintRequestId: reqObj?._id || pendingObj?._id,
+        reprintCount: completedRequests.length,
+        scannedByMemberId: matchingScan?.memberId || null,
+        scannedByMemberName: matchingScan?.memberName || null,
+        scanPoints: matchingScan?.points || 0,
+        scanLocation: matchingScan?.location || null
       };
     });
 
