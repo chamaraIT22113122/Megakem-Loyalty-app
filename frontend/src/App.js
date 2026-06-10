@@ -578,6 +578,20 @@ function App() {
   const [members, setMembers] = useState([]);
   const [loyaltyConfig, setLoyaltyConfig] = useState(null);
   const [products, setProducts] = useState([]);
+  const [manualScanForm, setManualScanForm] = useState({
+    memberName: '',
+    memberId: '',
+    role: 'applicator',
+    productName: '',
+    productNo: '',
+    batchNo: '',
+    bagNo: '',
+    qty: '',
+    price: 0,
+    location: ''
+  });
+  const [manualScanLoading, setManualScanLoading] = useState(false);
+  const [showManualScanForm, setShowManualScanForm] = useState(false);
   const [loyaltyConfigDialog, setLoyaltyConfigDialog] = useState({ open: false });
   const [loyaltyConfigTab, setLoyaltyConfigTab] = useState(0);
   const getTierDisplayName = (tierId) => {
@@ -4910,10 +4924,215 @@ function App() {
                 onClick={() => handleExportData('csv')}
                 disabled={loading || scanHistory.length === 0 || !hasPermission('canExport')}
                 size='small'
+                sx={{ mr: 1 }}
               >
                 Export CSV
               </Button>
+              {isMainAdmin() && (
+                <Button 
+                  variant='contained' 
+                  startIcon={<Add />} 
+                  onClick={() => setShowManualScanForm(!showManualScanForm)}
+                  size='small'
+                  color={showManualScanForm ? 'secondary' : 'primary'}
+                >
+                  {showManualScanForm ? 'Hide Manual Input' : 'Add Manual Scan'}
+                </Button>
+              )}
             </Box>
+
+            {showManualScanForm && isMainAdmin() && (
+              <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  📝 Record Manual Scan (Old Products)
+                </Typography>
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  Manually enter scan records directly into the system. Points will be calculated automatically based on the product and loyalty configuration.
+                </Alert>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Member Name"
+                      required
+                      value={manualScanForm.memberName}
+                      onChange={(e) => setManualScanForm({...manualScanForm, memberName: e.target.value})}
+                      placeholder="e.g., John Doe"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Member ID"
+                      required
+                      value={manualScanForm.memberId}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setManualScanForm({
+                          ...manualScanForm, 
+                          memberId: val,
+                          role: val.startsWith('MA') ? 'applicator' : (val.startsWith('MH') || val.startsWith('CUS-') ? 'customer' : manualScanForm.role)
+                        });
+                      }}
+                      placeholder="MA001, MH001, or CUS-001"
+                      size="small"
+                      helperText={`Role: ${manualScanForm.role === 'applicator' ? '👷 Applicator' : '👤 Customer'} (auto-detected from ID)`}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth size="small" required>
+                      <InputLabel>Product</InputLabel>
+                      <Select
+                        value={manualScanForm.productNo}
+                        onChange={(e) => {
+                          const prod = products.find(p => p.productNo === e.target.value);
+                          if (prod) {
+                            setManualScanForm({
+                              ...manualScanForm,
+                              productNo: prod.productNo,
+                              productName: prod.name,
+                              price: prod.price || 0
+                            });
+                          }
+                        }}
+                        label="Product"
+                      >
+                        {products.map(p => (
+                          <MenuItem key={p._id} value={p.productNo}>
+                            {p.productNo} - {p.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Batch Number"
+                      required
+                      value={manualScanForm.batchNo}
+                      onChange={(e) => setManualScanForm({...manualScanForm, batchNo: e.target.value})}
+                      placeholder="e.g., MKL39 001 050525 020"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Bag/Package Number (Optional)"
+                      value={manualScanForm.bagNo}
+                      onChange={(e) => setManualScanForm({...manualScanForm, bagNo: e.target.value})}
+                      placeholder="e.g., 020"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Quantity / Pack Size"
+                      required
+                      value={manualScanForm.qty}
+                      onChange={(e) => setManualScanForm({...manualScanForm, qty: e.target.value})}
+                      placeholder="e.g., 32 Kg, 5 Ltr"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Price (Rs.)"
+                      type="number"
+                      value={manualScanForm.price}
+                      onChange={(e) => setManualScanForm({...manualScanForm, price: parseFloat(e.target.value) || 0})}
+                      placeholder="Auto-filled from product"
+                      size="small"
+                      helperText="Points will be calculated automatically"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Location (Optional)"
+                      value={manualScanForm.location}
+                      onChange={(e) => setManualScanForm({...manualScanForm, location: e.target.value})}
+                      placeholder="e.g., Colombo, Kandy"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                      <Button
+                        variant="outlined"
+                        onClick={() => {
+                          setManualScanForm({
+                            memberName: '',
+                            memberId: '',
+                            role: 'applicator',
+                            productName: '',
+                            productNo: '',
+                            batchNo: '',
+                            bagNo: '',
+                            qty: '',
+                            price: 0,
+                            location: ''
+                          });
+                        }}
+                        size="small"
+                      >
+                        Clear Form
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        disabled={manualScanLoading || !manualScanForm.memberName || !manualScanForm.memberId || !manualScanForm.productNo || !manualScanForm.batchNo || !manualScanForm.qty}
+                        onClick={async () => {
+                          setManualScanLoading(true);
+                          try {
+                            const response = await api.post('/scans', manualScanForm);
+                            if (response.data.success) {
+                              showNotification(
+                                `Scan recorded successfully! Points earned: ${response.data.data.points || 0}`,
+                                'success'
+                              );
+                              // Clear form
+                              setManualScanForm({
+                                memberName: '',
+                                memberId: '',
+                                role: 'applicator',
+                                productName: '',
+                                productNo: '',
+                                batchNo: '',
+                                bagNo: '',
+                                qty: '',
+                                price: 0,
+                                location: ''
+                              });
+                              // Hide form on success to show updated scans
+                              setShowManualScanForm(false);
+                              // Refresh data
+                              loadAdminData();
+                            }
+                          } catch (error) {
+                            showNotification(
+                              error.response?.data?.message || 'Failed to record scan',
+                              'error'
+                            );
+                          } finally {
+                            setManualScanLoading(false);
+                          }
+                        }}
+                        startIcon={manualScanLoading ? <CircularProgress size={20} /> : <Add />}
+                        size="small"
+                      >
+                        {manualScanLoading ? 'Submitting...' : 'Submit Scan'}
+                      </Button>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+            )}
+
             {(() => {
               // Filter scans
               let filteredScans = scanHistory.filter(item => {
@@ -4998,6 +5217,9 @@ function App() {
                     ) : (
                       <Chip label="⚠️ Price Not Set" size='small' variant='outlined' sx={{ fontSize: '0.7rem', bgcolor: 'warning.light', color: 'warning.dark', fontWeight: 600 }} />
                     )}
+                    {item.points !== undefined && (
+                      <Chip label={`✨ ${item.points} pts`} size='small' color='secondary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                    )}
                   </Box>
                   {item.price === 0 && (
                     <Box sx={{ mt: 1, p: 1, bgcolor: 'warning.light', borderRadius: 1, border: '1px solid', borderColor: 'warning.main' }}>
@@ -5073,6 +5295,8 @@ function App() {
         );
       })()}
     </Box>}
+
+
 
         {adminTab === 'members' && (() => {
           // Compute real-time stats and sort list
