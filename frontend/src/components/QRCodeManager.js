@@ -1111,79 +1111,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         </Grid>
       </Grid>
       
-      {/* Production Batch Summary */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FilterList /> Production Batch History
-          </Typography>
-          <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300 }}>
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Batch No</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Total QRs</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Printed</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Scanned</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Last Print Date</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {batchSummary.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                      <Typography variant="body2" color="textSecondary">No batches found</Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  batchSummary.map(batch => (
-                    <TableRow key={batch._id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Chip label={batch._id} size="small" variant="outlined" color="primary" sx={{ fontWeight: 'bold' }} />
-                          {/* Upgrade 5: Expiry badge */}
-                          {batch.isExpired && (
-                            <Chip label="⚠️ Expired" size="small" color="error" />
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell align="center">{batch.totalQRs}</TableCell>
-                      <TableCell align="center">
-                        <Chip 
-                          label={`${isMainAdmin ? batch.printed : (batch.printed + batch.generated)}/${batch.totalQRs}`} 
-                          size="small" 
-                          color={(isMainAdmin ? batch.printed : (batch.printed + batch.generated)) === batch.totalQRs ? "success" : "warning"}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        {/* Upgrade 5: Scan rate with progress bar */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 80 }}>
-                          <Box sx={{ flexGrow: 1 }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={batch.scanRate || 0}
-                              sx={{ height: 6, borderRadius: 3,
-                                bgcolor: 'grey.200',
-                                '& .MuiLinearProgress-bar': { bgcolor: batch.scanRate >= 80 ? 'success.main' : batch.scanRate >= 40 ? 'warning.main' : 'info.main' }
-                              }}
-                            />
-                          </Box>
-                          <Typography variant="caption" fontWeight="bold" sx={{ minWidth: 32, textAlign: 'right' }}>
-                            {batch.scanned}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell align="right">
-                        {batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : 'N/A'}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+
 
       {/* Action Buttons */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -2076,7 +2004,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 }
               }}
             >
-              <Tab label="Batch Summary" />
+              <Tab label="Production Batch History" />
               {isMainAdmin && <Tab label={`🔍 Scan Attempt Logs`} />}
               {isMainAdmin && (
                 <Tab 
@@ -2086,34 +2014,70 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             </Tabs>
           </Box>
 
-          {/* Tab 0: Batch Summary (existing) */}
-          {activeTab === 0 && batchSummary.length > 0 && (
-            <TableContainer>
-              <Table size="small">
+          {/* Tab 0: Production Batch History */}
+          {activeTab === 0 && (
+            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300 }}>
+              <Table size="small" stickyHeader>
                 <TableHead>
-                  <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                    <TableCell><strong>Batch No</strong></TableCell>
-                    <TableCell align="center"><strong>Total</strong></TableCell>
-                    <TableCell align="center"><strong>Printed</strong></TableCell>
-                    <TableCell align="center"><strong>Scanned</strong></TableCell>
-                    <TableCell><strong>Last Print</strong></TableCell>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Batch No</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Total QRs</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Printed</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Scanned</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Last Print Date</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {batchSummary.map(batch => (
-                    <TableRow key={batch._id}>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <strong>{batch._id}</strong>
-                          {batch.isExpired && <Chip label="Expired" size="small" color="error" />}
-                        </Box>
+                  {batchSummary.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                        <Typography variant="body2" color="textSecondary">No batches found</Typography>
                       </TableCell>
-                      <TableCell align="center">{batch.totalQRs}</TableCell>
-                      <TableCell align="center">{isMainAdmin ? batch.printed : (batch.printed + batch.generated)}</TableCell>
-                      <TableCell align="center">{batch.scanned}</TableCell>
-                      <TableCell>{batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : '-'}</TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    batchSummary.map(batch => (
+                      <TableRow key={batch._id} hover>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip label={batch._id} size="small" variant="outlined" color="primary" sx={{ fontWeight: 'bold' }} />
+                            {/* Upgrade 5: Expiry badge */}
+                            {batch.isExpired && (
+                              <Chip label="⚠️ Expired" size="small" color="error" />
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell align="center">{batch.totalQRs}</TableCell>
+                        <TableCell align="center">
+                          <Chip 
+                            label={`${isMainAdmin ? batch.printed : (batch.printed + batch.generated)}/${batch.totalQRs}`} 
+                            size="small" 
+                            color={(isMainAdmin ? batch.printed : (batch.printed + batch.generated)) === batch.totalQRs ? "success" : "warning"}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          {/* Upgrade 5: Scan rate with progress bar */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 80 }}>
+                            <Box sx={{ flexGrow: 1 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={batch.scanRate || 0}
+                                sx={{ height: 6, borderRadius: 3,
+                                  bgcolor: 'grey.200',
+                                  '& .MuiLinearProgress-bar': { bgcolor: batch.scanRate >= 80 ? 'success.main' : batch.scanRate >= 40 ? 'warning.main' : 'info.main' }
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="caption" fontWeight="bold" sx={{ minWidth: 32, textAlign: 'right' }}>
+                              {batch.scanned}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell align="right">
+                          {batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : 'N/A'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
