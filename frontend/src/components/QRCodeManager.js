@@ -961,7 +961,15 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       const isMatch = batchLower.includes(query) || (query.length > 3 && fullBatchLower.includes(query));
       if (!isMatch) return false;
     }
-    if (filterStatus && qr.status !== filterStatus) return false;
+    if (filterStatus) {
+      if (!isMainAdmin && filterStatus === 'printed') {
+        if (qr.status !== 'printed' && qr.status !== 'generated') return false;
+      } else if (!isMainAdmin && filterStatus === 'generated') {
+        return false;
+      } else {
+        if (qr.status !== filterStatus) return false;
+      }
+    }
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const match = (
@@ -992,7 +1000,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           <Paper sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="h6" color="textSecondary">Printed</Typography>
             <Typography variant="h4" color="success.main">
-              {qrCodes.filter(q => q.status === 'printed').length}
+              {qrCodes.filter(q => q.status === 'printed' || (!isMainAdmin && q.status === 'generated')).length}
             </Typography>
           </Paper>
         </Grid>
@@ -1000,7 +1008,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           <Paper sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="h6" color="textSecondary">Generated</Typography>
             <Typography variant="h4" color="warning.main">
-              {qrCodes.filter(q => q.status === 'generated').length}
+              {isMainAdmin ? qrCodes.filter(q => q.status === 'generated').length : 0}
             </Typography>
           </Paper>
         </Grid>
@@ -1051,9 +1059,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       <TableCell align="center">{batch.totalQRs}</TableCell>
                       <TableCell align="center">
                         <Chip 
-                          label={`${batch.printed}/${batch.totalQRs}`} 
+                          label={`${isMainAdmin ? batch.printed : (batch.printed + batch.generated)}/${batch.totalQRs}`} 
                           size="small" 
-                          color={batch.printed === batch.totalQRs ? "success" : "warning"}
+                          color={(isMainAdmin ? batch.printed : (batch.printed + batch.generated)) === batch.totalQRs ? "success" : "warning"}
                         />
                       </TableCell>
                       <TableCell align="center">
@@ -1100,7 +1108,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           startIcon={<Add />}
           onClick={() => setOpenBulkDialog(true)}
         >
-          Bulk Generate
+          {isMainAdmin ? 'Bulk Generate' : 'Print Bulk'}
         </Button>
         {selectedForPrint.length > 0 && (
           <>
@@ -1271,7 +1279,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
       {/* Bulk Generate Dialog */}
       <Dialog open={openBulkDialog} onClose={() => setOpenBulkDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Bulk Generate QR Codes</DialogTitle>
+        <DialogTitle>{isMainAdmin ? 'Bulk Generate QR Codes' : 'Print QR Codes in Bulk'}</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <FormControl fullWidth margin="normal">
             <InputLabel>Select Product</InputLabel>
@@ -1386,7 +1394,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         <DialogActions>
           <Button onClick={() => setOpenBulkDialog(false)}>Cancel</Button>
           <Button onClick={generateBulkQRCodes} variant="contained" disabled={loading}>
-            {loading ? <CircularProgress size={24} /> : 'Generate Bulk'}
+            {loading ? <CircularProgress size={24} /> : (isMainAdmin ? 'Generate Bulk' : 'Print Bulk')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1726,7 +1734,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 label="Filter by Status"
               >
                 <MenuItem value="">All</MenuItem>
-                <MenuItem value="generated">Generated</MenuItem>
+                {isMainAdmin && <MenuItem value="generated">Generated</MenuItem>}
                 <MenuItem value="printed">Printed</MenuItem>
                 <MenuItem value="scanned">Scanned</MenuItem>
               </Select>
@@ -1786,9 +1794,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     <TableCell>{qr.packageNo || '-'}</TableCell>
                     <TableCell>
                       <Chip
-                        label={qr.status}
+                        label={(!isMainAdmin && qr.status === 'generated') ? 'printed' : qr.status}
                         size="small"
-                        color={qr.status === 'printed' ? 'success' : 'default'}
+                        color={((!isMainAdmin && qr.status === 'generated') || qr.status === 'printed') ? 'success' : 'default'}
                         variant={qr.status === 'scanned' ? 'filled' : 'outlined'}
                       />
                     </TableCell>
@@ -1894,7 +1902,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                         </Box>
                       </TableCell>
                       <TableCell align="center">{batch.totalQRs}</TableCell>
-                      <TableCell align="center">{batch.printed}</TableCell>
+                      <TableCell align="center">{isMainAdmin ? batch.printed : (batch.printed + batch.generated)}</TableCell>
                       <TableCell align="center">{batch.scanned}</TableCell>
                       <TableCell>{batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : '-'}</TableCell>
                     </TableRow>
