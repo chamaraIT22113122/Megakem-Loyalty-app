@@ -2749,18 +2749,24 @@ function App() {
           <Typography variant='h6' component='div' sx={{ fontWeight: 700, letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)', lineHeight: 1.2, fontSize: { xs: '0.9rem', sm: '1.25rem' } }}>MEGAKEM LOYALTY</Typography>
           <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: { xs: '0.55rem', sm: '0.65rem' }, opacity: 0.9, display: { xs: 'none', sm: 'block' } }}>WHERE TRUST MEETS EXCELLENCE</Typography>
         </Box>
-        {adminAuth && view === 'admin' && !isMainAdmin() && (
-          <Tooltip title="My Requests & Notifications">
+        {adminAuth && view === 'admin' && (
+          <Tooltip title={isMainAdmin() ? "Pending Co-Admin Requests" : "My Requests & Notifications"}>
             <IconButton 
               color='inherit' 
-              onClick={() => setCoAdminRequestsDialogOpen(true)} 
+              onClick={() => {
+                if (isMainAdmin()) {
+                  setAdminTab('reprint-requests');
+                } else {
+                  setCoAdminRequestsDialogOpen(true);
+                }
+              }} 
               sx={{ 
                 mr: 2, 
                 bgcolor: 'rgba(255,255,255,0.1)', 
                 '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
               }}
             >
-              <Badge badgeContent={coAdminApprovedCount} color="error">
+              <Badge badgeContent={isMainAdmin() ? pendingRequestsCount : coAdminApprovedCount} color="error">
                 <Notifications />
               </Badge>
             </IconButton>
