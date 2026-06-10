@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
-import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI } from './services/api';
 import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
@@ -542,6 +542,7 @@ function App() {
   });
   const [pendingScan, setPendingScan] = useState(null);
   const [scanHistory, setScanHistory] = useState([]);
+  const [allScans, setAllScans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1631,6 +1632,158 @@ function App() {
     }
   };
 
+  const getTrendChartData = (scansList) => {
+    const now = new Date();
+    if (dateFilter === 'today') {
+      // Group by hour for last 24 hours
+      const hourData = Array.from({ length: 24 }).map((_, i) => {
+        const h = new Date(now.getTime() - (23 - i) * 60 * 60 * 1000);
+        return {
+          label: `${h.getHours().toString().padStart(2, '0')}:00`,
+          scans: 0,
+          value: 0
+        };
+      });
+      scansList.forEach(scan => {
+        const scanDate = new Date(scan.timestamp || scan.createdAt);
+        const diffHrs = Math.floor((now - scanDate) / (60 * 60 * 1000));
+        if (diffHrs >= 0 && diffHrs < 24) {
+          const index = 23 - diffHrs;
+          if (hourData[index]) {
+            hourData[index].scans++;
+            hourData[index].value += scan.price || 0;
+          }
+        }
+      });
+      return hourData;
+    } else {
+      // Group by date for 7D or 30D
+      const numDays = dateFilter === '7days' ? 7 : 30;
+      const dayData = Array.from({ length: numDays }).map((_, i) => {
+        const d = new Date(now.getTime() - (numDays - 1 - i) * 24 * 60 * 60 * 1000);
+        return {
+          label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          scans: 0,
+          value: 0,
+          dateKey: d.toDateString()
+        };
+      });
+      scansList.forEach(scan => {
+        const scanDateStr = new Date(scan.timestamp || scan.createdAt).toDateString();
+        const match = dayData.find(d => d.dateKey === scanDateStr);
+        if (match) {
+          match.scans++;
+          match.value += scan.price || 0;
+        }
+      });
+      return dayData;
+    }
+  };
+
+  const playNotificationSound = () => {
+    if (!notificationPrefs.soundEnabled) return;
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
+      gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.4);
+      
+      oscillator.start(oscillator.frequency.value);
+      oscillator.stop(audioCtx.currentTime + 0.4);
+    } catch (err) {
+      console.error('AudioContext sound failed:', err);
+    }
+  };
+
+  const calculateComparison = (scansList, productList) => {
+    const now = new Date();
+    let currentStart, currentEnd, prevStart, prevEnd;
+
+    if (dateFilter === 'today') {
+      currentStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      currentEnd = now;
+      prevStart = new Date(currentStart.getTime() - 24 * 60 * 60 * 1000);
+      prevEnd = new Date(currentStart.getTime() - 1);
+    } else if (dateFilter === '7days') {
+      currentStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      currentEnd = now;
+      prevStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      prevEnd = currentStart;
+    } else {
+      currentStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      currentEnd = now;
+      prevStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      prevEnd = currentStart;
+    }
+
+    const currentScans = scansList.filter(s => {
+      const d = new Date(s.timestamp || s.createdAt);
+      return d >= currentStart && d <= currentEnd;
+    });
+
+    const prevScans = scansList.filter(s => {
+      const d = new Date(s.timestamp || s.createdAt);
+      return d >= prevStart && d <= prevEnd;
+    });
+
+    const currentScansCount = currentScans.length;
+    const currentMembersSet = new Set(currentScans.map(s => s.memberId));
+    const currentMembersCount = currentMembersSet.size;
+    const currentValue = currentScans.reduce((total, scan) => {
+      const product = productList.find(p => 
+        p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+        p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+      ); 
+      const price = product ? product.price : (scan.price || 0);
+      return total + price;
+    }, 0);
+
+    const prevScansCount = prevScans.length;
+    const prevMembersSet = new Set(prevScans.map(s => s.memberId));
+    const prevMembersCount = prevMembersSet.size;
+    const prevValue = prevScans.reduce((total, scan) => {
+      const product = productList.find(p => 
+        p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+        p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+      ); 
+      const price = product ? product.price : (scan.price || 0);
+      return total + price;
+    }, 0);
+
+    const getPercentChange = (curr, prev) => {
+      if (prev === 0) return curr > 0 ? 100 : 0;
+      return Math.round(((curr - prev) / prev) * 100);
+    };
+
+    setComparisonData({
+      scans: {
+        current: currentScansCount,
+        change: getPercentChange(currentScansCount, prevScansCount)
+      },
+      value: {
+        current: currentValue,
+        change: getPercentChange(currentValue, prevValue)
+      },
+      members: {
+        current: currentMembersCount,
+        change: getPercentChange(currentMembersCount, prevMembersCount)
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (adminAuth && allScans.length > 0) {
+      calculateComparison(allScans, products);
+    }
+  }, [dateFilter, allScans, products, adminAuth]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const loadAdminData = async () => {
     if (!adminAuth) return;
     try {
@@ -1684,20 +1837,27 @@ function App() {
         ? authAPI.getUsers()
         : Promise.resolve({ data: { data: [] } });
 
-      const [statsRes, scansRes, usersRes, productsRes, membersRes, loyaltyConfigRes] = await Promise.all([
+      const [statsRes, scansRes, usersRes, productsRes, membersRes, loyaltyConfigRes, allScansRes] = await Promise.all([
         scansAPI.getStats().catch(() => ({ data: { data: {} } })),
         scansAPI.getLive().catch(() => ({ data: { data: [] } })),
         usersPromise.catch(() => ({ data: { data: [] } })),
         productsAPI.getAll().catch(() => ({ data: { data: [] } })),
         membersPromise.catch(() => ({ data: { data: [] } })),
-        loyaltyAPI.getConfig().catch(() => ({ data: { data: null } }))
+        loyaltyAPI.getConfig().catch(() => ({ data: { data: null } })),
+        scansAPI.getAll({ limit: 1000 }).catch(() => ({ data: { data: [] } }))
       ]);
 
       console.log('📦 Products response:', productsRes.data);
       setStats(statsRes.data?.data || {});
       setScanHistory(scansRes.data?.data || []);
       setUsers(usersRes.data?.data || []);
-      setProducts(productsRes.data?.data || []);
+      
+      const fetchedProducts = productsRes.data?.data || [];
+      const fetchedAllScans = allScansRes.data?.data || [];
+      setProducts(fetchedProducts);
+      setAllScans(fetchedAllScans);
+      calculateComparison(fetchedAllScans, fetchedProducts);
+
       const allMembers = membersRes.data?.data || [];
       setMembers(allMembers);
       
@@ -1925,7 +2085,16 @@ function App() {
       
       if (view === 'admin') {
         const interval = setInterval(() => {
-          scansAPI.getLive().then(res => setScanHistory(res.data.data)).catch(console.error);
+          scansAPI.getLive().then(res => {
+            const newHistory = res.data.data || [];
+            setScanHistory(prev => {
+              if (newHistory.length > prev.length && prev.length > 0) {
+                playNotificationSound();
+              }
+              return newHistory;
+            });
+          }).catch(console.error);
+          
           if (isMainAdmin()) {
             loadPendingRequestsCount();
           } else {
@@ -1935,13 +2104,15 @@ function App() {
         return () => clearInterval(interval);
       }
     }
-  }, [adminAuth, view]);
-  // Auto-reload members data when new scans are detected to update leaderboard in real-time
+  }, [adminAuth, view]); // eslint-disable-line react-hooks/exhaustive-deps
+  
+  // Auto-reload members and stats data when new scans are detected to update leaderboard and dashboard in real-time
   useEffect(() => {
     if (adminAuth && scanHistory.length > 0) {
       reloadMembers();
+      loadAdminData();
     }
-  }, [scanHistory.length, adminAuth]);
+  }, [scanHistory.length, adminAuth]); // eslint-disable-line react-hooks/exhaustive-deps
   // Auto-refresh dashboard data every 30 seconds when enabled
   useEffect(() => {
     if (autoRefresh && adminAuth && view === 'admin' && adminTab === 'dashboard') {
@@ -3990,7 +4161,7 @@ function App() {
                   <DashboardIcon /> Dashboard Overview
                 </Typography>
                 
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
                   {/* Date Filter */}
                   <ToggleButtonGroup
                     value={dateFilter}
@@ -4024,6 +4195,21 @@ function App() {
                     </ToggleButton>
                   </ToggleButtonGroup>
                   
+                  {/* Notification Chime Toggle */}
+                  <Tooltip title={notificationPrefs.soundEnabled ? 'Sound notifications ON' : 'Sound notifications OFF'}>
+                    <IconButton
+                      color={notificationPrefs.soundEnabled ? 'primary' : 'default'}
+                      onClick={() => setNotificationPrefs(prev => ({ ...prev, soundEnabled: !prev.soundEnabled }))}
+                      sx={{
+                        border: '1px solid',
+                        borderColor: notificationPrefs.soundEnabled ? 'primary.main' : 'grey.300',
+                        p: '7px'
+                      }}
+                    >
+                      {notificationPrefs.soundEnabled ? <Notifications sx={{ fontSize: '1.2rem' }} /> : <NotificationsOff sx={{ fontSize: '1.2rem', color: 'text.disabled' }} />}
+                    </IconButton>
+                  </Tooltip>
+
                   {/* Auto Refresh Toggle */}
                   <Tooltip title={autoRefresh ? 'Auto-refresh ON (30s)' : 'Auto-refresh OFF'}>
                     <IconButton 
@@ -4031,32 +4217,33 @@ function App() {
                       onClick={() => setAutoRefresh(!autoRefresh)}
                       sx={{ 
                         border: '1px solid',
-                        borderColor: autoRefresh ? 'primary.main' : 'grey.300'
+                        borderColor: autoRefresh ? 'primary.main' : 'grey.300',
+                        p: '7px'
                       }}
                     >
-                      <Loop sx={{ animation: autoRefresh ? 'spin 2s linear infinite' : 'none', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />
+                      <Loop sx={{ fontSize: '1.2rem', animation: autoRefresh ? 'spin 2s linear infinite' : 'none', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />
                     </IconButton>
                   </Tooltip>
                   
                   {/* Calendar Toggle */}
                   <Button
-                  variant={showCalendarView ? 'contained' : 'outlined'}
-                  startIcon={<CalendarMonth />}
-                  onClick={() => {
-                    setShowCalendarView(!showCalendarView);
-                    if (!showCalendarView) {
-                      const today = new Date();
-                      setCalendarViewMonth(today.getMonth());
-                      setCalendarViewYear(today.getFullYear());
-                      setSelectedCalendarDate(today);
-                      setDailyReport(null); // Clear any previous report
-                      loadCalendarData(today.getFullYear(), today.getMonth());
-                    }
-                  }}
-                  sx={{ fontWeight: 600 }}
-                >
-                  {showCalendarView ? 'Hide Calendar' : 'Calendar View'}
-                </Button>
+                    variant={showCalendarView ? 'contained' : 'outlined'}
+                    startIcon={<CalendarMonth />}
+                    onClick={() => {
+                      setShowCalendarView(!showCalendarView);
+                      if (!showCalendarView) {
+                        const today = new Date();
+                        setCalendarViewMonth(today.getMonth());
+                        setCalendarViewYear(today.getFullYear());
+                        setSelectedCalendarDate(today);
+                        setDailyReport(null); // Clear any previous report
+                        loadCalendarData(today.getFullYear(), today.getMonth());
+                      }
+                    }}
+                    sx={{ fontWeight: 600, py: '7px' }}
+                  >
+                    {showCalendarView ? 'Hide Calendar' : 'Calendar View'}
+                  </Button>
                 </Box>
               </Box>
             </Grid>
@@ -4065,8 +4252,10 @@ function App() {
             <Grid item xs={12}>
               <Paper sx={{ 
                 p: 2, 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white'
+                background: 'linear-gradient(135deg, #003366 0%, #001a33 100%)',
+                color: 'white',
+                borderRadius: 3,
+                boxShadow: 2
               }}>
                 <Typography variant='subtitle2' gutterBottom sx={{ opacity: 0.9, fontWeight: 600 }}>
                   <Speed sx={{ fontSize: '1rem', mr: 0.5 }} /> Quick Performance Metrics
@@ -4114,7 +4303,7 @@ function App() {
             {showCalendarView && (
               <>
                 <Grid item xs={12}>
-                  <Card sx={{ height: '100%' }}>
+                  <Card sx={{ height: '100%', borderRadius: 3, boxShadow: 3, border: '1px solid', borderColor: 'grey.200' }}>
                     <CardContent>
                       <Typography variant='h6' gutterBottom sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
                         <CalendarMonth /> Sales & Scans Calendar
@@ -4201,13 +4390,17 @@ function App() {
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        bgcolor: hasScanData ? 'success.lighter' : 'transparent',
+                                        bgcolor: hasScanData 
+                                          ? `rgba(16, 185, 129, ${Math.max(0.12, Math.min(1.0, dayData.scans / 10))})` 
+                                          : 'transparent',
                                         border: isToday ? '2px solid' : isSelected ? '2px solid' : '1px solid transparent',
                                         borderColor: isToday ? 'primary.main' : isSelected ? 'primary.dark' : 'transparent',
                                         fontWeight: isSelected || isToday ? 700 : 400,
-                                        color: isSelected ? 'primary.main' : isToday ? 'primary.main' : 'text.primary',
+                                        color: isSelected ? 'primary.main' : isToday ? 'primary.main' : (hasScanData ? 'success.dark' : 'text.primary'),
                                         '&:hover': {
-                                          bgcolor: hasScanData ? 'success.light' : 'action.hover'
+                                          bgcolor: hasScanData 
+                                            ? `rgba(16, 185, 129, ${Math.max(0.25, Math.min(1.0, dayData.scans / 8))})` 
+                                            : 'action.hover'
                                         }
                                       }}
                                     >
@@ -4236,36 +4429,199 @@ function App() {
                     </CardContent>
                   </Card>
                 </Grid>
+
+                {/* Day Breakdown Card inside Dashboard Page */}
+                {selectedCalendarDate && (
+                  <Grid item xs={12}>
+                    <Card sx={{ borderRadius: 3, boxShadow: 3, border: '1px solid', borderColor: 'grey.200' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+                          <Typography variant='h6' sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CalendarMonth color="primary" /> Report for {selectedCalendarDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                          </Typography>
+                          <Button 
+                            variant="outlined" 
+                            size="small" 
+                            onClick={() => setDailyReportDialog({ open: true, date: selectedCalendarDate })}
+                            startIcon={<Assessment />}
+                            sx={{ fontWeight: 600 }}
+                          >
+                            View Full Report Dashboard
+                          </Button>
+                        </Box>
+                        
+                        {!dailyReport ? (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4, gap: 1 }}>
+                            <CircularProgress size={30} />
+                            <Typography variant="body2" color="text.secondary">Loading day breakdown...</Typography>
+                          </Box>
+                        ) : dailyReport.summary?.totalScans === 0 ? (
+                          <Box sx={{ py: 4, textAlign: 'center' }}>
+                            <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                              No scans recorded on this day.
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Grid container spacing={2}>
+                            {/* Quick stats for the day */}
+                            <Grid item xs={12} sm={4}>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 2 }}>
+                                  <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Total Scans</Typography>
+                                    <Typography variant="h5" fontWeight={800} color="primary.main">{dailyReport.summary.totalScans}</Typography>
+                                  </Box>
+                                  <ShowChart color="primary" sx={{ fontSize: '2rem', opacity: 0.7 }} />
+                                </Paper>
+                                
+                                <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 2 }}>
+                                  <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Active Members</Typography>
+                                    <Typography variant="h5" fontWeight={800} color="secondary.main">{dailyReport.summary.uniqueMembers}</Typography>
+                                  </Box>
+                                  <People color="secondary" sx={{ fontSize: '2rem', opacity: 0.7 }} />
+                                </Paper>
+                                
+                                <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 2 }}>
+                                  <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Products Scanned</Typography>
+                                    <Typography variant="h5" fontWeight={800} color="success.main">{dailyReport.summary.uniqueProducts}</Typography>
+                                  </Box>
+                                  <Category color="success" sx={{ fontSize: '2rem', opacity: 0.7 }} />
+                                </Paper>
+                              </Box>
+                            </Grid>
+
+                            {/* Top Product / Member of the day */}
+                            <Grid item xs={12} sm={4}>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%' }}>
+                                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', mb: 0.5 }}>Top scanning member</Typography>
+                                  {dailyReport.topMembers && dailyReport.topMembers[0] ? (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32, fontSize: '0.85rem', fontWeight: 600 }}>
+                                        {dailyReport.topMembers[0].name ? dailyReport.topMembers[0].name.substring(0, 2).toUpperCase() : 'M'}
+                                      </Avatar>
+                                      <Box>
+                                        <Typography variant="body2" fontWeight={700}>{dailyReport.topMembers[0].name || dailyReport.topMembers[0].memberId}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{dailyReport.topMembers[0].count} scans ({((dailyReport.topMembers[0].count / dailyReport.summary.totalScans) * 100).toFixed(0)}% share)</Typography>
+                                      </Box>
+                                    </Box>
+                                  ) : (
+                                    <Typography variant="body2" color="text.secondary">None</Typography>
+                                  )}
+                                </Paper>
+                                
+                                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', mb: 0.5 }}>Top product scanned</Typography>
+                                  {dailyReport.topProducts && dailyReport.topProducts[0] ? (
+                                    <Box>
+                                      <Typography variant="body2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                        📦 {dailyReport.topProducts[0].productName || dailyReport.topProducts[0]._id}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                        Pack Size: {dailyReport.topProducts[0].qty || 'N/A'} • {dailyReport.topProducts[0].count} scans
+                                      </Typography>
+                                    </Box>
+                                  ) : (
+                                    <Typography variant="body2" color="text.secondary">None</Typography>
+                                  )}
+                                </Paper>
+                              </Box>
+                            </Grid>
+
+                            {/* Daily Scans Timeline preview */}
+                            <Grid item xs={12} sm={4}>
+                              <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, height: '100%', maxHeight: 200, overflow: 'auto' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', mb: 1, display: 'block' }}>
+                                  Scans Timeline ({dailyReport.scans?.length || 0})
+                                </Typography>
+                                <List dense sx={{ p: 0 }}>
+                                  {dailyReport.scans?.slice(0, 3).map((scan, i) => {
+                                    const isManual = scan.isManual || scan.type === 'manual' || !scan.qrCodeId;
+                                    const scanTime = scan.scannedAt || scan.createdAt || scan.timestamp;
+                                    return (
+                                      <ListItem key={i} sx={{ px: 0.5, py: 0.5 }} divider={i < 2}>
+                                        <ListItemText
+                                          primary={
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                              <Typography variant="caption" fontWeight={700}>
+                                                {scan.memberName || scan.memberId || 'Member'}
+                                              </Typography>
+                                              <Typography variant="caption" color="text.secondary">
+                                                {scanTime ? new Date(scanTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                              </Typography>
+                                            </Box>
+                                          }
+                                          secondary={
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                                              {scan.productNo} ({scan.qty || 'N/A'}) • {isManual ? 'Manual' : 'QR'}
+                                            </Typography>
+                                          }
+                                        />
+                                      </ListItem>
+                                    );
+                                  })}
+                                  {dailyReport.scans?.length > 3 && (
+                                    <Typography variant="caption" color="primary.main" sx={{ display: 'block', mt: 0.5, textAlign: 'center', cursor: 'pointer', fontWeight: 600 }} onClick={() => setDailyReportDialog({ open: true, date: selectedCalendarDate })}>
+                                      + {dailyReport.scans.length - 3} more scans
+                                    </Typography>
+                                  )}
+                                </List>
+                              </Paper>
+                            </Grid>
+                          </Grid>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
               </>
             )}
 
+            {/* Core Summary Cards with hover scale transitions */}
             <Grid item xs={6} md={3}>
               <Card sx={{ 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                background: 'linear-gradient(135deg, #003366 0%, #1e40af 100%)', 
                 color: 'white',
                 position: 'relative',
-                overflow: 'visible'
+                borderRadius: 3,
+                boxShadow: 3,
+                transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 20px -10px rgba(0,0,0,0.3)' }
               }}>
                 <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Box>
                       <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold', mb: 0.5 }}>
-                        {stats.total}
+                        {comparisonData ? comparisonData.scans.current : stats.total}
                       </Typography>
                       <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
                         Total Scans
                       </Typography>
                     </Box>
-                    <Tooltip title='Overall scan activity'>
+                    <Tooltip title='Scan activity in selected period'>
                       <ShowChart sx={{ opacity: 0.5, fontSize: '2rem' }} />
                     </Tooltip>
                   </Box>
-                  {stats.last24Hours > 0 && (
-                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <TrendingUp sx={{ fontSize: '1rem' }} />
-                      <Typography variant='caption' sx={{ opacity: 0.9 }}>
-                        +{stats.last24Hours} in last 24hrs
-                      </Typography>
+                  {comparisonData && (
+                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                      <Box sx={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: 0.5, 
+                        px: 1, 
+                        py: 0.25, 
+                        borderRadius: 1.5, 
+                        bgcolor: comparisonData.scans.change > 0 ? 'rgba(16, 185, 129, 0.2)' : (comparisonData.scans.change === 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.2)'),
+                        color: comparisonData.scans.change > 0 ? '#10b981' : (comparisonData.scans.change === 0 ? '#e5e7eb' : '#f87171'),
+                        fontSize: '0.75rem',
+                        fontWeight: 700
+                      }}>
+                        <span>{comparisonData.scans.change > 0 ? '▲' : (comparisonData.scans.change === 0 ? '■' : '▼')}</span>
+                        <span>{comparisonData.scans.change > 0 ? '+' : ''}{comparisonData.scans.change}%</span>
+                      </Box>
+                      <Typography variant='caption' sx={{ opacity: 0.8, fontSize: '0.7rem' }}>vs prev period</Typography>
                     </Box>
                   )}
                 </CardContent>
@@ -4274,10 +4630,68 @@ function App() {
             
             <Grid item xs={6} md={3}>
               <Card sx={{ 
-                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', 
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
                 color: 'white',
                 position: 'relative',
-                overflow: 'visible'
+                borderRadius: 3,
+                boxShadow: 3,
+                transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 20px -10px rgba(0,0,0,0.3)' }
+              }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box sx={{ width: '80%' }}>
+                      <Typography variant='h4' sx={{ fontSize: { xs: '1.25rem', sm: '1.6rem', md: '1.9rem', lg: '2.2rem' }, fontWeight: 'bold', mb: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        Rs. {(comparisonData ? comparisonData.value.current : allScans.reduce((total, scan) => { 
+                          const product = products.find(p => 
+                            p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                            p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+                          ); 
+                          const price = product ? product.price : (scan.price || 0);
+                          return total + price; 
+                        }, 0)).toLocaleString()}
+                      </Typography>
+                      <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
+                        Est. Value
+                      </Typography>
+                    </Box>
+                    <Tooltip title='Estimated product value scanned'>
+                      <Star sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                    </Tooltip>
+                  </Box>
+                  {comparisonData && (
+                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                      <Box sx={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: 0.5, 
+                        px: 1, 
+                        py: 0.25, 
+                        borderRadius: 1.5, 
+                        bgcolor: comparisonData.value.change > 0 ? 'rgba(16, 185, 129, 0.2)' : (comparisonData.value.change === 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.2)'),
+                        color: comparisonData.value.change > 0 ? '#10b981' : (comparisonData.value.change === 0 ? '#e5e7eb' : '#f87171'),
+                        fontSize: '0.75rem',
+                        fontWeight: 700
+                      }}>
+                        <span>{comparisonData.value.change > 0 ? '▲' : (comparisonData.value.change === 0 ? '■' : '▼')}</span>
+                        <span>{comparisonData.value.change > 0 ? '+' : ''}{comparisonData.value.change}%</span>
+                      </Box>
+                      <Typography variant='caption' sx={{ opacity: 0.8, fontSize: '0.7rem' }}>vs prev period</Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)', 
+                color: 'white',
+                position: 'relative',
+                borderRadius: 3,
+                boxShadow: 3,
+                transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 20px -10px rgba(0,0,0,0.3)' }
               }}>
                 <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -4289,13 +4703,13 @@ function App() {
                         Applicators
                       </Typography>
                     </Box>
-                    <Tooltip title='Applicator scans'>
-                      <Person sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                    <Tooltip title='Total Applicator scans'>
+                      <Build sx={{ opacity: 0.5, fontSize: '2rem' }} />
                     </Tooltip>
                   </Box>
-                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant='caption' sx={{ opacity: 0.9 }}>
-                      {stats.total > 0 ? ((stats.applicator / stats.total) * 100).toFixed(1) : 0}% of total
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant='caption' sx={{ opacity: 0.9, fontWeight: 600, bgcolor: 'rgba(255,255,255,0.15)', px: 1, py: 0.5, borderRadius: 1 }}>
+                      {stats.total > 0 ? ((stats.applicator / stats.total) * 100).toFixed(1) : 0}% of scans
                     </Typography>
                   </Box>
                 </CardContent>
@@ -4304,10 +4718,13 @@ function App() {
             
             <Grid item xs={6} md={3}>
               <Card sx={{ 
-                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', 
+                background: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)', 
                 color: 'white',
                 position: 'relative',
-                overflow: 'visible'
+                borderRadius: 3,
+                boxShadow: 3,
+                transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 20px -10px rgba(0,0,0,0.3)' }
               }}>
                 <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -4319,57 +4736,209 @@ function App() {
                         Hardwares
                       </Typography>
                     </Box>
-                    <Tooltip title='Hardware scans'>
+                    <Tooltip title='Total Hardware scans'>
                       <People sx={{ opacity: 0.5, fontSize: '2rem' }} />
                     </Tooltip>
                   </Box>
-                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant='caption' sx={{ opacity: 0.9 }}>
-                      {stats.total > 0 ? ((stats.customer / stats.total) * 100).toFixed(1) : 0}% of total
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant='caption' sx={{ opacity: 0.9, fontWeight: 600, bgcolor: 'rgba(255,255,255,0.15)', px: 1, py: 0.5, borderRadius: 1 }}>
+                      {stats.total > 0 ? ((stats.customer / stats.total) * 100).toFixed(1) : 0}% of scans
                     </Typography>
                   </Box>
                 </CardContent>
               </Card>
             </Grid>
-            
-            <Grid item xs={6} md={3}>
-              <Card sx={{ 
-                background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', 
-                color: 'white',
-                position: 'relative',
-                overflow: 'visible'
-              }}>
-                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Box>
-                      <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold', mb: 0.5 }}>
-                        {stats.last24Hours}
-                      </Typography>
-                      <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
-                        Last 24hrs
+
+            {/* Trend Chart and Live activity stream side-by-side */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%', borderRadius: 3, boxShadow: 3, border: '1px solid', borderColor: 'grey.100' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant='h6' sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
+                      <Timeline color="primary" /> Scan & Value Trends
+                    </Typography>
+                    <Chip 
+                      label={dateFilter === 'today' ? 'Hourly (Today)' : dateFilter === '7days' ? 'Daily (7 Days)' : 'Daily (30 Days)'} 
+                      size="small" 
+                      color="primary" 
+                      variant="outlined" 
+                      sx={{ fontWeight: 600 }}
+                    />
+                  </Box>
+                  <ResponsiveContainer width='100%' height={300}>
+                    <AreaChart data={getTrendChartData(allScans)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorScans" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#003366" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#003366" stopOpacity={0.0}/>
+                        </linearGradient>
+                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#A4D233" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#A4D233" stopOpacity={0.0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray='3 3' stroke='#f3f4f6' />
+                      <XAxis dataKey='label' tick={{ fontSize: 11, fill: '#6b7280' }} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#6b7280' }} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#6b7280' }} tickFormatter={(val) => `Rs.${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`} />
+                      <RechartsTooltip 
+                        contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                        formatter={(value, name) => {
+                          if (name === 'scans') return [`${value} scans`, 'Scans'];
+                          return [`Rs. ${value.toLocaleString()}`, 'Est. Value'];
+                        }}
+                      />
+                      <Area yAxisId="left" type="monotone" dataKey="scans" stroke="#003366" strokeWidth={2.5} fillOpacity={1} fill="url(#colorScans)" name="scans" />
+                      <Area yAxisId="right" type="monotone" dataKey="value" stroke="#A4D233" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" name="value" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%', borderRadius: 3, boxShadow: 3, border: '1px solid', borderColor: 'grey.100' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        bgcolor: 'error.main',
+                        boxShadow: '0 0 8px #ef4444',
+                        animation: 'pulse 1.5s infinite',
+                        '@keyframes pulse': {
+                          '0%': { transform: 'scale(0.95)', opacity: 0.5, boxShadow: '0 0 0 0 rgba(239, 68, 68, 0.7)' },
+                          '70%': { transform: 'scale(1.2)', opacity: 1, boxShadow: '0 0 0 8px rgba(239, 68, 68, 0)' },
+                          '100%': { transform: 'scale(0.95)', opacity: 0.5, boxShadow: '0 0 0 0 rgba(239, 68, 68, 0)' }
+                        }
+                      }} />
+                      <Typography variant='h6' sx={{ fontWeight: 700 }}>
+                        Live Activity Feed
                       </Typography>
                     </Box>
-                    <Tooltip title='Recent activity'>
-                      <Timeline sx={{ opacity: 0.5, fontSize: '2rem' }} />
-                    </Tooltip>
+                    <Chip 
+                      label="Auto-Sync active" 
+                      size="small" 
+                      color="success" 
+                      variant="filled" 
+                      sx={{ fontWeight: 600, bgcolor: 'rgba(16, 185, 129, 0.1)', color: 'success.dark', border: 'none' }}
+                    />
                   </Box>
-                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    {stats.lastWeek > 0 ? (
-                      <TrendingUp sx={{ fontSize: '1rem', color: 'rgba(255,255,255,0.9)' }} />
+
+                  {/* List of scans with relative time and type badges */}
+                  <List sx={{ maxHeight: 300, overflow: 'auto', p: 0 }}>
+                    {scanHistory && scanHistory.length > 0 ? (
+                      scanHistory.slice(0, 10).map((scan, index) => {
+                        const isManual = scan.isManual || scan.type === 'manual' || !scan.qrCodeId;
+                        const isApplicator = scan.memberRole?.toLowerCase() === 'applicator' || (members.find(m => m.memberId === scan.memberId)?.role?.toLowerCase() === 'applicator');
+                        const memberName = scan.memberName || members.find(m => m.memberId === scan.memberId)?.name || scan.memberId || 'Unknown Member';
+                        
+                        // Helper to get relative time
+                        const getRelativeTime = (dateString) => {
+                          if (!dateString) return 'Just now';
+                          const date = new Date(dateString);
+                          const diffMs = new Date() - date;
+                          const diffMins = Math.floor(diffMs / 60000);
+                          if (diffMins < 1) return 'Just now';
+                          if (diffMins < 60) return `${diffMins}m ago`;
+                          const diffHrs = Math.floor(diffMins / 60);
+                          if (diffHrs < 24) return `${diffHrs}h ago`;
+                          return date.toLocaleDateString();
+                        };
+
+                        return (
+                          <Box key={scan._id || index}>
+                            <ListItem 
+                              alignItems="flex-start" 
+                              sx={{ 
+                                px: 1.5, 
+                                py: 1, 
+                                borderRadius: 2, 
+                                mb: 1, 
+                                transition: 'background-color 0.2s',
+                                '&:hover': { bgcolor: 'action.hover' } 
+                              }}
+                            >
+                              <ListItemText
+                                primary={
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                                      {memberName}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                                      {getRelativeTime(scan.scannedAt || scan.createdAt || scan.timestamp)}
+                                    </Typography>
+                                  </Box>
+                                }
+                                secondary={
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                    <Typography variant="caption" color="text.primary" sx={{ fontWeight: 600 }}>
+                                      Product: {scan.productName || scan.productNo} ({scan.qty || 'N/A'})
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 0.5 }}>
+                                      {/* Scan Type Badge */}
+                                      <Chip 
+                                        label={isManual ? '✨ Manual' : '📱 QR-Code'} 
+                                        size="small" 
+                                        sx={{ 
+                                          height: 20, 
+                                          fontSize: '0.675rem', 
+                                          fontWeight: 700,
+                                          bgcolor: isManual ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                                          color: isManual ? '#d97706' : '#2563eb',
+                                          border: 'none'
+                                        }} 
+                                      />
+                                      {/* Role Chip */}
+                                      <Chip 
+                                        label={isApplicator ? 'App' : 'HW'} 
+                                        size="small" 
+                                        color={isApplicator ? 'error' : 'info'} 
+                                        variant="outlined"
+                                        sx={{ 
+                                          height: 20, 
+                                          fontSize: '0.675rem', 
+                                          fontWeight: 700,
+                                          px: 0.5
+                                        }} 
+                                      />
+                                      {/* Location Badge */}
+                                      {scan.location && (
+                                        <Chip 
+                                          label={`📍 ${scan.location}`} 
+                                          size="small" 
+                                          variant="outlined"
+                                          sx={{ 
+                                            height: 20, 
+                                            fontSize: '0.675rem', 
+                                            fontWeight: 500,
+                                            color: 'text.secondary',
+                                            borderColor: 'grey.300'
+                                          }} 
+                                        />
+                                      )}
+                                    </Box>
+                                  </Box>
+                                }
+                              />
+                            </ListItem>
+                            {index < Math.min(scanHistory.length, 10) - 1 && <Divider component="li" sx={{ opacity: 0.6 }} />}
+                          </Box>
+                        );
+                      })
                     ) : (
-                      <TrendingFlat sx={{ fontSize: '1rem', color: 'rgba(255,255,255,0.9)' }} />
+                      <Box sx={{ py: 6, textAlign: 'center' }}>
+                        <Typography variant="body2" color="text.secondary">
+                          No recent scans available.
+                        </Typography>
+                      </Box>
                     )}
-                    <Typography variant='caption' sx={{ opacity: 0.9 }}>
-                      {stats.lastWeek || 0} this week
-                    </Typography>
-                  </Box>
+                  </List>
                 </CardContent>
               </Card>
             </Grid>
-            
-            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}><TrendingUp /> Top Products by Scans</Typography><ResponsiveContainer width='100%' height={300}><BarChart data={stats.topProducts?.slice(0, 5).map(p => ({ name: p._id.length > 20 ? p._id.substring(0, 20) + '...' : p._id, scans: p.count }))} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}><CartesianGrid strokeDasharray='3 3' stroke='#f0f0f0' /><XAxis dataKey='name' angle={-45} textAnchor='end' height={100} tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} /><RechartsTooltip contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }} /><Bar dataKey='scans' fill='#003366' radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card></Grid>
-            
-            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>User Distribution</Typography><ResponsiveContainer width='100%' height={300}><PieChart><Pie data={[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Hardwares', value: stats.customer, color: '#00f2fe' }]} cx='50%' cy='50%' labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill='#8884d8' dataKey='value'>{[{ name: 'Applicators', value: stats.applicator, color: '#f5576c' }, { name: 'Hardwares', value: stats.customer, color: '#00f2fe' }].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><RechartsTooltip /></PieChart></ResponsiveContainer></CardContent></Card></Grid>
 
             {/* Sri Lanka Zone Distribution Map */}
             <Grid item xs={12}>
@@ -4380,6 +4949,10 @@ function App() {
               <Card 
                 sx={{ 
                   cursor: 'pointer',
+                  borderRadius: 3,
+                  boxShadow: 3,
+                  border: '1px solid',
+                  borderColor: 'grey.200',
                   transition: 'all 0.3s',
                   '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
                 }}
@@ -4438,15 +5011,154 @@ function App() {
                 </CardContent>
               </Card>
             </Grid>
-            
-            <Grid item xs={12} md={6}><Card sx={{ background: 'linear-gradient(135deg, #FAD961 0%, #F76B1C 100%)', color: 'white' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>💰 Total Product Value (Estimated)</Typography><Typography variant='h3' fontWeight='bold' sx={{ my: 2 }}>Rs. {scanHistory.reduce((total, scan) => { 
-              const product = products.find(p => 
-                p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
-                p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
-              ); 
-              const price = product ? product.price : (scan.price || 0);
-              return total + price; 
-            }, 0).toLocaleString()}</Typography><Typography variant='body2' sx={{ opacity: 0.9 }}>Based on {scanHistory.length} scans with product pricing</Typography></CardContent></Card></Grid>
+
+            {/* Price Estimation by Product next to Top Cities */}
+            <Grid item xs={12} md={6}>
+              <Card 
+                sx={{ 
+                  cursor: 'pointer',
+                  borderRadius: 3,
+                  boxShadow: 3,
+                  border: '1px solid',
+                  borderColor: 'grey.200',
+                  transition: 'all 0.3s',
+                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
+                }}
+                onClick={() => {
+                  const productStats = scanHistory.reduce((acc, scan) => { 
+                    const product = products.find(p => 
+                      p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                      p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+                    ); 
+                    const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
+                    if (!acc[key]) { 
+                      acc[key] = { 
+                        productNo: scan.productNo,
+                        name: product ? product.name : scan.productName || 'Unknown Product',
+                        packSize: scan.qty || 'N/A', 
+                        price: product ? product.price : (scan.price || 0),
+                        scans: 0, 
+                        totalQty: 0 
+                      }; 
+                    } 
+                    acc[key].scans += 1; 
+                    acc[key].totalQty += 1; 
+                    return acc; 
+                  }, {}); 
+                  const sortedData = Object.entries(productStats)
+                    .sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty))
+                    .map(([key, data]) => ({
+                      productName: data.name,
+                      packSize: data.packSize,
+                      unitPrice: data.price || 0,
+                      totalScans: data.scans,
+                      estimatedValue: (data.price || 0) * data.totalQty
+                    }));
+                  setExpandedCardDialog({ open: true, type: 'priceEstimation', data: sortedData });
+                }}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant='h6' sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
+                      💵 Price Estimation by Product
+                    </Typography>
+                    {(() => {
+                      const productStats = scanHistory.reduce((acc, scan) => { 
+                        const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
+                        if (!acc[key]) acc[key] = true;
+                        return acc; 
+                      }, {});
+                      const totalProducts = Object.keys(productStats).length;
+                      return totalProducts > 6 && (
+                        <Chip 
+                          label={`+${totalProducts - 6} more`}
+                          size='small'
+                          color='primary'
+                        />
+                      );
+                    })()}
+                  </Box>
+                  <TableContainer sx={{ overflowX: 'auto', maxHeight: 275 }}>
+                    <Table size='small' stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Pack Size</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>Unit Price</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell>
+                          <TableCell align='right' sx={{ fontWeight: 700 }}>Est. Value</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(() => { 
+                          const productStats = scanHistory.reduce((acc, scan) => { 
+                            const product = products.find(p => 
+                              p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                              p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+                            ); 
+                            const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
+                            if (!acc[key]) { 
+                              acc[key] = { 
+                                productNo: scan.productNo,
+                                name: product ? product.name : scan.productName || 'Unknown Product',
+                                packSize: scan.qty || 'N/A', 
+                                price: product ? product.price : (scan.price || 0),
+                                scans: 0, 
+                                totalQty: 0 
+                              }; 
+                            } 
+                            acc[key].scans += 1; 
+                            acc[key].totalQty += 1; 
+                            return acc; 
+                          }, {}); 
+                          return Object.entries(productStats).sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty)).slice(0, 6).map(([key, data]) => 
+                            <TableRow key={key} sx={{ '&:hover': { bgcolor: 'action.hover' }, bgcolor: data.price === 0 ? 'warning.50' : 'inherit' }}>
+                              <TableCell>
+                                <Typography variant='body2' fontWeight={600}>{data.name}</Typography>
+                                <Typography variant='caption' color='text.secondary'>{data.productNo}</Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={data.packSize} size='small' variant='outlined' color={data.price === 0 ? 'warning' : 'default'} />
+                              </TableCell>
+                              <TableCell align='right'>
+                                {data.price > 0 ? 
+                                  <Typography variant='body2' fontWeight={600}>Rs. {data.price.toLocaleString()}</Typography> : 
+                                  <Typography variant='body2' fontWeight={600} color='warning.main'>Not Set</Typography>
+                                }
+                              </TableCell>
+                              <TableCell align='right'>
+                                <Chip label={data.scans} size='small' color='primary' />
+                              </TableCell>
+                              <TableCell align='right'>
+                                <Typography variant='body1' fontWeight={700} color={data.price > 0 ? 'success.main' : 'warning.main'}>
+                                  Rs. {(data.price * data.totalQty).toLocaleString()}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ); 
+                        })()}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <Box sx={{ mt: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant='body1' fontWeight={700} color='success.dark'>Grand Total Estimated Value:</Typography>
+                    <Typography variant='h5' fontWeight={800} color='success.dark'>
+                      Rs. {scanHistory.reduce((total, scan) => { 
+                        const product = products.find(p => 
+                          p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
+                          p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+                        ); 
+                        const price = product ? product.price : (scan.price || 0);
+                        return total + price; 
+                      }, 0).toLocaleString()}
+                    </Typography>
+                  </Box>
+                  <Typography variant='caption' color='text.secondary' sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
+                    Click to view complete price estimation
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
             
             {/* Advanced Insights Section */}
             <Grid item xs={12}>
@@ -4555,148 +5267,7 @@ function App() {
               </Paper>
             </Grid>
             
-            <Grid item xs={12}>
-              <Card 
-                sx={{ 
-                  cursor: 'pointer',
-                  transition: 'all 0.3s',
-                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
-                }}
-                onClick={() => {
-                  const productStats = scanHistory.reduce((acc, scan) => { 
-                    const product = products.find(p => 
-                      p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
-                      p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
-                    ); 
-                    const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
-                    if (!acc[key]) { 
-                      acc[key] = { 
-                        productNo: scan.productNo,
-                        name: product ? product.name : scan.productName || 'Unknown Product',
-                        packSize: scan.qty || 'N/A', 
-                        price: product ? product.price : (scan.price || 0),
-                        scans: 0, 
-                        totalQty: 0 
-                      }; 
-                    } 
-                    acc[key].scans += 1; 
-                    acc[key].totalQty += 1; 
-                    return acc; 
-                  }, {}); 
-                  const sortedData = Object.entries(productStats)
-                    .sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty))
-                    .map(([key, data]) => ({
-                      productName: data.name,
-                      packSize: data.packSize,
-                      unitPrice: data.price || 0,
-                      totalScans: data.scans,
-                      estimatedValue: (data.price || 0) * data.totalQty
-                    }));
-                  setExpandedCardDialog({ open: true, type: 'priceEstimation', data: sortedData });
-                }}
-              >
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant='h6' sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
-                      💵 Price Estimation by Product
-                    </Typography>
-                    {(() => {
-                      const productStats = scanHistory.reduce((acc, scan) => { 
-                        const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
-                        if (!acc[key]) acc[key] = true;
-                        return acc; 
-                      }, {});
-                      const totalProducts = Object.keys(productStats).length;
-                      return totalProducts > 6 && (
-                        <Chip 
-                          label={`+${totalProducts - 6} more`}
-                          size='small'
-                          color='primary'
-                        />
-                      );
-                    })()}
-                  </Box>
-                  <TableContainer sx={{ overflowX: 'auto' }}>
-                    <Table size='small'>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Pack Size</TableCell>
-                          <TableCell align='right' sx={{ fontWeight: 700 }}>Unit Price</TableCell>
-                          <TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell>
-                          <TableCell align='right' sx={{ fontWeight: 700 }}>Est. Value</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {(() => { 
-                          const productStats = scanHistory.reduce((acc, scan) => { 
-                            const product = products.find(p => 
-                              p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
-                              p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
-                            ); 
-                            const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
-                            if (!acc[key]) { 
-                              acc[key] = { 
-                                productNo: scan.productNo,
-                                name: product ? product.name : scan.productName || 'Unknown Product',
-                                packSize: scan.qty || 'N/A', 
-                                price: product ? product.price : (scan.price || 0),
-                                scans: 0, 
-                                totalQty: 0 
-                              }; 
-                            } 
-                            acc[key].scans += 1; 
-                            acc[key].totalQty += 1; 
-                            return acc; 
-                          }, {}); 
-                          return Object.entries(productStats).sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty)).slice(0, 6).map(([key, data]) => 
-                            <TableRow key={key} sx={{ '&:hover': { bgcolor: 'action.hover' }, bgcolor: data.price === 0 ? 'warning.50' : 'inherit' }}>
-                              <TableCell>
-                                <Typography variant='body2' fontWeight={600}>{data.name}</Typography>
-                                <Typography variant='caption' color='text.secondary'>{data.productNo}</Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Chip label={data.packSize} size='small' variant='outlined' color={data.price === 0 ? 'warning' : 'default'} />
-                              </TableCell>
-                              <TableCell align='right'>
-                                {data.price > 0 ? 
-                                  <Typography variant='body2' fontWeight={600}>Rs. {data.price.toLocaleString()}</Typography> : 
-                                  <Typography variant='body2' fontWeight={600} color='warning.main'>Not Set</Typography>
-                                }
-                              </TableCell>
-                              <TableCell align='right'>
-                                <Chip label={data.scans} size='small' color='primary' />
-                              </TableCell>
-                              <TableCell align='right'>
-                                <Typography variant='body1' fontWeight={700} color={data.price > 0 ? 'success.main' : 'warning.main'}>
-                                  Rs. {(data.price * data.totalQty).toLocaleString()}
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
-                          ); 
-                        })()}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant='body1' fontWeight={700} color='success.dark'>Grand Total Estimated Value:</Typography>
-                    <Typography variant='h5' fontWeight={800} color='success.dark'>
-                      Rs. {scanHistory.reduce((total, scan) => { 
-                        const product = products.find(p => 
-                          p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
-                          p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
-                        ); 
-                        const price = product ? product.price : (scan.price || 0);
-                        return total + price; 
-                      }, 0).toLocaleString()}
-                    </Typography>
-                  </Box>
-                  <Typography variant='caption' color='text.secondary' sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
-                    Click to view complete price estimation
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
+            {/* Price Estimation card moved next to Top Cities */}
             
             <Grid item xs={12}>
               <Card 
