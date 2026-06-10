@@ -153,6 +153,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [reprintRequests, setReprintRequests] = useState([]);
   const [openReprintDialog, setOpenReprintDialog] = useState(false);
   const [selectedQRForReprint, setSelectedQRForReprint] = useState(null);
+  const [selectedQRIdsForReprint, setSelectedQRIdsForReprint] = useState([]);
   const [reprintReason, setReprintReason] = useState('');
   
   // Form states
@@ -679,7 +680,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   };
 
   const handleRequestReprint = async () => {
-    if (!selectedQRForReprint || !reprintReason.trim()) {
+    if (selectedQRIdsForReprint.length === 0 || !reprintReason.trim()) {
       onShowNotification('Please enter a reason for reprint', 'error');
       return;
     }
@@ -687,11 +688,13 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     try {
       setLoading(true);
       await api.post('/qr-codes/reprint-requests', {
-        qrCodeId: selectedQRForReprint._id,
+        qrCodeIds: selectedQRIdsForReprint,
         reason: reprintReason
       });
-      onShowNotification('Reprint request submitted to Main Admin successfully', 'success');
+      onShowNotification(`Submitted reprint request for ${selectedQRIdsForReprint.length} QR code(s) to Main Admin.`, 'success');
       setOpenReprintDialog(false);
+      setSelectedQRIdsForReprint([]);
+      setSelectedQRForReprint(null);
       loadData();
     } catch (error) {
       onShowNotification('Error requesting reprint: ' + (error.response?.data?.error || error.message), 'error');
@@ -1221,7 +1224,10 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     return qr && qr.status !== 'generated' && !qr.reprintApproved;
                   });
                   if (requireReprint.length > 0) {
-                    onShowNotification('Some of the selected QR codes have already been printed. Please request reprint approval for them individually in the table.', 'error');
+                    setSelectedQRForReprint(null);
+                    setSelectedQRIdsForReprint(requireReprint);
+                    setReprintReason('');
+                    setOpenReprintDialog(true);
                   } else {
                     printQRLabels(selectedForPrint);
                   }
@@ -1501,10 +1507,16 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           ⚠️ Request Reprint Approval
         </DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
-          <Typography variant="body2" sx={{ mb: 2 }} color="textSecondary">
-            This QR code (Batch: {selectedQRForReprint?.batchNo}, Pkg: {selectedQRForReprint?.packageNo || 'N/A'}) has already been printed. 
-            Co-admins require reprint approval from the Main Admin to print it again.
-          </Typography>
+          {selectedQRForReprint ? (
+            <Typography variant="body2" sx={{ mb: 2 }} color="textSecondary">
+              This QR code (Batch: {selectedQRForReprint?.batchNo}, Pkg: {selectedQRForReprint?.packageNo || 'N/A'}) has already been printed. 
+              Co-admins require reprint approval from the Main Admin to print it again.
+            </Typography>
+          ) : (
+            <Typography variant="body2" sx={{ mb: 2 }} color="textSecondary">
+              You are requesting reprint approval for <strong>{selectedQRIdsForReprint.length}</strong> selected QR code(s) that have already been printed.
+            </Typography>
+          )}
           <TextField
             fullWidth
             multiline
@@ -1948,6 +1960,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                             onClick={() => {
                               if (!isMainAdmin && qr.status !== 'generated' && !qr.reprintApproved) {
                                 setSelectedQRForReprint(qr);
+                                setSelectedQRIdsForReprint([qr._id]);
                                 setReprintReason('');
                                 setOpenReprintDialog(true);
                               } else {

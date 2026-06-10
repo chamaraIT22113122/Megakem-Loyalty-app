@@ -790,35 +790,55 @@ router.get('/scan-logs', protect, qrAdmin, async (req, res) => {
 // @access  Private/Co-Admin with QR Access
 router.post('/reprint-requests', protect, qrAdmin, async (req, res) => {
   try {
-    const { qrCodeId, reason } = req.body;
-    if (!qrCodeId || !reason) {
-      return res.status(400).json({ error: 'qrCodeId and reason are required' });
+    const { qrCodeId, qrCodeIds, reason } = req.body;
+    if (!reason) {
+      return res.status(400).json({ error: 'reason is required' });
     }
 
-    const qrCode = await QRCodeModel.findById(qrCodeId);
-    if (!qrCode) {
-      return res.status(404).json({ error: 'QR Code not found' });
+    let ids = [];
+    if (qrCodeId) {
+      ids.push(qrCodeId);
+    } else if (qrCodeIds && Array.isArray(qrCodeIds)) {
+      ids = qrCodeIds;
+    }
+
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'qrCodeId or qrCodeIds array is required' });
+    }
+
+    // Find all matching QR codes
+    const qrCodes = await QRCodeModel.find({ _id: { $in: ids } });
+    if (qrCodes.length === 0) {
+      return res.status(404).json({ error: 'No matching QR Codes found' });
     }
 
     // Check if there is already a pending or approved request
-    const existing = await ReprintRequest.findOne({
-      qrCode: qrCodeId,
+    const existing = await ReprintRequest.find({
+      qrCode: { $in: ids },
       status: { $in: ['pending', 'approved'] }
     });
 
-    if (existing) {
-      return res.status(400).json({ error: `There is already a ${existing.status} reprint request for this QR code.` });
+    const existingIds = new Set(existing.map(r => r.qrCode.toString()));
+    const idsToCreate = ids.filter(id => !existingIds.has(id.toString()));
+
+    if (idsToCreate.length === 0) {
+      return res.status(400).json({ error: 'All selected QR codes already have pending or approved reprint requests.' });
     }
 
-    const request = new ReprintRequest({
-      qrCode: qrCodeId,
+    const newRequests = idsToCreate.map(id => ({
+      qrCode: id,
       requestedBy: req.user.id,
       requestedByEmail: req.user.email,
       reason
-    });
+    }));
 
-    await request.save();
-    res.status(201).json({ success: true, data: request });
+    const createdRequests = await ReprintRequest.insertMany(newRequests);
+
+    res.status(201).json({
+      success: true,
+      message: `Submitted ${createdRequests.length} reprint request(s).`,
+      data: createdRequests
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
