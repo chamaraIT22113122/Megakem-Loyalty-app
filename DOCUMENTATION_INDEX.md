@@ -290,6 +290,7 @@ Found an error or unclear section?
 
 ### Already Existing
 
+- **MANUAL_SCAN_FEATURE.md** - Manual Scan Input feature summary
 - **DEPLOYMENT.md** - Deployment procedures
 - **BACKEND_DEPLOYMENT_STEPS.md** - Backend setup
 - **ADMIN_USER_CREATION.md** - Creating admin users
