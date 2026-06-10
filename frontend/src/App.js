@@ -3,7 +3,7 @@ import { Box, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent,
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
-import { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI } from './services/api';
+import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI } from './services/api';
 import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import megakemLogo from './assets/MegakemLogo.png';
@@ -559,6 +559,11 @@ function App() {
   });
   const [adminPassword, setAdminPassword] = useState('');
   const [adminTab, setAdminTab] = useState('dashboard');
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [coAdminApprovedCount, setCoAdminApprovedCount] = useState(0);
+  const [coAdminRequestsDialogOpen, setCoAdminRequestsDialogOpen] = useState(false);
+  const [coAdminRequests, setCoAdminRequests] = useState([]);
+  const [coAdminTabVal, setCoAdminTabVal] = useState(0);
   const [userLoginEmail, setUserLoginEmail] = useState('');
   const [userLoginPassword, setUserLoginPassword] = useState('');
   const [showUserLogin, setShowUserLogin] = useState(false);
@@ -1693,8 +1698,38 @@ function App() {
 
       setLoyaltyConfig(loyaltyConfigRes.data?.data || null);
       console.log('✅ Products loaded:', productsRes.data?.data?.length || 0, 'products');
+      if (isMainAdmin()) {
+        loadPendingRequestsCount();
+      } else {
+        loadCoAdminRequests();
+      }
     } catch (error) {
       console.error('❌ Error loading admin data:', error);
+    }
+  };
+
+  const loadPendingRequestsCount = async () => {
+    if (!adminAuth) return;
+    try {
+      const res = await api.get('/qr-codes/reprint-requests');
+      const requests = res.data?.data || [];
+      const pendingCount = requests.filter(r => r.status === 'pending').length;
+      setPendingRequestsCount(pendingCount);
+    } catch (err) {
+      console.error('Failed to load pending reprint requests count:', err);
+    }
+  };
+
+  const loadCoAdminRequests = async () => {
+    if (!adminAuth) return;
+    try {
+      const res = await api.get('/qr-codes/reprint-requests');
+      const requests = res.data?.data || [];
+      setCoAdminRequests(requests);
+      const approvedCount = requests.filter(r => r.status === 'approved').length;
+      setCoAdminApprovedCount(approvedCount);
+    } catch (err) {
+      console.error('Failed to load co-admin requests:', err);
     }
   };
 
@@ -1866,6 +1901,11 @@ function App() {
       if (view === 'admin') {
         const interval = setInterval(() => {
           scansAPI.getLive().then(res => setScanHistory(res.data.data)).catch(console.error);
+          if (isMainAdmin()) {
+            loadPendingRequestsCount();
+          } else {
+            loadCoAdminRequests();
+          }
         }, 5000);
         return () => clearInterval(interval);
       }
@@ -2709,6 +2749,23 @@ function App() {
           <Typography variant='h6' component='div' sx={{ fontWeight: 700, letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)', lineHeight: 1.2, fontSize: { xs: '0.9rem', sm: '1.25rem' } }}>MEGAKEM LOYALTY</Typography>
           <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: { xs: '0.55rem', sm: '0.65rem' }, opacity: 0.9, display: { xs: 'none', sm: 'block' } }}>WHERE TRUST MEETS EXCELLENCE</Typography>
         </Box>
+        {adminAuth && view === 'admin' && !isMainAdmin() && (
+          <Tooltip title="My Requests & Notifications">
+            <IconButton 
+              color='inherit' 
+              onClick={() => setCoAdminRequestsDialogOpen(true)} 
+              sx={{ 
+                mr: 2, 
+                bgcolor: 'rgba(255,255,255,0.1)', 
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+              }}
+            >
+              <Badge badgeContent={coAdminApprovedCount} color="error">
+                <Notifications />
+              </Badge>
+            </IconButton>
+          </Tooltip>
+        )}
         {adminAuth && view === 'admin' && (
           <Button color='inherit' onClick={handleAdminLogout} sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>Logout</Button>
         )}
@@ -3868,7 +3925,17 @@ function App() {
               {hasPermission('canViewDashboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
-              {isMainAdmin() && <Tab icon={<Notifications />} label='Reprint Requests' value='reprint-requests' />}
+              {isMainAdmin() && (
+                <Tab 
+                  icon={
+                    <Badge badgeContent={pendingRequestsCount} color="error">
+                      <Notifications />
+                    </Badge>
+                  } 
+                  label="Co-Admin Requests" 
+                  value="reprint-requests" 
+                />
+              )}
               {hasPermission('canManageApplicators') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
               <Tab icon={<Settings />} label='Profile' value='profile' />
             </Tabs>
@@ -6457,7 +6524,7 @@ function App() {
 
           {/* Reprint Requests Tab */}
           {adminTab === 'reprint-requests' && isMainAdmin() && <Box>
-            <ReprintRequestsPanel onShowNotification={showNotification} />
+            <ReprintRequestsPanel onShowNotification={showNotification} onRequestsChanged={loadPendingRequestsCount} />
           </Box>}
 
           {/* Profile Settings Tab */}
@@ -9558,6 +9625,187 @@ function App() {
             disabled={!hardwareFormData.name}
           >
             {hardwareDialog.data ? 'Update' : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Co-Admin Requests Dialog */}
+      <Dialog 
+        open={coAdminRequestsDialogOpen} 
+        onClose={() => setCoAdminRequestsDialogOpen(false)} 
+        maxWidth='md' 
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'primary.main', color: 'white' }}>
+          <Notifications /> My Print & Reprint Requests
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+            <Tabs 
+              value={coAdminTabVal} 
+              onChange={(e, v) => setCoAdminTabVal(v)} 
+              variant="fullWidth"
+            >
+              <Tab 
+                label={`Approved (${coAdminRequests.filter(r => r.status === 'approved').length})`} 
+                sx={{ fontWeight: 'bold' }} 
+              />
+              <Tab 
+                label={`Pending (${coAdminRequests.filter(r => r.status === 'pending').length})`} 
+                sx={{ fontWeight: 'bold' }} 
+              />
+              <Tab 
+                label="History" 
+                sx={{ fontWeight: 'bold' }} 
+              />
+            </Tabs>
+          </Box>
+          <Box sx={{ p: 3, maxHeight: 400, overflowY: 'auto' }}>
+            {coAdminTabVal === 0 && (
+              <Box>
+                <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2 }}>
+                  These reprint requests have been approved by the main admin. You can now reprint these labels in the QR Codes tab.
+                </Typography>
+                {coAdminRequests.filter(r => r.status === 'approved').length === 0 ? (
+                  <Typography color="textSecondary" align="center" sx={{ py: 4 }}>
+                    No approved requests.
+                  </Typography>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: 'grey.50' }}>
+                        <TableRow>
+                          <TableCell><strong>Approved Time</strong></TableCell>
+                          <TableCell><strong>Product</strong></TableCell>
+                          <TableCell><strong>Batch & Pkg</strong></TableCell>
+                          <TableCell><strong>Reason</strong></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {coAdminRequests.filter(r => r.status === 'approved').map(req => (
+                          <TableRow key={req._id} hover>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              {req.approvedAt ? new Date(req.approvedAt).toLocaleString() : new Date(req.updatedAt).toLocaleString()}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              {req.qrCode?.productName || '-'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              <Chip label={`B: ${req.qrCode?.batchNo || '-'}`} size="small" variant="outlined" sx={{ mr: 0.5 }} />
+                              <Chip label={`P: ${req.qrCode?.packageNo || '-'}`} size="small" variant="outlined" />
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              {req.reason}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            )}
+
+            {coAdminTabVal === 1 && (
+              <Box>
+                <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2 }}>
+                  These requests are currently awaiting approval from the main admin.
+                </Typography>
+                {coAdminRequests.filter(r => r.status === 'pending').length === 0 ? (
+                  <Typography color="textSecondary" align="center" sx={{ py: 4 }}>
+                    No pending requests.
+                  </Typography>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: 'grey.50' }}>
+                        <TableRow>
+                          <TableCell><strong>Requested Time</strong></TableCell>
+                          <TableCell><strong>Product</strong></TableCell>
+                          <TableCell><strong>Batch & Pkg</strong></TableCell>
+                          <TableCell><strong>Reason</strong></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {coAdminRequests.filter(r => r.status === 'pending').map(req => (
+                          <TableRow key={req._id} hover>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              {new Date(req.createdAt).toLocaleString()}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              {req.qrCode?.productName || '-'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              <Chip label={`B: ${req.qrCode?.batchNo || '-'}`} size="small" variant="outlined" sx={{ mr: 0.5 }} />
+                              <Chip label={`P: ${req.qrCode?.packageNo || '-'}`} size="small" variant="outlined" />
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              {req.reason}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            )}
+
+            {coAdminTabVal === 2 && (
+              <Box>
+                {coAdminRequests.filter(r => ['rejected', 'completed'].includes(r.status)).length === 0 ? (
+                  <Typography color="textSecondary" align="center" sx={{ py: 4 }}>
+                    No request history.
+                  </Typography>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: 'grey.50' }}>
+                        <TableRow>
+                          <TableCell><strong>Time</strong></TableCell>
+                          <TableCell><strong>Product</strong></TableCell>
+                          <TableCell><strong>Batch & Pkg</strong></TableCell>
+                          <TableCell><strong>Reason</strong></TableCell>
+                          <TableCell><strong>Status</strong></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {coAdminRequests.filter(r => ['rejected', 'completed'].includes(r.status)).map(req => (
+                          <TableRow key={req._id} hover>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              {new Date(req.updatedAt).toLocaleString()}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              {req.qrCode?.productName || '-'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              <Chip label={`B: ${req.qrCode?.batchNo || '-'}`} size="small" variant="outlined" sx={{ mr: 0.5 }} />
+                              <Chip label={`P: ${req.qrCode?.packageNo || '-'}`} size="small" variant="outlined" />
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.85rem' }}>
+                              {req.reason}
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={req.status.toUpperCase()} 
+                                size="small" 
+                                color={req.status === 'completed' ? 'success' : 'error'} 
+                                sx={{ fontWeight: 'bold' }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Button onClick={() => setCoAdminRequestsDialogOpen(false)} variant='contained' color='primary'>
+            Close
           </Button>
         </DialogActions>
       </Dialog>

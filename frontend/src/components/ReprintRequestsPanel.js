@@ -24,7 +24,7 @@ import {
 } from '@mui/icons-material';
 import api from '../services/api';
 
-const ReprintRequestsPanel = ({ onShowNotification }) => {
+const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
   const [loading, setLoading] = useState(false);
   const [requests, setRequests] = useState([]);
 
@@ -50,6 +50,7 @@ const ReprintRequestsPanel = ({ onShowNotification }) => {
       await api.put(`/qr-codes/reprint-requests/${id}/approve`);
       onShowNotification('Reprint request approved successfully', 'success');
       loadRequests();
+      if (onRequestsChanged) onRequestsChanged();
     } catch (error) {
       onShowNotification('Error approving request: ' + (error.response?.data?.error || error.message), 'error');
       setLoading(false);
@@ -62,6 +63,7 @@ const ReprintRequestsPanel = ({ onShowNotification }) => {
       await api.put(`/qr-codes/reprint-requests/${id}/reject`);
       onShowNotification('Reprint request rejected successfully', 'success');
       loadRequests();
+      if (onRequestsChanged) onRequestsChanged();
     } catch (error) {
       onShowNotification('Error rejecting request: ' + (error.response?.data?.error || error.message), 'error');
       setLoading(false);
@@ -72,7 +74,7 @@ const ReprintRequestsPanel = ({ onShowNotification }) => {
     <Box sx={{ p: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Notifications color="primary" /> Co-Admin Reprint Requests
+          <Notifications color="primary" /> Co-Admin Requests
         </Typography>
         <Button
           variant="outlined"
