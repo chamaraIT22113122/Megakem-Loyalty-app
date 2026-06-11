@@ -589,7 +589,9 @@ function App() {
     bagNo: '',
     qty: '',
     price: 0,
-    location: ''
+    location: '',
+    batchIndex: '',
+    mfgDate: ''
   });
   const [manualScanLoading, setManualScanLoading] = useState(false);
   const [showManualScanForm, setShowManualScanForm] = useState(false);
@@ -624,6 +626,49 @@ function App() {
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
   const [memberTierFilter, setMemberTierFilter] = useState('all');
   const [memberSortKey, setMemberSortKey] = useState('points-desc');
+
+  // Auto-generate batch number from manual scan form inputs
+  useEffect(() => {
+    const formatMfgDate = (dateStr) => {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const year = parts[0].substring(2); // YY
+        const month = parts[1]; // MM
+        const day = parts[2]; // DD
+        return `${day}${month}${year}`;
+      }
+      return '';
+    };
+
+    const padNumber = (numStr, length) => {
+      if (!numStr) return '';
+      const clean = numStr.toString().trim();
+      return clean.padStart(length, '0');
+    };
+
+    const prodNo = manualScanForm.productNo || '';
+    const index = padNumber(manualScanForm.batchIndex || '', 3);
+    const mfg = formatMfgDate(manualScanForm.mfgDate || '');
+    const bag = padNumber(manualScanForm.bagNo || '', 3);
+
+    if (prodNo && index && mfg && bag) {
+      setManualScanForm(prev => {
+        const newBatchNo = `${prodNo} ${index} ${mfg} ${bag}`;
+        if (prev.batchNo !== newBatchNo) {
+          return { ...prev, batchNo: newBatchNo };
+        }
+        return prev;
+      });
+    } else {
+      setManualScanForm(prev => {
+        if (prev.batchNo !== '') {
+          return { ...prev, batchNo: '' };
+        }
+        return prev;
+      });
+    }
+  }, [manualScanForm.productNo, manualScanForm.batchIndex, manualScanForm.mfgDate, manualScanForm.bagNo]);
 
   // Local storage persistence for scan user session and cart
   useEffect(() => {
@@ -5740,24 +5785,37 @@ function App() {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={3}>
                     <TextField
                       fullWidth
-                      label="Batch Number"
+                      label="Number of which batch"
                       required
-                      value={manualScanForm.batchNo}
-                      onChange={(e) => setManualScanForm({...manualScanForm, batchNo: e.target.value})}
-                      placeholder="e.g., MKL39 001 050525 020"
+                      value={manualScanForm.batchIndex || ''}
+                      onChange={(e) => setManualScanForm({...manualScanForm, batchIndex: e.target.value})}
+                      placeholder="e.g., 010"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      fullWidth
+                      label="Manufacture Date"
+                      type="date"
+                      required
+                      InputLabelProps={{ shrink: true }}
+                      value={manualScanForm.mfgDate || ''}
+                      onChange={(e) => setManualScanForm({...manualScanForm, mfgDate: e.target.value})}
                       size="small"
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Bag/Package Number (Optional)"
+                      label="Bag/Package Number"
+                      required
                       value={manualScanForm.bagNo}
                       onChange={(e) => setManualScanForm({...manualScanForm, bagNo: e.target.value})}
-                      placeholder="e.g., 020"
+                      placeholder="e.g., 050"
                       size="small"
                     />
                   </Grid>
@@ -5784,6 +5842,20 @@ function App() {
                       helperText="Points will be calculated automatically"
                     />
                   </Grid>
+                  {manualScanForm.batchNo && (
+                    <Grid item xs={12}>
+                      <Box sx={{ p: 2, bgcolor: 'primary.lighter', borderRadius: 2, border: '1px dashed', borderColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.dark' }}>
+                          Generated Batch Code:
+                        </Typography>
+                        <Chip 
+                          label={manualScanForm.batchNo} 
+                          color="primary" 
+                          sx={{ fontWeight: 'bold', letterSpacing: '1px' }} 
+                        />
+                      </Box>
+                    </Grid>
+                  )}
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
@@ -5809,7 +5881,9 @@ function App() {
                             bagNo: '',
                             qty: '',
                             price: 0,
-                            location: ''
+                            location: '',
+                            batchIndex: '',
+                            mfgDate: ''
                           });
                         }}
                         size="small"
@@ -5840,7 +5914,9 @@ function App() {
                                 bagNo: '',
                                 qty: '',
                                 price: 0,
-                                location: ''
+                                location: '',
+                                batchIndex: '',
+                                mfgDate: ''
                               });
                               // Hide form on success to show updated scans
                               setShowManualScanForm(false);
