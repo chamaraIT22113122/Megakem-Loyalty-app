@@ -718,7 +718,7 @@ function App() {
     }
   }, [manualScanForm.memberId, members]);
 
-  // Set default expiryDate to 2 years after mfgDate
+  // Set default expiryDate to 2 years after mfgDate (auto-update when mfgDate changes, but keep manual override possible)
   useEffect(() => {
     if (manualScanForm.mfgDate) {
       const mfg = new Date(manualScanForm.mfgDate);
@@ -726,7 +726,7 @@ function App() {
         mfg.setFullYear(mfg.getFullYear() + 2);
         const expStr = mfg.toISOString().split('T')[0];
         setManualScanForm(prev => {
-          if (!prev.expiryDate) {
+          if (prev.expiryDate !== expStr) {
             return { ...prev, expiryDate: expStr };
           }
           return prev;
@@ -6130,21 +6130,92 @@ function App() {
                   <Divider sx={{ my: 1 }} />
                   <Typography variant='body2' color='text.secondary'>Product: <Box component='span' color='text.primary' fontWeight={600}>{item.productName}</Box></Typography>
                   <Typography variant='body2' color='text.secondary'>PRODUCT: {item.productNo}</Typography>
-                  <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
-                    <Chip label={`Batch: ${item.batchNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
-                    <Chip label={`Bag: ${item.bagNo}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem' }} />
-                    {item.qty && <Chip label={item.qty} size='small' variant='outlined' sx={{ fontSize: '0.7rem', bgcolor: 'success.light', color: 'success.dark', fontWeight: 600 }} />}
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Chip 
+                      label={`Batch: ${item.batchNo}`} 
+                      size='small' 
+                      sx={{ 
+                        borderRadius: '6px', 
+                        fontSize: '0.7rem', 
+                        bgcolor: 'background.paper', 
+                        border: '1px solid', 
+                        borderColor: 'divider', 
+                        color: 'text.secondary',
+                        height: 24,
+                        fontWeight: 500
+                      }} 
+                    />
+                    <Chip 
+                      label={`Bag: ${item.bagNo}`} 
+                      size='small' 
+                      sx={{ 
+                        borderRadius: '6px', 
+                        fontSize: '0.7rem', 
+                        bgcolor: 'background.paper', 
+                        border: '1px solid', 
+                        borderColor: 'divider', 
+                        color: 'text.secondary',
+                        height: 24,
+                        fontWeight: 500
+                      }} 
+                    />
+                    {item.qty && (
+                      <Chip 
+                        label={item.qty} 
+                        size='small' 
+                        sx={{ 
+                          borderRadius: '6px', 
+                          fontSize: '0.7rem', 
+                          bgcolor: '#10b981', 
+                          color: 'white', 
+                          fontWeight: 'bold',
+                          height: 24
+                        }} 
+                      />
+                    )}
                     {item.price > 0 ? (
-                      <Chip label={`Rs. ${item.price.toLocaleString()}`} size='small' variant='outlined' sx={{ fontSize: '0.7rem', bgcolor: 'primary.light', color: 'primary.dark', fontWeight: 600 }} />
+                      <Chip 
+                        label={`Rs. ${item.price.toLocaleString()}`} 
+                        size='small' 
+                        sx={{ 
+                          borderRadius: '6px', 
+                          fontSize: '0.7rem', 
+                          bgcolor: '#2d6a8b', 
+                          color: 'white', 
+                          fontWeight: 'bold',
+                          height: 24
+                        }} 
+                      />
                     ) : (
-                      <Chip label="⚠️ Price Not Set" size='small' variant='outlined' sx={{ fontSize: '0.7rem', bgcolor: 'warning.light', color: 'warning.dark', fontWeight: 600 }} />
+                      <Chip 
+                        label="⚠️ Price Not Set" 
+                        size='small' 
+                        sx={{ 
+                          borderRadius: '6px', 
+                          fontSize: '0.7rem', 
+                          bgcolor: 'warning.light', 
+                          color: 'warning.dark', 
+                          fontWeight: 'bold',
+                          height: 24
+                        }} 
+                      />
                     )}
                     {item.points !== undefined && (
-                      <Chip label={`✨ ${item.points} pts`} size='small' color='secondary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                      <Chip 
+                        label={`✨ ${item.points} pts`} 
+                        size='small' 
+                        color='secondary' 
+                        sx={{ 
+                          borderRadius: '6px', 
+                          fontSize: '0.7rem', 
+                          fontWeight: 'bold',
+                          height: 24
+                        }} 
+                      />
                     )}
                   </Box>
                   {item.price === 0 && (
-                    <Box sx={{ mt: 1, p: 1, bgcolor: 'warning.light', borderRadius: 1, border: '1px solid', borderColor: 'warning.main' }}>
+                    <Box sx={{ mt: 1, p: 1, bgcolor: 'warning.lighter', borderRadius: 1, border: '1px solid', borderColor: 'warning.light' }}>
                       <Typography variant='caption' color='warning.dark' sx={{ fontSize: '0.7rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         ⚠️ Product with pack size "{item.qty}" not found in Products tab. Please add it to set the correct price.
                       </Typography>
@@ -6154,8 +6225,8 @@ function App() {
                     const batchInfo = parseBatchInfo(item.batchNo);
                     if (batchInfo?.parsed) {
                       return (
-                        <Box sx={{ mt: 1, p: 0.75, bgcolor: 'action.hover', borderRadius: 0.5 }}>
-                          <Typography variant='caption' color='text.secondary' sx={{ fontSize: '0.65rem' }}>
+                        <Box sx={{ mt: 1.5, p: 1.25, bgcolor: '#f1f5f9', borderRadius: 1.5, display: 'flex', alignItems: 'center' }}>
+                          <Typography variant='caption' color='text.secondary' sx={{ fontSize: '0.75rem', fontWeight: 500, letterSpacing: '0.2px' }}>
                             📦 {batchInfo.productCode} • Batch {batchInfo.materialBatch} • {batchInfo.date} • Pack {batchInfo.packSize} #{batchInfo.packNo}
                           </Typography>
                         </Box>
