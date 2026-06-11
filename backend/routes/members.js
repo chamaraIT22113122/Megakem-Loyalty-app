@@ -738,11 +738,12 @@ router.delete('/:id', protect, async (req, res) => {
     const isCoAdmin = req.user.role === 'co-admin';
     const hasUsersPerm = req.user.permissions?.canManageUsers === true;
     const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
+    const hasDeletePerm = req.user.permissions?.canDelete === true;
 
-    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm))) {
+    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm) && hasDeletePerm)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied'
+        message: 'Access denied. Delete permission required.'
       });
     }
 
@@ -790,11 +791,12 @@ router.post('/bulk-delete', protect, async (req, res) => {
     const isCoAdmin = req.user.role === 'co-admin';
     const hasUsersPerm = req.user.permissions?.canManageUsers === true;
     const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
+    const hasDeletePerm = req.user.permissions?.canDelete === true;
 
-    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm))) {
+    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm) && hasDeletePerm)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied'
+        message: 'Access denied. Delete permission required.'
       });
     }
 

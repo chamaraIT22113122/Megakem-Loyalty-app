@@ -1816,6 +1816,10 @@ function App() {
 
   const handleBulkDelete = async () => {
     if (selectedApplicators.length === 0) return;
+    if (!hasPermission('canDelete')) {
+      showNotification('You do not have permission to delete members', 'error');
+      return;
+    }
     if (window.confirm(`Are you sure you want to delete the ${selectedApplicators.length} selected members? This will permanently delete their profiles.`)) {
       setLoading(true);
       try {
@@ -2381,7 +2385,7 @@ function App() {
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (!hasPermission('canManageProducts')) {
+    if (!hasPermission('canManageProducts') || !hasPermission('canDelete')) {
       showNotification('You do not have permission to delete products', 'error');
       return;
     }
@@ -7033,7 +7037,7 @@ function App() {
                             <Box sx={{ display: 'flex', gap: 0.5 }}>
                               <IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Edit Product'><Edit /></IconButton>
                               <IconButton size='small' color='primary' onClick={() => setProductPointsDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Configure Points'><EmojiEvents /></IconButton>
-                              <IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts')} title='Delete Product'><Delete /></IconButton>
+                              <IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts') || !hasPermission('canDelete')} title='Delete Product'><Delete /></IconButton>
                             </Box>
                           </TableCell>
                         </TableRow>
@@ -7063,6 +7067,7 @@ function App() {
                     color='error'
                     startIcon={<Delete />}
                     onClick={handleBulkDelete}
+                    disabled={!hasPermission('canDelete')}
                   >
                     Delete Selected ({selectedApplicators.length})
                   </Button>
@@ -7525,6 +7530,7 @@ function App() {
                                           }
                                         }
                                       }}
+                                      disabled={!hasPermission('canDelete')}
                                     >
                                       <Delete />
                                     </IconButton>

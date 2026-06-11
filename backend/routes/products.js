@@ -134,7 +134,7 @@ router.put('/:id', protect, hasPermission('canManageProducts'), async (req, res)
 // @route   DELETE /api/products/:id
 // @desc    Delete product
 // @access  Private (Admin only)
-router.delete('/:id', protect, hasPermission('canManageProducts'), async (req, res) => {
+router.delete('/:id', protect, hasPermission('canManageProducts'), hasPermission('canDelete'), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
 

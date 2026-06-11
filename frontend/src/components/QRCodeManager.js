@@ -748,6 +748,10 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   };
 
   const deleteQRCodes = async (qrIds) => {
+    if (!hasPermission('canDelete')) {
+      onShowNotification('You do not have permission to delete QR codes', 'error');
+      return;
+    }
     if (window.confirm('Are you sure you want to delete these QR codes?')) {
       try {
         setLoading(true);
