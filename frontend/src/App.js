@@ -5653,7 +5653,7 @@ function App() {
               >
                 Export CSV
               </Button>
-              {isMainAdmin() && (
+              {hasPermission('canViewScans') && (
                 <Button 
                   variant='contained' 
                   startIcon={<Add />} 
@@ -5666,7 +5666,7 @@ function App() {
               )}
             </Box>
 
-            {showManualScanForm && isMainAdmin() && (
+            {showManualScanForm && hasPermission('canViewScans') && (
               <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
                   📝 Record Manual Scan (Old Products)
