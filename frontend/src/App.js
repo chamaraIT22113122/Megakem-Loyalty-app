@@ -687,6 +687,9 @@ function App() {
           if (prev.role !== roleFromId) {
             updates.role = roleFromId;
           }
+          if (foundMember.location && prev.location !== foundMember.location) {
+            updates.location = foundMember.location;
+          }
           if (Object.keys(updates).length > 0) {
             return { ...prev, ...updates };
           }
@@ -5832,7 +5835,8 @@ function App() {
                         onChange={(event, newValue) => {
                           setManualScanForm(prev => ({
                             ...prev,
-                            connectedHardware: newValue ? newValue.memberName : ''
+                            connectedHardware: newValue ? newValue.memberName : '',
+                            location: newValue && newValue.location ? newValue.location : prev.location
                           }));
                         }}
                         renderInput={(params) => (
@@ -5860,7 +5864,8 @@ function App() {
                               ...manualScanForm,
                               productNo: prod.productNo,
                               productName: prod.name,
-                              price: prod.price || 0
+                              price: prod.price || 0,
+                              qty: prod.category || ''
                             });
                           }
                         }}
