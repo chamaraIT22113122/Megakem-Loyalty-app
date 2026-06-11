@@ -4346,7 +4346,7 @@ function App() {
                   renderInput={(params) => (
                     <TextField 
                       {...params} 
-                      label="Purchased From Hardware Shop (Optional)" 
+                      label="Purchased From (Optional)" 
                       placeholder="Search Hardware shops..."
                       sx={{ 
                         '& .MuiOutlinedInput-root': { 
@@ -5232,6 +5232,23 @@ function App() {
                                             fontWeight: 500,
                                             color: 'text.secondary',
                                             borderColor: 'grey.300'
+                                          }} 
+                                        />
+                                      )}
+                                      {/* Connected Hardware Badge */}
+                                      {isApplicator && scan.connectedHardware && (
+                                        <Chip 
+                                          label={`🏬 ${scan.connectedHardware}`} 
+                                          size="small" 
+                                          variant="outlined"
+                                          color="info"
+                                          sx={{ 
+                                            height: 20, 
+                                            fontSize: '0.675rem', 
+                                            fontWeight: 600,
+                                            color: 'info.dark',
+                                            borderColor: 'info.light',
+                                            bgcolor: 'info.50'
                                           }} 
                                         />
                                       )}
@@ -6300,7 +6317,10 @@ function App() {
                     }
                     return null;
                   })()}
-                  {item.location && <Typography variant='body2' color='text.secondary' sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>📍 <Box component='span' fontWeight={500}>{item.location}</Box></Typography>}
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+                    {item.location && <Typography variant='body2' color='text.secondary' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>📍 <Box component='span' fontWeight={500}>{item.location}</Box></Typography>}
+                    {item.role === 'applicator' && item.connectedHardware && <Typography variant='body2' color='text.secondary' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>🏬 <Box component='span' fontWeight={500}>{item.connectedHardware}</Box></Typography>}
+                  </Box>
                   <Typography variant='caption' sx={{ display: 'block', textAlign: 'right', mt: 1, color: 'text.disabled' }}>{item.timestamp ? new Date(item.timestamp).toLocaleString() : 'Pending'}</Typography>
                 </CardContent>
               </Card>)}
@@ -10326,6 +10346,7 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Purchased From</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -10377,6 +10398,17 @@ function App() {
                                   <Typography variant='body2' color='text.secondary'>
                                     {scan.location || 'N/A'}
                                   </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  {scan.role === 'applicator' && scan.connectedHardware ? (
+                                    <Chip 
+                                      label={scan.connectedHardware} 
+                                      size='small' 
+                                      color='info' 
+                                      variant='outlined'
+                                      sx={{ fontSize: '0.75rem', fontWeight: 500 }}
+                                    />
+                                  ) : '-'}
                                 </TableCell>
                               </TableRow>
                             );
