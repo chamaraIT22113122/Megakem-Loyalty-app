@@ -591,7 +591,9 @@ function App() {
     price: 0,
     location: '',
     batchIndex: '',
-    mfgDate: ''
+    mfgDate: '',
+    expiryDate: '',
+    connectedHardware: ''
   });
   const [manualScanLoading, setManualScanLoading] = useState(false);
   const [showManualScanForm, setShowManualScanForm] = useState(false);
@@ -669,6 +671,69 @@ function App() {
       });
     }
   }, [manualScanForm.productNo, manualScanForm.batchIndex, manualScanForm.mfgDate, manualScanForm.bagNo]);
+
+  // Auto-resolve memberName and role from memberId
+  useEffect(() => {
+    const id = (manualScanForm.memberId || '').toUpperCase().trim();
+    if (id) {
+      const foundMember = members.find(m => m.memberId.toUpperCase() === id);
+      if (foundMember) {
+        setManualScanForm(prev => {
+          const updates = {};
+          if (prev.memberName !== foundMember.memberName) {
+            updates.memberName = foundMember.memberName;
+          }
+          const roleFromId = id.startsWith('MA') ? 'applicator' : (id.startsWith('MH') || id.startsWith('CUS-') ? 'customer' : prev.role);
+          if (prev.role !== roleFromId) {
+            updates.role = roleFromId;
+          }
+          if (Object.keys(updates).length > 0) {
+            return { ...prev, ...updates };
+          }
+          return prev;
+        });
+      } else {
+        const roleFromId = id.startsWith('MA') ? 'applicator' : (id.startsWith('MH') || id.startsWith('CUS-') ? 'customer' : 'applicator');
+        setManualScanForm(prev => {
+          const updates = {};
+          if (prev.memberName !== '') {
+            updates.memberName = '';
+          }
+          if (prev.role !== roleFromId) {
+            updates.role = roleFromId;
+          }
+          if (Object.keys(updates).length > 0) {
+            return { ...prev, ...updates };
+          }
+          return prev;
+        });
+      }
+    } else {
+      setManualScanForm(prev => {
+        if (prev.memberName !== '' || prev.role !== 'applicator') {
+          return { ...prev, memberName: '', role: 'applicator' };
+        }
+        return prev;
+      });
+    }
+  }, [manualScanForm.memberId, members]);
+
+  // Set default expiryDate to 2 years after mfgDate
+  useEffect(() => {
+    if (manualScanForm.mfgDate) {
+      const mfg = new Date(manualScanForm.mfgDate);
+      if (!isNaN(mfg.getTime())) {
+        mfg.setFullYear(mfg.getFullYear() + 2);
+        const expStr = mfg.toISOString().split('T')[0];
+        setManualScanForm(prev => {
+          if (!prev.expiryDate) {
+            return { ...prev, expiryDate: expStr };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [manualScanForm.mfgDate]);
 
   // Local storage persistence for scan user session and cart
   useEffect(() => {
@@ -5732,33 +5797,57 @@ function App() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Member Name"
-                      required
-                      value={manualScanForm.memberName}
-                      onChange={(e) => setManualScanForm({...manualScanForm, memberName: e.target.value})}
-                      placeholder="e.g., John Doe"
-                      size="small"
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Member ID"
+                      label="Member ID / Hardware ID"
                       required
                       value={manualScanForm.memberId}
                       onChange={(e) => {
                         const val = e.target.value.toUpperCase();
                         setManualScanForm({
                           ...manualScanForm, 
-                          memberId: val,
-                          role: val.startsWith('MA') ? 'applicator' : (val.startsWith('MH') || val.startsWith('CUS-') ? 'customer' : manualScanForm.role)
+                          memberId: val
                         });
                       }}
-                      placeholder="MA001, MH001, or CUS-001"
+                      placeholder="e.g., MA4502 or MH001"
                       size="small"
-                      helperText={`Role: ${manualScanForm.role === 'applicator' ? '👷 Applicator' : '👤 Customer'} (auto-detected from ID)`}
                     />
                   </Grid>
+                  <Grid item xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
+                    {manualScanForm.memberId && (
+                      <Box sx={{ p: 1.5, bgcolor: manualScanForm.memberName ? 'success.lighter' : 'warning.lighter', borderRadius: 2, border: '1px solid', borderColor: manualScanForm.memberName ? 'success.light' : 'warning.light', width: '100%' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: manualScanForm.memberName ? 'success.dark' : 'warning.dark' }}>
+                          Resolved Name: {manualScanForm.memberName || 'Searching/Unregistered Member...'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Role: {manualScanForm.role === 'applicator' ? '👷 Applicator' : '🏢 Hardware/Customer'}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Grid>
+                  {manualScanForm.role === 'applicator' && manualScanForm.memberName && (
+                    <Grid item xs={12} md={6}>
+                      <Autocomplete
+                        options={members.filter(m => m.role === 'customer' || m.memberId.toUpperCase().startsWith('MH'))}
+                        getOptionLabel={(option) => `${option.memberId} - ${option.memberName}`}
+                        value={members.find(m => m.memberName === manualScanForm.connectedHardware) || null}
+                        onChange={(event, newValue) => {
+                          setManualScanForm(prev => ({
+                            ...prev,
+                            connectedHardware: newValue ? newValue.memberName : ''
+                          }));
+                        }}
+                        renderInput={(params) => (
+                          <TextField 
+                            {...params} 
+                            label="Purchased From Hardware Shop" 
+                            size="small" 
+                            required 
+                            placeholder="Search Hardware shops..."
+                          />
+                        )}
+                        fullWidth
+                      />
+                    </Grid>
+                  )}
                   <Grid item xs={12} md={6}>
                     <FormControl fullWidth size="small" required>
                       <InputLabel>Product</InputLabel>
@@ -5785,7 +5874,7 @@ function App() {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} md={3}>
+                  <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
                       label="Number of which batch"
@@ -5796,7 +5885,7 @@ function App() {
                       size="small"
                     />
                   </Grid>
-                  <Grid item xs={12} md={3}>
+                  <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
                       label="Manufacture Date"
@@ -5805,6 +5894,18 @@ function App() {
                       InputLabelProps={{ shrink: true }}
                       value={manualScanForm.mfgDate || ''}
                       onChange={(e) => setManualScanForm({...manualScanForm, mfgDate: e.target.value})}
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Expiry Date"
+                      type="date"
+                      required
+                      InputLabelProps={{ shrink: true }}
+                      value={manualScanForm.expiryDate || ''}
+                      onChange={(e) => setManualScanForm({...manualScanForm, expiryDate: e.target.value})}
                       size="small"
                     />
                   </Grid>
@@ -5883,7 +5984,9 @@ function App() {
                             price: 0,
                             location: '',
                             batchIndex: '',
-                            mfgDate: ''
+                            mfgDate: '',
+                            expiryDate: '',
+                            connectedHardware: ''
                           });
                         }}
                         size="small"
@@ -5893,7 +5996,15 @@ function App() {
                       <Button
                         variant="contained"
                         color="primary"
-                        disabled={manualScanLoading || !manualScanForm.memberName || !manualScanForm.memberId || !manualScanForm.productNo || !manualScanForm.batchNo || !manualScanForm.qty}
+                        disabled={
+                          manualScanLoading || 
+                          !manualScanForm.memberName || 
+                          !manualScanForm.memberId || 
+                          !manualScanForm.productNo || 
+                          !manualScanForm.batchNo || 
+                          !manualScanForm.qty ||
+                          (manualScanForm.role === 'applicator' && !manualScanForm.connectedHardware)
+                        }
                         onClick={async () => {
                           setManualScanLoading(true);
                           try {
@@ -5916,7 +6027,9 @@ function App() {
                                 price: 0,
                                 location: '',
                                 batchIndex: '',
-                                mfgDate: ''
+                                mfgDate: '',
+                                expiryDate: '',
+                                connectedHardware: ''
                               });
                               // Hide form on success to show updated scans
                               setShowManualScanForm(false);

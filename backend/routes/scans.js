@@ -255,7 +255,9 @@ router.post('/', optionalAuth, async (req, res) => {
       qty,
       price: productPrice || 0,
       points: 0,
-      location: location || ''
+      location: location || '',
+      connectedHardware: req.body.connectedHardware || '',
+      expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : undefined
     };
 
     // Calculate loyalty points based on product and loyalty configuration
@@ -686,6 +688,11 @@ async function updateMemberFromScan(scan) {
     member.points += pointsEarned;
     member.totalScans += 1;
     member.lastScanDate = scan.timestamp || new Date();
+
+    // Update connectedHardware for applicator profiles
+    if (scan.role === 'applicator' && scan.connectedHardware) {
+      member.connectedHardware = scan.connectedHardware;
+    }
 
     // Track monthly purchase value for cash rewards (only for applicators)
     if (scan.role === 'applicator' && scan.price && scan.price > 0) {

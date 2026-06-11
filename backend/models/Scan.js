@@ -42,6 +42,14 @@ const scanSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  expiryDate: {
+    type: Date
+  },
+  connectedHardware: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   price: {
     type: Number,
     default: 0
