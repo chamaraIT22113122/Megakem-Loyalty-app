@@ -579,10 +579,6 @@ function App() {
   const [members, setMembers] = useState([]);
   const [loyaltyConfig, setLoyaltyConfig] = useState(null);
   const [products, setProducts] = useState([]);
-  const generateRandomBagNo = () => {
-    return String(Math.floor(Math.random() * 999) + 1).padStart(3, '0');
-  };
-
   const [manualScanForm, setManualScanForm] = useState({
     memberName: '',
     memberId: '',
@@ -590,7 +586,7 @@ function App() {
     productName: '',
     productNo: '',
     batchNo: '',
-    bagNo: generateRandomBagNo(),
+    bagNo: '001',
     qty: '',
     price: 0,
     location: '',
@@ -741,6 +737,68 @@ function App() {
       }
     }
   }, [manualScanForm.mfgDate]);
+
+  // Auto-calculate next bag number sequentially based on existing scan history for same product, batch index & manufacture date
+  useEffect(() => {
+    const prodNo = manualScanForm.productNo || '';
+    const batchIndex = manualScanForm.batchIndex || '';
+    const mfgDate = manualScanForm.mfgDate || '';
+    
+    if (prodNo && batchIndex && mfgDate) {
+      const formatMfgDate = (dateStr) => {
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+          const year = parts[0].substring(2); // YY
+          const month = parts[1]; // MM
+          const day = parts[2]; // DD
+          return `${day}${month}${year}`;
+        }
+        return '';
+      };
+      
+      const padNumber = (numStr, length) => {
+        if (!numStr) return '';
+        const clean = numStr.toString().trim();
+        return clean.padStart(length, '0');
+      };
+      
+      const index = padNumber(batchIndex, 3);
+      const mfg = formatMfgDate(mfgDate);
+      
+      if (index && mfg) {
+        const targetPrefix = `${prodNo} ${index} ${mfg}`.toUpperCase().replace(/_/g, ' ');
+        
+        let maxBag = 0;
+        scanHistory.forEach(scan => {
+          if (scan.batchNo) {
+            const cleanBatch = scan.batchNo.toUpperCase().trim().replace(/_/g, ' ');
+            if (cleanBatch.startsWith(targetPrefix)) {
+              const parts = cleanBatch.split(/\s+/);
+              if (parts.length >= 4) {
+                const bagNum = parseInt(parts[3], 10);
+                if (!isNaN(bagNum) && bagNum > maxBag) {
+                  maxBag = bagNum;
+                }
+              } else if (scan.bagNo) {
+                const bagNum = parseInt(scan.bagNo, 10);
+                if (!isNaN(bagNum) && bagNum > maxBag) {
+                  maxBag = bagNum;
+                }
+              }
+            }
+          }
+        });
+        
+        const nextBag = String(maxBag + 1).padStart(3, '0');
+        setManualScanForm(prev => {
+          if (prev.bagNo !== nextBag) {
+            return { ...prev, bagNo: nextBag };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [manualScanForm.productNo, manualScanForm.batchIndex, manualScanForm.mfgDate, scanHistory]);
 
   // Local storage persistence for scan user session and cart
   useEffect(() => {
@@ -5988,7 +6046,7 @@ function App() {
                             productName: '',
                             productNo: '',
                             batchNo: '',
-                            bagNo: generateRandomBagNo(),
+                            bagNo: '001',
                             qty: '',
                             price: 0,
                             location: '',
@@ -6031,7 +6089,7 @@ function App() {
                                 productName: '',
                                 productNo: '',
                                 batchNo: '',
-                                bagNo: generateRandomBagNo(),
+                                bagNo: '001',
                                 qty: '',
                                 price: 0,
                                 location: '',
