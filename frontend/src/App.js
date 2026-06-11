@@ -1932,9 +1932,9 @@ function App() {
 
       setLoyaltyConfig(loyaltyConfigRes.data?.data || null);
       console.log('✅ Products loaded:', productsRes.data?.data?.length || 0, 'products');
-      if (isMainAdmin()) {
+      if (isMainAdmin() || hasPermission('canManageCoAdminRequests')) {
         loadPendingRequestsCount();
-      } else {
+      } else if (hasPermission('canManageQRCodes') || hasPermission('canPrintQRCodes')) {
         loadCoAdminRequests();
       }
     } catch (error) {
@@ -2143,9 +2143,9 @@ function App() {
             });
           }).catch(console.error);
           
-          if (isMainAdmin()) {
+          if (isMainAdmin() || hasPermission('canManageCoAdminRequests')) {
             loadPendingRequestsCount();
-          } else {
+          } else if (hasPermission('canManageQRCodes') || hasPermission('canPrintQRCodes')) {
             loadCoAdminRequests();
           }
         }, 5000);

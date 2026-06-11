@@ -145,8 +145,14 @@ exports.qrAdmin = (req, res, next) => {
     });
   }
 
-  // Allow super admin or QR admin
-  if (req.user.role === 'admin' || req.user.adminType === 'qr_admin' || req.user.permissions?.canManageQRCodes) {
+  // Allow super admin, QR admin, or anyone with manage/print QR code permissions or reprint request permissions
+  if (
+    req.user.role === 'admin' || 
+    req.user.adminType === 'qr_admin' || 
+    req.user.permissions?.canManageQRCodes || 
+    req.user.permissions?.canPrintQRCodes || 
+    req.user.permissions?.canManageCoAdminRequests
+  ) {
     return next();
   }
 

@@ -871,13 +871,14 @@ router.post('/reprint-requests', protect, qrAdmin, async (req, res) => {
 
 // @route   GET /api/qr-codes/reprint-requests
 // @desc    Get reprint requests
-// @access  Private (Main Admin gets all, Co-Admins get their own)
+// @access  Private (Main Admin & authorized Co-Admins get all, Co-Admins get their own)
 router.get('/reprint-requests', protect, qrAdmin, async (req, res) => {
   try {
     const isMainAdmin = req.user.email === 'admin@megakem.com' || (req.user.role === 'admin' && !req.user.permissions);
+    const canManageRequests = req.user.permissions?.canManageCoAdminRequests === true;
     
     let filter = {};
-    if (!isMainAdmin) {
+    if (!isMainAdmin && !canManageRequests) {
       filter.requestedBy = req.user.id;
     }
 
