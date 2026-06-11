@@ -387,7 +387,8 @@ router.get('/me', protect, async (req, res) => {
       id: req.user._id,
       username: req.user.username,
       email: req.user.email,
-      role: req.user.role
+      role: req.user.role,
+      permissions: req.user.permissions
     }
   });
 });
@@ -463,7 +464,8 @@ router.put('/profile', protect, [
         id: user._id,
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role,
+        permissions: user.permissions
       }
     });
   } catch (error) {

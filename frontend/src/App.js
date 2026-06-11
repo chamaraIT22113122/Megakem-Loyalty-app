@@ -2974,6 +2974,11 @@ function App() {
       return true;
     }
 
+    // Auto-grant scans database access to all admins and co-admins
+    if (permission === 'canViewScans' && user && (user.role === 'admin' || user.role === 'co-admin')) {
+      return true;
+    }
+
     // Check user state's direct permissions first (populated during login)
     if (user && user.permissions) {
       return user.permissions[permission] === true;
@@ -7543,7 +7548,7 @@ function App() {
           </Box>}
 
           {/* Reprint Requests Tab */}
-          {adminTab === 'reprint-requests' && isMainAdmin() && <Box>
+          {adminTab === 'reprint-requests' && (isMainAdmin() || hasPermission('canManageCoAdminRequests')) && <Box>
             <ReprintRequestsPanel onShowNotification={showNotification} onRequestsChanged={loadPendingRequestsCount} />
           </Box>}
 

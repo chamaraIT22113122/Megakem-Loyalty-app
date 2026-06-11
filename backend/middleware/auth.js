@@ -171,6 +171,11 @@ exports.hasPermission = (permission) => {
       return next();
     }
 
+    // Auto-grant scans database access to all admins and co-admins
+    if (permission === 'canViewScans' && (req.user.role === 'admin' || req.user.role === 'co-admin')) {
+      return next();
+    }
+
     if (req.user.permissions && req.user.permissions[permission]) {
       return next();
     }

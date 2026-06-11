@@ -386,7 +386,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [selectedForPrint, setSelectedForPrint] = useState([]);
   
   // Upgrade 5: Tab and Scan Logs state
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState('batches');
   const [scanLogs, setScanLogs] = useState([]);
   const [scanLogsLoading, setScanLogsLoading] = useState(false);
   const [scanLogFilter, setScanLogFilter] = useState('');
@@ -1828,7 +1828,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   <TableCell><strong>Package</strong></TableCell>
                   <TableCell><strong>Status</strong></TableCell>
                   <TableCell><strong>Printed</strong></TableCell>
-                  {isMainAdmin && <TableCell><strong>Scan & Reprint Info</strong></TableCell>}
+                  {(isMainAdmin || hasPermission('canViewScans')) && <TableCell><strong>Scan & Reprint Info</strong></TableCell>}
                   <TableCell><strong>Actions</strong></TableCell>
                 </TableRow>
               </TableHead>
@@ -1868,7 +1868,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       />
                     </TableCell>
                     <TableCell>{qr.printedDate ? new Date(qr.printedDate).toLocaleDateString() : '-'}</TableCell>
-                    {isMainAdmin && (
+                    {(isMainAdmin || hasPermission('canViewScans')) && (
                       <TableCell>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           {qr.reprintCount > 0 && (
@@ -1996,26 +1996,23 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               value={activeTab} 
               onChange={(e, v) => { 
                 setActiveTab(v); 
-                if (isMainAdmin) {
-                  if (v === 1) loadScanLogs(); 
-                  if (v === 2) loadData();
-                } else {
-                  if (v === 1) loadData();
-                }
+                if (v === 'scan_logs') loadScanLogs(); 
+                if (v === 'batches' || v === 'reprint_requests') loadData();
               }}
             >
-              <Tab label="Production Batch History" />
-              {isMainAdmin && <Tab label={`🔍 Scan Attempt Logs`} />}
-              {isMainAdmin && (
+              <Tab label="Production Batch History" value="batches" />
+              {(isMainAdmin || hasPermission('canViewScans')) && <Tab label="🔍 Scan Attempt Logs" value="scan_logs" />}
+              {(isMainAdmin || hasPermission('canManageCoAdminRequests')) && (
                 <Tab 
                   label={`✉️ Reprint Requests (${reprintRequests.filter(r => r.status === 'pending').length})`} 
+                  value="reprint_requests"
                 />
               )}
             </Tabs>
           </Box>
 
           {/* Tab 0: Production Batch History */}
-          {activeTab === 0 && (
+          {activeTab === 'batches' && (
             <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
@@ -2084,7 +2081,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           )}
 
           {/* Tab 1: Scan Attempt Logs */}
-          {activeTab === 1 && isMainAdmin && (
+          {activeTab === 'scan_logs' && (isMainAdmin || hasPermission('canViewScans')) && (
             <Box>
               <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                 <FormControl sx={{ minWidth: 180 }} size="small">
@@ -2194,7 +2191,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           )}
 
           {/* Tab 2: Reprint Requests */}
-          {activeTab === 2 && isMainAdmin && (
+          {activeTab === 'reprint_requests' && (isMainAdmin || hasPermission('canManageCoAdminRequests')) && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
                 ✉️ Reprint Permission Requests

@@ -892,9 +892,9 @@ router.get('/reprint-requests', protect, qrAdmin, async (req, res) => {
 });
 
 // @route   PUT /api/qr-codes/reprint-requests/:id/approve
-// @desc    Approve a reprint request (Main Admin only)
-// @access  Private/Admin (Main Admin Only)
-router.put('/reprint-requests/:id/approve', protect, admin, async (req, res) => {
+// @desc    Approve a reprint request (Main Admin or authorized Co-Admin)
+// @access  Private/Admin (Main Admin or Co-Admin with canManageCoAdminRequests)
+router.put('/reprint-requests/:id/approve', protect, hasPermission('canManageCoAdminRequests'), async (req, res) => {
   try {
     const request = await ReprintRequest.findById(req.params.id);
     if (!request) {
@@ -913,9 +913,9 @@ router.put('/reprint-requests/:id/approve', protect, admin, async (req, res) => 
 });
 
 // @route   PUT /api/qr-codes/reprint-requests/:id/reject
-// @desc    Reject a reprint request (Main Admin only)
-// @access  Private/Admin (Main Admin Only)
-router.put('/reprint-requests/:id/reject', protect, admin, async (req, res) => {
+// @desc    Reject a reprint request (Main Admin or authorized Co-Admin)
+// @access  Private/Admin (Main Admin or Co-Admin with canManageCoAdminRequests)
+router.put('/reprint-requests/:id/reject', protect, hasPermission('canManageCoAdminRequests'), async (req, res) => {
   try {
     const request = await ReprintRequest.findById(req.params.id);
     if (!request) {
@@ -931,9 +931,9 @@ router.put('/reprint-requests/:id/reject', protect, admin, async (req, res) => {
 });
 
 // @route   DELETE /api/qr-codes/reprint-requests/:id
-// @desc    Delete a reprint request (Main Admin only)
-// @access  Private/Admin (Main Admin Only)
-router.delete('/reprint-requests/:id', protect, admin, async (req, res) => {
+// @desc    Delete a reprint request (Main Admin or authorized Co-Admin)
+// @access  Private/Admin (Main Admin or Co-Admin with canManageCoAdminRequests)
+router.delete('/reprint-requests/:id', protect, hasPermission('canManageCoAdminRequests'), async (req, res) => {
   try {
     const request = await ReprintRequest.findById(req.params.id);
     if (!request) {
