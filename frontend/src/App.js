@@ -5888,7 +5888,7 @@ function App() {
                       </Box>
                     )}
                   </Grid>
-                  {manualScanForm.role === 'applicator' && manualScanForm.memberName && (
+                  {manualScanForm.role === 'applicator' && (
                     <Grid item xs={12} md={6}>
                       <Autocomplete
                         options={members.filter(m => m.role === 'customer' || m.memberId.toUpperCase().startsWith('MH'))}
