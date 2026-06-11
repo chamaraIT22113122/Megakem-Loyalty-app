@@ -579,6 +579,10 @@ function App() {
   const [members, setMembers] = useState([]);
   const [loyaltyConfig, setLoyaltyConfig] = useState(null);
   const [products, setProducts] = useState([]);
+  const generateRandomBagNo = () => {
+    return String(Math.floor(Math.random() * 999) + 1).padStart(3, '0');
+  };
+
   const [manualScanForm, setManualScanForm] = useState({
     memberName: '',
     memberId: '',
@@ -586,7 +590,7 @@ function App() {
     productName: '',
     productNo: '',
     batchNo: '',
-    bagNo: '',
+    bagNo: generateRandomBagNo(),
     qty: '',
     price: 0,
     location: '',
@@ -5984,7 +5988,7 @@ function App() {
                             productName: '',
                             productNo: '',
                             batchNo: '',
-                            bagNo: '',
+                            bagNo: generateRandomBagNo(),
                             qty: '',
                             price: 0,
                             location: '',
@@ -6027,7 +6031,7 @@ function App() {
                                 productName: '',
                                 productNo: '',
                                 batchNo: '',
-                                bagNo: '',
+                                bagNo: generateRandomBagNo(),
                                 qty: '',
                                 price: 0,
                                 location: '',
