@@ -935,7 +935,10 @@ function App() {
     const fetchApplicators = async () => {
       try {
         const res = await membersAPI.getAll();
-        const mapped = (res.data.data || []).map(m => ({
+        const rawMembers = res.data.data || [];
+        setMembers(rawMembers);
+        
+        const mapped = rawMembers.map(m => ({
           _id: m._id,
           name: m.memberName,
           memberId: m.memberId,
@@ -4330,7 +4333,7 @@ function App() {
               <Grid item xs={12}>
                 <Autocomplete
                   options={members.filter(m => m.role === 'customer' || m.memberId.toUpperCase().startsWith('MH'))}
-                  getOptionLabel={(option) => `${option.memberId} - ${option.memberName}`}
+                  getOptionLabel={(option) => option.memberName || ''}
                   value={members.find(m => m.memberName === connectedHardware) || null}
                   onChange={(event, newValue) => {
                     setConnectedHardware(newValue ? newValue.memberName : '');
