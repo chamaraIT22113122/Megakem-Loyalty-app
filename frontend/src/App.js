@@ -2471,11 +2471,16 @@ function App() {
         role: role || 'admin',
         permissions: {
           canViewDashboard: permissions?.canViewDashboard === true,
+          canViewScans: permissions?.canViewScans === true,
+          canManageCoAdmins: permissions?.canManageCoAdmins === true,
           canDelete: permissions?.canDelete === true,
           canExport: permissions?.canExport === true,
           canManageUsers: permissions?.canManageUsers === true,
+          canViewRewards: permissions?.canViewRewards === true,
+          canViewLeaderboard: permissions?.canViewLeaderboard === true,
           canManageProducts: permissions?.canManageProducts === true,
           canManageQRCodes: permissions?.canManageQRCodes === true,
+          canManageCoAdminRequests: permissions?.canManageCoAdminRequests === true,
           canManageApplicators: permissions?.canManageApplicators === true
         }
       };
