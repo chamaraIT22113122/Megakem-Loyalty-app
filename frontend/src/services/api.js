@@ -160,4 +160,26 @@ export const qrCodesAPI = {
   savePrintLayout: (settings) => api.put('/qr-codes/settings/print-layout', settings),
 };
 
+// Rewards API
+export const rewardsAPI = {
+  getActive: () => api.get('/rewards'),
+  getAll: () => api.get('/rewards/all'),
+  create: (data) => api.post('/rewards', data),
+  update: (id, data) => api.put(`/rewards/${id}`, data),
+  delete: (id) => api.delete(`/rewards/${id}`),
+};
+
+// Redemptions API
+export const redemptionsAPI = {
+  getAll: () => api.get('/redemptions'),
+  getForMember: (memberId) => api.get(`/redemptions/member/${memberId}`),
+  requestRedemption: (data) => api.post('/redemptions', data),
+  updateStatus: (id, data) => api.put(`/redemptions/${id}/status`, data),
+};
+
+// Audit Logs API
+export const auditLogsAPI = {
+  getAll: (params) => api.get('/audit-logs', { params }),
+};
+
 export default api;

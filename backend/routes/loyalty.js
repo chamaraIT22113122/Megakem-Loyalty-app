@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
 const Product = require('../models/Product');
 const { protect } = require('../middleware/auth');
+const { logAction } = require('../middleware/audit');
 
 // @route   GET /api/loyalty/config
 // @desc    Get loyalty configuration
@@ -83,6 +84,8 @@ router.put('/config', protect, [
 
     await config.save();
 
+    await logAction(req, 'UPDATE_LOYALTY_CONFIG', 'SETTINGS', req.body);
+
     res.json({
       success: true,
       data: config,
@@ -147,6 +150,12 @@ router.put('/products/:id/points', protect, [
     }
 
     await product.save();
+
+    await logAction(req, 'UPDATE_PRODUCT_POINTS', 'PRODUCTS', {
+      productId: product._id,
+      pointsPerProduct: product.pointsPerProduct,
+      pointsPerPackSize: product.pointsPerPackSize
+    });
 
     res.json({
       success: true,

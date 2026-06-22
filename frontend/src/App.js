@@ -3,7 +3,7 @@ import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, Ca
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
-import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI } from './services/api';
+import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI } from './services/api';
 import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import megakemLogo from './assets/MegakemLogo.png';
@@ -581,6 +581,9 @@ function App() {
   const [members, setMembers] = useState([]);
   const [loyaltyConfig, setLoyaltyConfig] = useState(null);
   const [products, setProducts] = useState([]);
+  const [rewards, setRewards] = useState([]);
+  const [redemptions, setRedemptions] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [manualScanForm, setManualScanForm] = useState({
     memberName: '',
     memberId: '',
@@ -1246,10 +1249,22 @@ function App() {
         const productsRes = await productsAPI.getAll();
         setProducts(productsRes.data.data);
         
+        try {
+          const rewardsRes = await rewardsAPI.getActive();
+          setRewards(rewardsRes.data.data || []);
+        } catch (err) { console.warn('Error loading rewards', err); }
+        
         // Load additional data for logged-in users
         if (!user.anonymous) {
           const leaderboardRes = await analyticsAPI.getLeaderboard();
           setLeaderboard(leaderboardRes.data.data);
+        }
+        
+        if (memberId) {
+          try {
+            const redemptionsRes = await redemptionsAPI.getForMember(memberId);
+            setRedemptions(redemptionsRes.data.data || []);
+          } catch (err) { console.warn('Error loading redemptions', err); }
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -2080,6 +2095,22 @@ function App() {
         loyaltyAPI.getConfig().catch(() => ({ data: { data: null } })),
         scansAPI.getAll({ limit: 1000 }).catch(() => ({ data: { data: [] } }))
       ]);
+
+      if (hasProducts || isMainAdmin()) {
+        try {
+          const rewardsRes = await rewardsAPI.getAll();
+          setRewards(rewardsRes.data.data || []);
+          const redemptionsRes = await redemptionsAPI.getAll();
+          setRedemptions(redemptionsRes.data.data || []);
+        } catch (e) { console.warn('Error loading rewards/redemptions', e); }
+      }
+
+      if (isMainAdmin()) {
+        try {
+          const logsRes = await auditLogsAPI.getAll({ limit: 100 });
+          setAuditLogs(logsRes.data.data || []);
+        } catch (e) { console.warn('Error loading audit logs', e); }
+      }
 
       console.log('📦 Products response:', productsRes.data);
       setStats(statsRes.data?.data || {});
@@ -3295,7 +3326,16 @@ function App() {
             <Box sx={{ mt: 4 }}>
               <Divider sx={{ mb: 3 }}><Chip label="Member Account" color="primary" /></Divider>
               <Grid container spacing={2}>
-                <Grid item xs={12}>
+                <Grid item xs={12} sm={6}>
+                  <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('profile')}>
+                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                      <Person sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                      <Typography variant="h6" fontWeight={600}>My Profile & Rewards</Typography>
+                      <Typography variant="caption" color="text.secondary">View stats & redeem points</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6}>
                   <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('leaderboard')}>
                     <CardContent sx={{ textAlign: 'center', py: 3 }}>
                       <EmojiEvents sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
@@ -3600,7 +3640,7 @@ function App() {
           const memberScans = scanHistory.filter(s => s.memberId === currentMember?.memberId) || [];
           const totalScans = memberScans.length;
           const totalAmount = memberScans.reduce((sum, s) => sum + (s.price || 0), 0);
-          const totalPoints = memberScans.reduce((sum, s) => sum + (s.points || 0), 0);
+          const totalPoints = currentMember?.points || 0;
           
           return (
             <Box sx={{ 
@@ -3815,6 +3855,90 @@ function App() {
                           </Grid>
                         </Grid>
                       </Grid>
+                    </Box>
+                  </Card>
+
+                  {/* Rewards Catalog Section */}
+                  <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', mb: 3 }}>
+                    <Box sx={{ p: 3, bgcolor: 'secondary.main', color: 'white' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Star sx={{ fontSize: '2rem' }} />
+                        <Box>
+                          <Typography variant="h5" fontWeight={700}>Rewards Catalog</Typography>
+                          <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                            Redeem your loyalty points for exclusive items
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+                    <Box sx={{ p: 3 }}>
+                      <Grid container spacing={3}>
+                        {rewards.filter(r => r.active).map(reward => (
+                          <Grid item xs={12} sm={6} md={4} key={reward._id}>
+                            <Card sx={{ border: '1px solid', borderColor: 'divider', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                              <CardContent sx={{ flexGrow: 1 }}>
+                                <Typography variant="h6" fontWeight={600} gutterBottom>{reward.name}</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{reward.description}</Typography>
+                                <Chip icon={<EmojiEvents />} label={`${reward.pointsRequired} Points`} color="warning" sx={{ fontWeight: 600 }} />
+                              </CardContent>
+                              <Box sx={{ p: 2, pt: 0 }}>
+                                <Button 
+                                  fullWidth 
+                                  variant="contained" 
+                                  color="primary"
+                                  disabled={totalPoints < reward.pointsRequired}
+                                  onClick={async () => {
+                                    try {
+                                      await redemptionsAPI.create({ rewardId: reward._id, memberId: currentMember.memberId });
+                                      showNotification('Redemption requested successfully!', 'success');
+                                      setMembers(prev => prev.map(m => m.memberId === currentMember.memberId ? { ...m, points: m.points - reward.pointsRequired } : m));
+                                      const res = await redemptionsAPI.getForMember(currentMember.memberId);
+                                      setRedemptions(res.data.data || []);
+                                    } catch(e) { showNotification('Failed to redeem reward', 'error'); }
+                                  }}
+                                >
+                                  {totalPoints >= reward.pointsRequired ? 'Redeem Now' : 'Not Enough Points'}
+                                </Button>
+                              </Box>
+                            </Card>
+                          </Grid>
+                        ))}
+                        {rewards.filter(r => r.active).length === 0 && (
+                          <Grid item xs={12}>
+                            <Typography variant="body1" color="text.secondary" align="center">No rewards available at the moment.</Typography>
+                          </Grid>
+                        )}
+                      </Grid>
+
+                      {redemptions.length > 0 && (
+                        <Box sx={{ mt: 4 }}>
+                          <Typography variant="h6" fontWeight={600} gutterBottom>My Redemption Requests</Typography>
+                          <TableContainer component={Paper} variant="outlined">
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Date</TableCell>
+                                  <TableCell>Reward</TableCell>
+                                  <TableCell>Points</TableCell>
+                                  <TableCell>Status</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {redemptions.map(r => (
+                                  <TableRow key={r._id}>
+                                    <TableCell>{new Date(r.createdAt).toLocaleDateString()}</TableCell>
+                                    <TableCell>{r.rewardId?.name}</TableCell>
+                                    <TableCell>{r.pointsSpent}</TableCell>
+                                    <TableCell>
+                                      <Chip size="small" label={r.status} color={r.status === 'pending' ? 'warning' : r.status === 'approved' ? 'success' : 'error'} />
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </Box>
+                      )}
                     </Box>
                   </Card>
 
@@ -4452,7 +4576,9 @@ function App() {
               {hasPermission('canManageCoAdmins') && <Tab icon={<People />} label='Co-Admins' value='co-admins' />}
               {hasPermission('canManageUsers') && <Tab icon={<EmojiEvents />} label='Members & Loyalty' value='members' />}
               {hasPermission('canViewRewards') && <Tab icon={<CardGiftcard />} label='Cash Rewards' value='rewards' />}
+              {hasPermission('canManageProducts') && <Tab icon={<Star />} label='Rewards Catalog' value='catalog' />}
               {hasPermission('canViewLeaderboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
+              {isMainAdmin() && <Tab icon={<Security />} label='Audit Logs' value='audit-logs' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
               {hasPermission('canManageCoAdminRequests') && (
@@ -7145,6 +7271,149 @@ function App() {
               </Paper>
             )}
           </Box>}
+
+          {/* Rewards Catalog Management Tab */}
+          {adminTab === 'catalog' && (
+            <Box>
+              <Typography variant="h5" sx={{ mb: 2 }}><Star sx={{ mr: 1, verticalAlign: 'middle' }}/> Rewards Catalog Management</Typography>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography variant="h6">Catalog Items</Typography>
+                    </Box>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Name</TableCell>
+                            <TableCell>Points Required</TableCell>
+                            <TableCell>Status</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {rewards.map(reward => (
+                            <TableRow key={reward._id}>
+                              <TableCell>{reward.name}</TableCell>
+                              <TableCell>{reward.pointsRequired}</TableCell>
+                              <TableCell>
+                                <Chip size="small" label={reward.active ? "Active" : "Inactive"} color={reward.active ? "success" : "default"} />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {rewards.length === 0 && (
+                            <TableRow><TableCell colSpan={3} align="center">No rewards configured</TableCell></TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="h6" sx={{ mb: 2 }}>Redemption Requests</Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Member ID</TableCell>
+                            <TableCell>Reward</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Action</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {redemptions.map(r => (
+                            <TableRow key={r._id}>
+                              <TableCell>{r.memberId}</TableCell>
+                              <TableCell>{r.rewardId?.name}</TableCell>
+                              <TableCell>
+                                <Chip size="small" label={r.status} color={r.status === 'pending' ? 'warning' : r.status === 'approved' ? 'success' : 'error'} />
+                              </TableCell>
+                              <TableCell>
+                                {r.status === 'pending' && (
+                                  <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Button size="small" variant="contained" color="success" onClick={async () => {
+                                      try {
+                                        await redemptionsAPI.updateStatus(r._id, { status: 'approved' });
+                                        showNotification('Approved', 'success');
+                                        const res = await redemptionsAPI.getAll();
+                                        setRedemptions(res.data.data || []);
+                                      } catch(e) { showNotification('Error approving', 'error'); }
+                                    }}>Approve</Button>
+                                    <Button size="small" variant="contained" color="error" onClick={async () => {
+                                      try {
+                                        await redemptionsAPI.updateStatus(r._id, { status: 'rejected' });
+                                        showNotification('Rejected', 'success');
+                                        const res = await redemptionsAPI.getAll();
+                                        setRedemptions(res.data.data || []);
+                                      } catch(e) { showNotification('Error rejecting', 'error'); }
+                                    }}>Reject</Button>
+                                  </Box>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {redemptions.length === 0 && (
+                            <TableRow><TableCell colSpan={4} align="center">No requests</TableCell></TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+
+          {/* Audit Logs Tab */}
+          {adminTab === 'audit-logs' && isMainAdmin() && (
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h5"><Security sx={{ mr: 1, verticalAlign: 'middle' }}/> System Audit Logs</Typography>
+                <Button variant="outlined" startIcon={<Refresh />} onClick={async () => {
+                  try {
+                    const res = await auditLogsAPI.getAll({ limit: 100 });
+                    setAuditLogs(res.data.data || []);
+                    showNotification('Audit logs refreshed', 'success');
+                  } catch (e) { showNotification('Error fetching logs', 'error'); }
+                }}>Refresh</Button>
+              </Box>
+              <Paper sx={{ p: 2 }}>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Timestamp</TableCell>
+                        <TableCell>Module</TableCell>
+                        <TableCell>Action</TableCell>
+                        <TableCell>Performed By</TableCell>
+                        <TableCell>Details</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {auditLogs.map(log => (
+                        <TableRow key={log._id}>
+                          <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                          <TableCell><Chip size="small" label={log.module} /></TableCell>
+                          <TableCell>{log.action}</TableCell>
+                          <TableCell>{log.performedBy ? `${log.performedBy.username} (${log.performedBy.email})` : 'System/Unknown'}</TableCell>
+                          <TableCell>
+                            <Box sx={{ maxHeight: 100, overflow: 'auto', fontSize: '0.75rem', p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
+                              <pre style={{ margin: 0 }}>{JSON.stringify(log.details, null, 2)}</pre>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {auditLogs.length === 0 && (
+                        <TableRow><TableCell colSpan={5} align="center">No logs found</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Box>
+          )}
 
           {/* Leaderboard Admin Tab */}
           {adminTab === 'leaderboard-admin' && (() => {

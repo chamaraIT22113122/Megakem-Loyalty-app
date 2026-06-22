@@ -8,6 +8,7 @@ const Product = require('../models/Product');
 const { protect, qrAdmin, hasPermission, admin } = require('../middleware/auth');
 const PrintLayoutConfig = require('../models/PrintLayoutConfig');
 const ReprintRequest = require('../models/ReprintRequest');
+const { logAction } = require('../middleware/audit');
 
 // ─── HMAC Signature Helpers (Upgrade 1: Anti-Fraud) ─────────────────────────
 const QR_HMAC_SECRET = process.env.QR_HMAC_SECRET || 'megakem-qr-default-secret-change-in-production';
@@ -482,6 +483,7 @@ router.delete('/', protect, qrAdmin, hasPermission('canDelete'), async (req, res
 
     if (batchNo) {
       const deleted = await QRCodeModel.deleteMany({ batchNo });
+      await logAction(req, 'BULK_DELETE_QR_CODES', 'QR_CODES', { batchNo, deletedCount: deleted.deletedCount });
       return res.json({
         message: `Deleted ${deleted.deletedCount} QR codes for batch ${batchNo}`,
         deleted: deleted.deletedCount
@@ -493,6 +495,8 @@ router.delete('/', protect, qrAdmin, hasPermission('canDelete'), async (req, res
     }
 
     const deleted = await QRCodeModel.deleteMany({ _id: { $in: qrIds } });
+
+    await logAction(req, 'DELETE_QR_CODES', 'QR_CODES', { count: qrIds.length, deletedCount: deleted.deletedCount });
 
     res.json({
       message: `Deleted ${deleted.deletedCount} QR codes`,
