@@ -478,10 +478,18 @@ router.put('/mark-printed', protect, qrAdmin, async (req, res) => {
 // Delete QR codes
 router.delete('/', protect, qrAdmin, hasPermission('canDelete'), async (req, res) => {
   try {
-    const { qrIds } = req.body;
+    const { qrIds, batchNo } = req.body;
+
+    if (batchNo) {
+      const deleted = await QRCodeModel.deleteMany({ batchNo });
+      return res.json({
+        message: `Deleted ${deleted.deletedCount} QR codes for batch ${batchNo}`,
+        deleted: deleted.deletedCount
+      });
+    }
 
     if (!qrIds || !Array.isArray(qrIds)) {
-      return res.status(400).json({ error: 'QR IDs are required' });
+      return res.status(400).json({ error: 'QR IDs or batch number are required' });
     }
 
     const deleted = await QRCodeModel.deleteMany({ _id: { $in: qrIds } });

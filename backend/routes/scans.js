@@ -257,6 +257,7 @@ router.post('/', optionalAuth, async (req, res) => {
       points: 0,
       location: location || '',
       connectedHardware: req.body.connectedHardware || '',
+      connectedHardwareId: req.body.connectedHardwareId || '',
       expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : undefined
     };
 
@@ -690,8 +691,13 @@ async function updateMemberFromScan(scan) {
     member.lastScanDate = scan.timestamp || new Date();
 
     // Update connectedHardware for applicator profiles
-    if (scan.role === 'applicator' && scan.connectedHardware) {
-      member.connectedHardware = scan.connectedHardware;
+    if (scan.role === 'applicator') {
+      if (scan.connectedHardware) {
+        member.connectedHardware = scan.connectedHardware;
+      }
+      if (scan.connectedHardwareId) {
+        member.connectedHardwareId = scan.connectedHardwareId;
+      }
     }
 
     // Track monthly purchase value for cash rewards (only for applicators)
@@ -737,10 +743,16 @@ router.post('/sync-members', protect, hasPermission('canManageUsers'), async (re
             role: scan.role,
             points: 0,
             totalScans: 0,
-            location: scan.location || ''
+            location: scan.location || '',
+            connectedHardware: scan.connectedHardware || '',
+            connectedHardwareId: scan.connectedHardwareId || ''
           });
           created++;
         } else {
+          if (scan.role === 'applicator') {
+            if (scan.connectedHardware) member.connectedHardware = scan.connectedHardware;
+            if (scan.connectedHardwareId) member.connectedHardwareId = scan.connectedHardwareId;
+          }
           updated++;
         }
 

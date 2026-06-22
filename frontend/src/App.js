@@ -516,6 +516,7 @@ function App() {
   const [memberName, setMemberName] = useState(() => localStorage.getItem('user_member_name') || '');
   const [location, setLocation] = useState(() => localStorage.getItem('user_location') || '');
   const [connectedHardware, setConnectedHardware] = useState('');
+  const [connectedHardwareId, setConnectedHardwareId] = useState('');
   const [cart, setCart] = useState(() => {
     try {
       const savedCart = localStorage.getItem('user_cart');
@@ -594,7 +595,8 @@ function App() {
     batchIndex: '',
     mfgDate: '',
     expiryDate: '',
-    connectedHardware: ''
+    connectedHardware: '',
+    connectedHardwareId: ''
   });
   const [manualScanLoading, setManualScanLoading] = useState(false);
   const [showManualScanForm, setShowManualScanForm] = useState(false);
@@ -10851,10 +10853,15 @@ function App() {
             <Grid item xs={12} sm={6}>
               <Autocomplete
                 fullWidth
-                options={applicatorInfo.filter(a => a.equipment === 'Hardware').map(h => h.name)}
-                value={applicatorFormData.connectedHardware || null}
+                options={applicatorInfo.filter(a => a.equipment === 'Hardware')}
+                getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
+                value={applicatorInfo.find(h => h.name === applicatorFormData.connectedHardware) || null}
                 onChange={(event, newValue) => {
-                  setApplicatorFormData({ ...applicatorFormData, connectedHardware: newValue || '' });
+                  setApplicatorFormData({ 
+                    ...applicatorFormData, 
+                    connectedHardware: newValue?.name || '',
+                    connectedHardwareId: newValue?.memberId || ''
+                  });
                 }}
                 renderInput={(params) => (
                   <TextField 
@@ -10917,7 +10924,8 @@ function App() {
                   condition: applicatorFormData.condition || 'good',
                   equipment: applicatorFormData.equipment || 'Applicator',
                   role: 'applicator',
-                  connectedHardware: applicatorFormData.connectedHardware || ''
+                  connectedHardware: applicatorFormData.connectedHardware || '',
+                  connectedHardwareId: applicatorFormData.connectedHardwareId || ''
                 };
 
                 if (applicatorDialog.data && applicatorDialog.data._id) {

@@ -50,6 +50,11 @@ const scanSchema = new mongoose.Schema({
     trim: true,
     default: ''
   },
+  connectedHardwareId: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   price: {
     type: Number,
     default: 0

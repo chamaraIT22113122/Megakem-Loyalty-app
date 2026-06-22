@@ -147,6 +147,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [openGenerateDialog, setOpenGenerateDialog] = useState(false);
   const [openBulkDialog, setOpenBulkDialog] = useState(false);
   const [openPreviewDialog, setOpenPreviewDialog] = useState(false);
+  const [openBulkDeleteDialog, setOpenBulkDeleteDialog] = useState(false);
+  const [bulkDeleteBatchNo, setBulkDeleteBatchNo] = useState('');
   const [selectedQRCode, setSelectedQRCode] = useState(null);
   
   // Reprint request states
@@ -770,6 +772,31 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteBatchNo) {
+      onShowNotification('Please enter a batch number', 'error');
+      return;
+    }
+    if (window.confirm(`Are you SURE you want to delete ALL QR codes for batch ${bulkDeleteBatchNo}? This cannot be undone.`)) {
+      try {
+        setLoading(true);
+        const response = await api.delete('/qr-codes', {
+          data: { batchNo: bulkDeleteBatchNo }
+        });
+
+        onShowNotification(`Deleted ${response.data.deleted} QR codes`, 'success');
+        setOpenBulkDeleteDialog(false);
+        setBulkDeleteBatchNo('');
+        setSelectedForPrint([]);
+        loadData();
+      } catch (error) {
+        onShowNotification('Error deleting QR codes: ' + (error.response?.data?.error || error.message), 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const downloadQRAsImage = async (qrCode) => {
     if (!qrCode.qrData) {
       onShowNotification('QR code image not available', 'error');
@@ -1133,6 +1160,16 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         >
           {isMainAdmin ? 'Bulk Generate' : 'Print Bulk'}
         </Button>
+        {hasPermission('canDelete') && (
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => setOpenBulkDeleteDialog(true)}
+          >
+            Bulk Delete
+          </Button>
+        )}
         {selectedForPrint.length > 0 && (
           <>
             <Button
@@ -2286,6 +2323,39 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Delete Dialog */}
+      <Dialog open={openBulkDeleteDialog} onClose={() => setOpenBulkDeleteDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ color: 'error.main' }}>Bulk Delete QR Codes</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Warning: This action is permanent and will delete all QR codes associated with the specified Batch Number.
+          </Alert>
+          <TextField
+            fullWidth
+            label="Batch Number"
+            value={bulkDeleteBatchNo}
+            onChange={(e) => setBulkDeleteBatchNo(e.target.value)}
+            margin="normal"
+            required
+            helperText="Enter the exact Batch Number to delete all its QR codes"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenBulkDeleteDialog(false)} disabled={loading}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleBulkDelete} 
+            color="error" 
+            variant="contained" 
+            disabled={loading || !bulkDeleteBatchNo}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <DeleteIcon />}
+          >
+            {loading ? 'Deleting...' : 'Delete All in Batch'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

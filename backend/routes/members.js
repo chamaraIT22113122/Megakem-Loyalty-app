@@ -529,7 +529,8 @@ router.post('/', protect, [
       purchaseDate,
       condition = 'good',
       notes,
-      connectedHardware
+      connectedHardware,
+      connectedHardwareId
     } = req.body;
 
     if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && role !== 'applicator' && role !== 'customer') {
@@ -560,6 +561,7 @@ router.post('/', protect, [
       if (condition !== undefined) member.condition = condition || 'good';
       if (notes !== undefined) member.notes = notes;
       if (connectedHardware !== undefined) member.connectedHardware = connectedHardware;
+      if (connectedHardwareId !== undefined) member.connectedHardwareId = connectedHardwareId;
 
       const config = await LoyaltyConfig.getConfig();
       member.updateTier(config.tierThresholds);
@@ -598,7 +600,8 @@ router.post('/', protect, [
       purchaseDate: purchaseDate || null,
       condition,
       notes,
-      connectedHardware
+      connectedHardware,
+      connectedHardwareId
     });
 
     const config = await LoyaltyConfig.getConfig();
@@ -674,7 +677,8 @@ router.put('/:id', protect, async (req, res) => {
       'equipmentBrand',
       'condition',
       'notes',
-      'connectedHardware'
+      'connectedHardware',
+      'connectedHardwareId'
     ];
 
     fieldsToUpdate.forEach(field => {
