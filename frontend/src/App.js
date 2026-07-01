@@ -965,7 +965,9 @@ function App() {
           purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
           condition: m.condition || 'good',
           notes: m.notes || '',
-          connectedHardware: m.connectedHardware || ''
+          photo: m.photo || '',
+          connectedHardware: m.connectedHardware || '',
+          connectedHardwareId: m.connectedHardwareId || ''
         }));
         setApplicatorInfo(mapped);
       } catch (error) {
