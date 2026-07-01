@@ -3779,7 +3779,9 @@ function App() {
                         {/* Profile Info */}
                         <Grid item xs={12} md={4.5} lg={3.5}>
                           <Box sx={{ textAlign: 'center', color: 'white' }}>
-                            <Avatar sx={{ 
+                            <Avatar 
+                              src={currentMember.photo ? (currentMember.photo.startsWith('data:image') || currentMember.photo.startsWith('http') ? currentMember.photo : `http://localhost:5000${currentMember.photo}`) : ''}
+                              sx={{ 
                               width: 120, 
                               height: 120, 
                               mx: 'auto', 

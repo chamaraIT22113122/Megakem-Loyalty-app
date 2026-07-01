@@ -59,7 +59,7 @@ router.get('/', protect, async (req, res) => {
     let selectFields = '';
     if (req.user.role !== 'admin' && !hasUsersPerm) {
       // Exclude sensitive financial and points info for users/co-admins without canManageUsers
-      selectFields = 'memberId memberName phone whatsappNumber nic birthday role location hardwareAddress contactPersonName contactPersonMobile zone equipment equipmentBrand purchaseDate condition notes connectedHardware';
+      selectFields = 'memberId memberName phone whatsappNumber nic birthday role location hardwareAddress contactPersonName contactPersonMobile zone equipment equipmentBrand purchaseDate condition notes connectedHardware photo';
     }
 
     const members = await Member.find(query).select(selectFields).sort(sort);
