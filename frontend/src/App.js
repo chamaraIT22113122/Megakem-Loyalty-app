@@ -8141,7 +8141,13 @@ function App() {
                               ) : (
                                 <>
                                   <TableCell>
-                                    <Avatar src={applicator.photo ? (applicator.photo.startsWith('data:image') || applicator.photo.startsWith('http') ? applicator.photo : `http://localhost:5000${applicator.photo}`) : ''} alt={applicator.name} />
+                                    <Avatar 
+                              src={applicator.photo ? (applicator.photo.startsWith('data:image') || applicator.photo.startsWith('http') ? applicator.photo : `http://localhost:5000${applicator.photo}`) : ''} 
+                              alt={applicator.name}
+                              sx={{ bgcolor: applicator.photo ? 'transparent' : 'secondary.main' }}
+                            >
+                              {applicator.name ? applicator.name[0].toUpperCase() : 'A'}
+                            </Avatar>
                                   </TableCell>
                                   <TableCell>
                                     <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
