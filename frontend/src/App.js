@@ -2228,7 +2228,10 @@ function App() {
         equipmentBrand: m.equipmentBrand || '',
         purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
         condition: m.condition || 'good',
-        notes: m.notes || ''
+        notes: m.notes || '',
+        photo: m.photo || '',
+        connectedHardware: m.connectedHardware || '',
+        connectedHardwareId: m.connectedHardwareId || ''
       }));
       setApplicatorInfo(applicators);
 
