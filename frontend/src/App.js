@@ -8060,7 +8060,7 @@ function App() {
                               ) : (
                                 <>
                                   <TableCell>
-                                    <Avatar src={applicator.photo ? `http://localhost:5000${applicator.photo}` : ''} alt={applicator.name} />
+                                    <Avatar src={applicator.photo ? (applicator.photo.startsWith('data:image') || applicator.photo.startsWith('http') ? applicator.photo : `http://localhost:5000${applicator.photo}`) : ''} alt={applicator.name} />
                                   </TableCell>
                                   <TableCell>
                                     <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
@@ -11030,7 +11030,7 @@ function App() {
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
               <Avatar
-                src={applicatorPhotoFile ? URL.createObjectURL(applicatorPhotoFile) : (applicatorFormData.photo ? `http://localhost:5000${applicatorFormData.photo}` : '')}
+                src={applicatorPhotoFile ? URL.createObjectURL(applicatorPhotoFile) : (applicatorFormData.photo ? (applicatorFormData.photo.startsWith('data:image') || applicatorFormData.photo.startsWith('http') ? applicatorFormData.photo : `http://localhost:5000${applicatorFormData.photo}`) : '')}
                 sx={{ width: 100, height: 100, mb: 1 }}
               />
               <Button
@@ -11231,15 +11231,16 @@ function App() {
                 // Handle photo upload
                 if (applicatorPhotoFile) {
                   try {
-                    const formData = new FormData();
-                    formData.append('image', applicatorPhotoFile);
-                    const uploadResponse = await uploadAPI.uploadImage(formData);
-                    if (uploadResponse.data.success) {
-                      backendPayload.photo = uploadResponse.data.data.url;
-                    }
+                    const base64Photo = await new Promise((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.readAsDataURL(applicatorPhotoFile);
+                      reader.onload = () => resolve(reader.result);
+                      reader.onerror = error => reject(error);
+                    });
+                    backendPayload.photo = base64Photo;
                   } catch (uploadError) {
-                    console.error('Error uploading photo:', uploadError);
-                    showNotification('Failed to upload photo. Saving without new photo.', 'warning');
+                    console.error('Error processing photo:', uploadError);
+                    showNotification('Failed to process photo. Saving without new photo.', 'warning');
                   }
                 }
 
