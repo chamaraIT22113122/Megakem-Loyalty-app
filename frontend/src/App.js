@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI } from './services/api';
 import QRCodeManager from './components/QRCodeManager';
@@ -2012,6 +2014,87 @@ function App() {
       calculateComparison(allScans, products);
     }
   }, [dateFilter, allScans, products, adminAuth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const generatePDFReport = (data, title, isHardware = false) => {
+    if (data.length === 0) {
+      showNotification('No data to export', 'warning');
+      return;
+    }
+    
+    try {
+      const doc = new jsPDF('landscape');
+      
+      // Add Title
+      doc.setFontSize(18);
+      doc.text(title, 14, 22);
+      
+      doc.setFontSize(11);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+      
+      const tableColumn = isHardware 
+        ? ["Photo", "Name", "ID", "Phone", "Equipment", "Brand", "Notes"]
+        : ["Photo", "Name", "ID", "Phone", "NIC", "City", "Notes"];
+        
+      const tableRows = [];
+      const images = []; // store images separately
+      
+      data.forEach(item => {
+        const rowData = isHardware 
+          ? [
+              '', // placeholder for photo
+              item.name || '',
+              item.memberId || '',
+              item.phoneNumber || item.whatsappNumber || '',
+              item.equipment || '',
+              item.equipmentBrand || '',
+              item.notes || ''
+            ]
+          : [
+              '', // placeholder for photo
+              item.name || '',
+              item.memberId || '',
+              item.phoneNumber || item.whatsappNumber || '',
+              item.nic || '',
+              item.location || '',
+              item.notes || ''
+            ];
+            
+        tableRows.push(rowData);
+        
+        let photoData = null;
+        if (item.photo && item.photo.startsWith('data:image')) {
+          photoData = item.photo;
+        }
+        images.push(photoData);
+      });
+      
+      doc.autoTable({
+        head: [tableColumn],
+        body: tableRows,
+        startY: 35,
+        rowPageBreak: 'avoid',
+        styles: { minCellHeight: 20 },
+        didDrawCell: function(data) {
+          if (data.column.index === 0 && data.cell.section === 'body') {
+            const imgData = images[data.row.index];
+            if (imgData) {
+              try {
+                doc.addImage(imgData, 'JPEG', data.cell.x + 2, data.cell.y + 2, 16, 16);
+              } catch (e) {
+                console.error("Failed to add image", e);
+              }
+            }
+          }
+        }
+      });
+      
+      doc.save(`${title.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+      showNotification('PDF exported successfully!', 'success');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      showNotification('Failed to generate PDF', 'error');
+    }
+  };
 
   const handleBulkDelete = async () => {
     if (selectedApplicators.length === 0) return;
@@ -7700,42 +7783,30 @@ function App() {
                       return;
                     }
                     
-                    const wb = XLSX.utils.book_new();
-                    const wsData = [
-                      ['Applicator & Hardware Information Report'],
-                      ['Generated:', new Date().toLocaleString()],
-                      [],
-                      ['Name', 'Member ID', 'Phone Number', 'Whatsapp Number', 'NIC', 'Birthday', 'City', 'Equipment Type', 'Equipment Brand', 'Purchase Date', 'Condition', 'Notes'],
-                      ...applicatorInfo.map(a => [
-                        a.name,
-                        a.memberId,
-                        a.phoneNumber || '',
-                        a.whatsappNumber || '',
-                        a.nic || '',
-                        a.birthday || '',
-                        a.location || '',
-                        a.equipment || '',
-                        a.equipmentBrand || '',
-                        a.purchaseDate || '',
-                        a.condition || '',
-                        a.notes || ''
-                      ])
-                    ];
-                    
-                    const ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws['!cols'] = [
-                      { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
-                      { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 30 }
-                    ];
-                    
-                    XLSX.utils.book_append_sheet(wb, ws, 'Applicator Info');
-                    XLSX.writeFile(wb, `applicator_hardware_info_${new Date().toISOString().split('T')[0]}.xlsx`);
-                    showNotification('Data exported successfully!', 'success');
+                    const isHardware = applicatorTypeFilter === 'Hardware';
+                    const dataToExport = applicatorInfo.filter(a => isHardware ? a.equipment === 'Hardware' : a.equipment !== 'Hardware');
+                    const title = isHardware ? 'Hardware Information Report' : 'Applicator Information Report';
+                    generatePDFReport(dataToExport, title, isHardware);
                   }}
                   disabled={applicatorInfo.length === 0}
                 >
-                  Export
+                  Export All (PDF)
                 </Button>
+                {selectedApplicators.length > 0 && (
+                  <Button
+                    variant='outlined'
+                    color='info'
+                    startIcon={<PictureAsPdf />}
+                    onClick={() => {
+                      const isHardware = applicatorTypeFilter === 'Hardware';
+                      const dataToExport = applicatorInfo.filter(a => selectedApplicators.includes(a._id));
+                      const title = `Selected ${isHardware ? 'Hardware' : 'Applicators'} Report`;
+                      generatePDFReport(dataToExport, title, isHardware);
+                    }}
+                  >
+                    Export Selected (PDF)
+                  </Button>
+                )}
                 <Button
                   variant='outlined'
                   startIcon={<Refresh />}
@@ -8108,6 +8179,19 @@ function App() {
                                       }}
                                     >
                                       <Person />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title='Export PDF'>
+                                    <IconButton
+                                      size='small'
+                                      color='secondary'
+                                      onClick={() => {
+                                        const isHardware = applicator.equipment === 'Hardware';
+                                        const title = `${applicator.name || 'Profile'}_Report`;
+                                        generatePDFReport([applicator], title, isHardware);
+                                      }}
+                                    >
+                                      <PictureAsPdf />
                                     </IconButton>
                                   </Tooltip>
                                   <Tooltip title='Edit'>
