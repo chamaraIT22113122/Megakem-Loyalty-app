@@ -160,6 +160,15 @@ export const qrCodesAPI = {
   savePrintLayout: (settings) => api.put('/qr-codes/settings/print-layout', settings),
 };
 
+// Upload API
+export const uploadAPI = {
+  uploadImage: (formData) => api.post('/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    }
+  }),
+};
+
 // Rewards API
 export const rewardsAPI = {
   getActive: () => api.get('/rewards'),

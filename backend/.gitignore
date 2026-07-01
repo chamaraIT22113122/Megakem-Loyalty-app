@@ -9,3 +9,5 @@ db-data/
 backups/
 test-connection.js
 *.txt
+
+uploads/

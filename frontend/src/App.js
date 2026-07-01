@@ -3,7 +3,7 @@ import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, Ca
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
-import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI } from './services/api';
+import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI } from './services/api';
 import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import megakemLogo from './assets/MegakemLogo.png';
@@ -892,8 +892,10 @@ function App() {
     purchaseDate: '',
     condition: 'good',
     notes: '',
-    connectedHardware: ''
+    connectedHardware: '',
+    photo: ''
   });
+  const [applicatorPhotoFile, setApplicatorPhotoFile] = useState(null);
   
   const [hardwareDialog, setHardwareDialog] = useState({ open: false, data: null });
   const [hardwareFormData, setHardwareFormData] = useState({
@@ -7961,6 +7963,7 @@ function App() {
                           </>
                         ) : (
                           <>
+                            <TableCell sx={{ fontWeight: 700 }}>Photo</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Member ID</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
@@ -7992,7 +7995,7 @@ function App() {
                         if (visibleApplicators.length === 0) {
                           return (
                             <TableRow>
-                              <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 11 : 12} align='center'>
+                              <TableCell colSpan={applicatorTypeFilter === 'Hardware' ? 11 : 13} align='center'>
                                 <Box sx={{ py: 4 }}>
                                   <Hardware sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                                   <Typography variant='body1' color='text.secondary'>
@@ -8056,6 +8059,9 @@ function App() {
                                 </>
                               ) : (
                                 <>
+                                  <TableCell>
+                                    <Avatar src={applicator.photo ? `http://localhost:5000${applicator.photo}` : ''} alt={applicator.name} />
+                                  </TableCell>
                                   <TableCell>
                                     <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
                                       {applicator.name}
@@ -11022,6 +11028,30 @@ function App() {
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
+              <Avatar
+                src={applicatorPhotoFile ? URL.createObjectURL(applicatorPhotoFile) : (applicatorFormData.photo ? `http://localhost:5000${applicatorFormData.photo}` : '')}
+                sx={{ width: 100, height: 100, mb: 1 }}
+              />
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<Add />}
+              >
+                Upload Photo
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setApplicatorPhotoFile(e.target.files[0]);
+                    }
+                  }}
+                />
+              </Button>
+            </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -11194,8 +11224,24 @@ function App() {
                   equipment: applicatorFormData.equipment || 'Applicator',
                   role: 'applicator',
                   connectedHardware: applicatorFormData.connectedHardware || '',
-                  connectedHardwareId: applicatorFormData.connectedHardwareId || ''
+                  connectedHardwareId: applicatorFormData.connectedHardwareId || '',
+                  photo: applicatorFormData.photo || ''
                 };
+                
+                // Handle photo upload
+                if (applicatorPhotoFile) {
+                  try {
+                    const formData = new FormData();
+                    formData.append('image', applicatorPhotoFile);
+                    const uploadResponse = await uploadAPI.uploadImage(formData);
+                    if (uploadResponse.data.success) {
+                      backendPayload.photo = uploadResponse.data.data.url;
+                    }
+                  } catch (uploadError) {
+                    console.error('Error uploading photo:', uploadError);
+                    showNotification('Failed to upload photo. Saving without new photo.', 'warning');
+                  }
+                }
 
                 if (applicatorDialog.data && applicatorDialog.data._id) {
                   await membersAPI.update(applicatorDialog.data._id, backendPayload);
@@ -11207,6 +11253,7 @@ function App() {
                 
                 await loadAdminData();
                 setApplicatorDialog({ open: false, data: null });
+                setApplicatorPhotoFile(null);
               } catch (error) {
                 console.error('Error saving applicator:', error);
                 showNotification(error.response?.data?.message || 'Failed to save applicator information', 'error');
