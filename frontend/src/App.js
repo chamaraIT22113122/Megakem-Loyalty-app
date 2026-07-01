@@ -11323,7 +11323,32 @@ function App() {
                     const base64Photo = await new Promise((resolve, reject) => {
                       const reader = new FileReader();
                       reader.readAsDataURL(applicatorPhotoFile);
-                      reader.onload = () => resolve(reader.result);
+                      reader.onload = (e) => {
+                        const img = new Image();
+                        img.src = e.target.result;
+                        img.onload = () => {
+                          const canvas = document.createElement('canvas');
+                          let width = img.width;
+                          let height = img.height;
+                          const maxDim = 800;
+                          
+                          if (width > height && width > maxDim) {
+                            height *= maxDim / width;
+                            width = maxDim;
+                          } else if (height > maxDim) {
+                            width *= maxDim / height;
+                            height = maxDim;
+                          }
+                          
+                          canvas.width = width;
+                          canvas.height = height;
+                          const ctx = canvas.getContext('2d');
+                          ctx.drawImage(img, 0, 0, width, height);
+                          
+                          resolve(canvas.toDataURL('image/jpeg', 0.7));
+                        };
+                        img.onerror = (err) => reject(err);
+                      };
                       reader.onerror = error => reject(error);
                     });
                     backendPayload.photo = base64Photo;
