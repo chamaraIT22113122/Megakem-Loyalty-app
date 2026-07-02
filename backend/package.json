@@ -1,7 +1,7 @@
 {
   "name": "megakem-loyalty-backend",
   "version": "1.0.0",
-  "description": "Backend API for Megakem Loyalty System",
+  "description": "Backend API for Megakem Rewards System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

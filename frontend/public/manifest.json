@@ -1,7 +1,7 @@
 {
-  "short_name": "Megakem Loyalty",
-  "name": "Megakem Loyalty Program",
-  "description": "Scan products and earn rewards with Megakem Loyalty Program",
+  "short_name": "Megakem Rewards",
+  "name": "Megakem Rewards Program",
+  "description": "Scan products and earn rewards with Megakem Rewards Program",
   "icons": [
     {
       "src": "favicon.ico",

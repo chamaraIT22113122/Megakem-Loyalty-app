@@ -163,7 +163,7 @@ app.use('/api/upload', require('./routes/upload'));
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
-    message: 'Megakem Loyalty API is running',
+    message: 'Megakem Rewards API is running',
     timestamp: new Date().toISOString()
   });
 });
