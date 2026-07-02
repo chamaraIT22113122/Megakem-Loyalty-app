@@ -35,11 +35,7 @@ jobs:
       env:
         REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
       run: |
-        if [ -n "$REACT_APP_API_URL" ]; then
-          echo "REACT_APP_API_URL=$REACT_APP_API_URL" > .env
-        else
-          echo "REACT_APP_API_URL=https://api.megakemrewards.com/api" > .env
-        fi
+        echo "REACT_APP_API_URL=https://megakem-loyalty-app.onrender.com/api" > .env
         CI=false npm run build
 
     - name: Create .htaccess for React Router
