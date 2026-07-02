@@ -10,16 +10,14 @@ root.render(
   </React.StrictMode>
 );
 
-// Register Service Worker for PWA support
+// Unregister Service Worker to ensure mobile devices always get the latest version
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    const swUrl = `${process.env.PUBLIC_URL}/service-worker.js`;
-    navigator.serviceWorker.register(swUrl)
-      .then(registration => {
-        console.log('SW registered: ', registration);
-      })
-      .catch(registrationError => {
-        console.log('SW registration failed: ', registrationError);
-      });
-  });
+  navigator.serviceWorker.ready
+    .then((registration) => {
+      registration.unregister();
+      console.log('Service worker unregistered successfully');
+    })
+    .catch((error) => {
+      console.error(error.message);
+    });
 }
