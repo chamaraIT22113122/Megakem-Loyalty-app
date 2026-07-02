@@ -62,7 +62,7 @@ jobs:
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./frontend/build/
-        server-dir: ./public_html/
+        server-dir: ./domains/megakemrewards.com/public_html/
         # Exclude files you don't want to upload
         exclude: |
           **/.git*
