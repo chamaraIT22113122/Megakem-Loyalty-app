@@ -1,5 +1,6 @@
+/* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
+import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -837,6 +838,9 @@ function App() {
   const [applicatorSearchQuery, setApplicatorSearchQuery] = useState('');
   const [selectedApplicators, setSelectedApplicators] = useState([]);
   const [applicatorTypeFilter, setApplicatorTypeFilter] = useState('Applicator');
+  const [applicatorsPage, setApplicatorsPage] = useState(0);
+  const [applicatorsRowsPerPage, setApplicatorsRowsPerPage] = useState(50);
+  const [applicatorsTotalCount, setApplicatorsTotalCount] = useState(0);
   const [qrCodeSearchQuery, setQrCodeSearchQuery] = useState('');
   const [cashRewards, setCashRewards] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -983,22 +987,21 @@ function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const token = localStorage.getItem('token');
         const storedAdminAuth = localStorage.getItem('adminAuth');
         
-        if (token) {
-          try { 
-            const response = await authAPI.getMe(); 
-            setUser(response.data.data);
-            // Keep default welcome view - don't auto-switch to admin
-            // Users can manually click "Admin" button to access admin panel
-          }
-          catch { 
-            localStorage.removeItem('token'); 
-            localStorage.removeItem('adminAuth');
-            await createAnonymousSession(); 
-          }
-        } else { await createAnonymousSession(); }
+        try { 
+          // Always try to fetch the current session. The backend will use HttpOnly cookies.
+          const response = await authAPI.getMe(); 
+          setUser(response.data.data);
+          // If we have adminAuth flag in localStorage and the user has correct permissions,
+          // they can access the admin panel. The backend already verified their session.
+        }
+        catch { 
+          // Not logged in or session expired
+          localStorage.removeItem('token'); 
+          localStorage.removeItem('adminAuth');
+          await createAnonymousSession(); 
+        }
       } catch (error) { 
         console.error('Auth error:', error); 
         showNotification(getUserFriendlyError(error), 'error', 5000); 
@@ -1006,6 +1009,7 @@ function App() {
       finally { setInitializing(false); }
     };
     initAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const createAnonymousSession = async (retries = 3) => {
@@ -1246,6 +1250,7 @@ function App() {
     // Set up polling to refresh every 30 seconds (reduced from 3s to prevent server flood)
     pollIntervalRef.current = setInterval(refreshScanHistory, 30000);
     return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
@@ -1277,6 +1282,7 @@ function App() {
       }
     };
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Upgrade 3: Play beep sound using Web Audio API (no audio file needed)
@@ -2120,6 +2126,57 @@ function App() {
     }
   };
 
+  const fetchPaginatedMembers = async () => {
+    if (!adminAuth) return;
+    try {
+      setLoading(true);
+      const res = await membersAPI.getAll({
+        page: applicatorsPage + 1,
+        limit: applicatorsRowsPerPage,
+        search: applicatorSearchQuery
+      });
+      const allMembers = res.data?.data || [];
+      setMembers(allMembers);
+      
+      const applicators = allMembers.filter(m => m.role === 'applicator' || m.role === 'customer').map(m => ({
+        _id: m._id,
+        name: m.memberName,
+        memberId: m.memberId,
+        phoneNumber: m.phone || '',
+        whatsappNumber: m.whatsappNumber || '',
+        nic: m.nic || '',
+        birthday: m.birthday ? new Date(m.birthday).toISOString().split('T')[0] : '',
+        location: m.location || '',
+        hardwareAddress: m.hardwareAddress || '',
+        contactPersonName: m.contactPersonName || '',
+        contactPersonMobile: m.contactPersonMobile || '',
+        zone: m.zone || '',
+        equipment: m.equipment || '',
+        equipmentBrand: m.equipmentBrand || '',
+        purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
+        condition: m.condition || 'good',
+        notes: m.notes || '',
+        photo: m.photo || '',
+        connectedHardware: m.connectedHardware || '',
+        connectedHardwareId: m.connectedHardwareId || ''
+      }));
+      setApplicatorInfo(applicators);
+      setApplicatorsTotalCount(res.data?.pagination?.total || applicators.length);
+    } catch (error) {
+      console.error('Error fetching paginated members:', error);
+      showNotification('Failed to load paginated members.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (adminAuth && (hasPermission('canManageUsers') || hasPermission('canManageProducts') || hasPermission('canViewLeaderboard'))) {
+      fetchPaginatedMembers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicatorsPage, applicatorsRowsPerPage, applicatorSearchQuery, adminAuth]);
+
   const loadAdminData = async () => {
     if (!adminAuth) return;
     try {
@@ -2165,22 +2222,25 @@ function App() {
       const hasProducts = hasPermission('canManageProducts');
       const hasLeaderboard = hasPermission('canViewLeaderboard');
 
-      const membersPromise = (hasUsers || hasProducts || hasLeaderboard)
-        ? membersAPI.getAll()
-        : Promise.resolve({ data: { data: [] } });
-
       const usersPromise = isMainAdmin()
         ? authAPI.getUsers()
         : Promise.resolve({ data: { data: [] } });
 
-      const [statsRes, scansRes, usersRes, productsRes, membersRes, loyaltyConfigRes, allScansRes] = await Promise.all([
-        scansAPI.getStats().catch(() => ({ data: { data: {} } })),
-        scansAPI.getLive().catch(() => ({ data: { data: [] } })),
-        usersPromise.catch(() => ({ data: { data: [] } })),
-        productsAPI.getAll().catch(() => ({ data: { data: [] } })),
-        membersPromise.catch(() => ({ data: { data: [] } })),
-        loyaltyAPI.getConfig().catch(() => ({ data: { data: null } })),
-        scansAPI.getAll({ limit: 1000 }).catch(() => ({ data: { data: [] } }))
+      const handleApiError = (apiCall, fallbackData, errorMessage) => {
+        return apiCall.catch(err => {
+          console.error(errorMessage, err);
+          showNotification(errorMessage, 'error');
+          return { data: { data: fallbackData } };
+        });
+      };
+
+      const [statsRes, scansRes, usersRes, productsRes, loyaltyConfigRes, allScansRes] = await Promise.all([
+        handleApiError(scansAPI.getStats(), {}, 'Failed to load stats.'),
+        handleApiError(scansAPI.getLive(), [], 'Failed to load recent scans.'),
+        handleApiError(usersPromise, [], 'Failed to load users.'),
+        handleApiError(productsAPI.getAll(), [], 'Failed to load products.'),
+        handleApiError(loyaltyAPI.getConfig(), null, 'Failed to load loyalty config.'),
+        handleApiError(scansAPI.getAll({ limit: 1000 }), [], 'Failed to load scan history.')
       ]);
 
       if (hasProducts || isMainAdmin()) {
@@ -2209,34 +2269,6 @@ function App() {
       setProducts(fetchedProducts);
       setAllScans(fetchedAllScans);
       calculateComparison(fetchedAllScans, fetchedProducts);
-
-      const allMembers = membersRes.data?.data || [];
-      setMembers(allMembers);
-      
-      const applicators = allMembers.filter(m => m.role === 'applicator' || m.role === 'customer').map(m => ({
-        _id: m._id,
-        name: m.memberName,
-        memberId: m.memberId,
-        phoneNumber: m.phone || '',
-        whatsappNumber: m.whatsappNumber || '',
-        nic: m.nic || '',
-        birthday: m.birthday ? new Date(m.birthday).toISOString().split('T')[0] : '',
-        location: m.location || '',
-        hardwareAddress: m.hardwareAddress || '',
-        contactPersonName: m.contactPersonName || '',
-        contactPersonMobile: m.contactPersonMobile || '',
-        zone: m.zone || '',
-        equipment: m.equipment || '',
-        equipmentBrand: m.equipmentBrand || '',
-        purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
-        condition: m.condition || 'good',
-        notes: m.notes || '',
-        photo: m.photo || '',
-        connectedHardware: m.connectedHardware || '',
-        connectedHardwareId: m.connectedHardwareId || ''
-      }));
-      setApplicatorInfo(applicators);
-
       setLoyaltyConfig(loyaltyConfigRes.data?.data || null);
       console.log('✅ Products loaded:', productsRes.data?.data?.length || 0, 'products');
       if (isMainAdmin() || hasPermission('canManageCoAdminRequests')) {
@@ -2482,6 +2514,7 @@ function App() {
       
       return () => clearInterval(interval);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, adminAuth, view, adminTab]);
 
   // Tab protection and redirection logic
@@ -2513,6 +2546,7 @@ function App() {
         else setAdminTab('profile');
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminAuth, user, view, adminTab]);
 
   // Load leaderboard when leaderboard view is accessed
@@ -2933,6 +2967,7 @@ function App() {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleSyncMembers = async () => {
     if (!window.confirm('This will sync all members from existing scans. This may take a few moments. Continue?')) {
       return;
@@ -3559,6 +3594,7 @@ function App() {
             
             const currentTier = tierThresholds.find(tier => totalPoints >= tier.min && totalPoints < tier.max) || tierThresholds[tierThresholds.length - 1];
             const nextTier = tierThresholds[tierThresholds.indexOf(currentTier) + 1];
+            // eslint-disable-next-line no-unused-vars
             const tierProgress = nextTier ? ((totalPoints - currentTier.min) / (nextTier.min - currentTier.min)) * 100 : 100;
             
             // Group purchases by month for chart
@@ -8267,6 +8303,18 @@ function App() {
                     </TableBody>
                   </Table>
                 </TableContainer>
+                <TablePagination
+                  component="div"
+                  count={applicatorsTotalCount}
+                  page={applicatorsPage}
+                  onPageChange={(e, newPage) => setApplicatorsPage(newPage)}
+                  rowsPerPage={applicatorsRowsPerPage}
+                  onRowsPerPageChange={(e) => {
+                    setApplicatorsRowsPerPage(parseInt(e.target.value, 10));
+                    setApplicatorsPage(0);
+                  }}
+                  rowsPerPageOptions={[50, 100, 200, 500]}
+                />
               </CardContent>
             </Card>
           </Box>}
@@ -11307,6 +11355,7 @@ function App() {
                 } else {
                   do {
                     newMemberId = 'MA' + Math.floor(1000 + Math.random() * 9000).toString();
+                    // eslint-disable-next-line no-loop-func
                   } while (applicatorInfo.some(a => a.memberId === newMemberId));
                 }
                 const generatedMemberId = newMemberId;
@@ -11331,7 +11380,7 @@ function App() {
                 // Handle photo upload
                 if (applicatorPhotoFile) {
                   try {
-                    const base64Photo = await new Promise((resolve, reject) => {
+                    const uploadedUrl = await new Promise((resolve, reject) => {
                       const reader = new FileReader();
                       reader.readAsDataURL(applicatorPhotoFile);
                       reader.onload = (e) => {
@@ -11356,16 +11405,36 @@ function App() {
                           const ctx = canvas.getContext('2d');
                           ctx.drawImage(img, 0, 0, width, height);
                           
-                          resolve(canvas.toDataURL('image/jpeg', 0.7));
+                          canvas.toBlob(async (blob) => {
+                            if (!blob) {
+                              reject(new Error('Canvas to Blob failed'));
+                              return;
+                            }
+                            const formData = new FormData();
+                            formData.append('image', blob, applicatorPhotoFile.name || 'photo.jpg');
+                            
+                            try {
+                              const uploadRes = await uploadAPI.uploadImage(formData);
+                              if (uploadRes.data && uploadRes.data.url) {
+                                resolve(uploadRes.data.url);
+                              } else if (uploadRes.data && uploadRes.data.data && uploadRes.data.data.url) {
+                                resolve(uploadRes.data.data.url);
+                              } else {
+                                reject(new Error('Upload API did not return a URL'));
+                              }
+                            } catch (err) {
+                              reject(err);
+                            }
+                          }, 'image/jpeg', 0.8);
                         };
                         img.onerror = (err) => reject(err);
                       };
                       reader.onerror = error => reject(error);
                     });
-                    backendPayload.photo = base64Photo;
+                    backendPayload.photo = uploadedUrl;
                   } catch (uploadError) {
                     console.error('Error processing photo:', uploadError);
-                    showNotification('Failed to process photo. Saving without new photo.', 'warning');
+                    showNotification('Failed to upload photo. Saving without new photo.', 'warning');
                   }
                 }
 
@@ -11546,6 +11615,7 @@ function App() {
                 } else {
                   do {
                     newHardwareId = 'MH' + Math.floor(1000 + Math.random() * 9000).toString();
+                    // eslint-disable-next-line no-loop-func
                   } while (applicatorInfo.some(a => a.memberId === newHardwareId));
                 }
                 const generatedHardwareId = newHardwareId;

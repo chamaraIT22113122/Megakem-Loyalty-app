@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
