@@ -11,7 +11,7 @@ const { logAction } = require('../middleware/audit');
 // @access  Private/Admin
 router.get('/', protect, async (req, res) => {
   try {
-    const { role, search, sortBy = 'points', sortOrder = 'desc' } = req.query;
+    const { role, search, sortBy = 'points', sortOrder = 'desc', page = 1, limit = 50 } = req.query;
     
     // Allow admin, co-admin with proper permissions, or any user fetching only applicator list for scan validation
     const isAdmin = req.user.role === 'admin';
@@ -62,11 +62,26 @@ router.get('/', protect, async (req, res) => {
       selectFields = 'memberId memberName phone whatsappNumber nic birthday role location hardwareAddress contactPersonName contactPersonMobile zone equipment equipmentBrand purchaseDate condition notes connectedHardware photo';
     }
 
-    const members = await Member.find(query).select(selectFields).sort(sort);
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    const members = await Member.find(query)
+      .select(selectFields)
+      .sort(sort)
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum);
+
+    const count = await Member.countDocuments(query);
 
     res.json({
       success: true,
-      data: members
+      data: members,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: count,
+        pages: Math.ceil(count / limitNum)
+      }
     });
   } catch (error) {
     res.status(400).json({

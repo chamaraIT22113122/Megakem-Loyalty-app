@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const cron = require('node-cron');
@@ -17,6 +18,7 @@ dotenv.config();
 // Initialize Express
 const app = express();
 
+app.use(cookieParser());
 const initializeApp = async () => {
   try {
     const conn = await connectDB();

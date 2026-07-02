@@ -170,6 +170,13 @@ router.post('/login', [
     const token = generateToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
 
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
     res.json({
       success: true,
       data: {
@@ -181,7 +188,7 @@ router.post('/login', [
         tier: user.tier,
         totalScans: user.totalScans,
         achievements: user.achievements,
-        token,
+        token, // Keep for backward compatibility during transition
         refreshToken
       }
     });
@@ -274,6 +281,13 @@ router.post('/admin/login', [
       role: user.role 
     });
 
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
     res.json({
       success: true,
       data: {
@@ -282,7 +296,7 @@ router.post('/admin/login', [
         email: user.email,
         role: user.role,
         permissions: user.permissions,
-        token,
+        token, // Keep for backward compatibility during transition
         refreshToken
       }
     });
@@ -951,6 +965,33 @@ router.get('/stats', protect, async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+});
+
+// @route   GET /api/auth/me
+// @desc    Get current user session
+// @access  Private
+router.get('/me', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+        points: user.points,
+        tier: user.tier
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
