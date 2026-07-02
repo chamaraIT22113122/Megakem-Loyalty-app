@@ -211,7 +211,7 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
       finalExpDate.setFullYear(finalExpDate.getFullYear() + 2);
     }
 
-    const baseUrl = 'https://chamarait22113122.github.io/Megakem-Loyalty-app';
+    const baseUrl = process.env.FRONTEND_URL || 'https://megakemrewards.com';
     const generatedQRs = [];
 
     for (const productId of productIds) {
@@ -589,7 +589,7 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       });
     }
 
-    const baseUrl = 'https://chamarait22113122.github.io/Megakem-Loyalty-app';
+    const baseUrl = process.env.FRONTEND_URL || 'https://megakemrewards.com';
     const qrRecords = [];
 
     // Generate in chunks with the database to avoid memory issues and long transactions
