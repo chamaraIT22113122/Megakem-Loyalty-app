@@ -738,6 +738,8 @@ router.put('/users/:id', protect, async (req, res) => {
           'permissions.canViewLeaderboard': permissions.canViewLeaderboard === true,
           'permissions.canManageProducts': permissions.canManageProducts === true,
           'permissions.canManageQRCodes': permissions.canManageQRCodes === true,
+          'permissions.canPrintQRCodes': permissions.canPrintQRCodes === true,
+          'permissions.canViewQRAnalytics': permissions.canViewQRAnalytics === true,
           'permissions.canManageCoAdminRequests': permissions.canManageCoAdminRequests === true,
           'permissions.canManageApplicators': permissions.canManageApplicators === true
         })

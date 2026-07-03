@@ -64,6 +64,34 @@ const initializeApp = async () => {
       console.error('⚠️  Error with admin user:', error.message);
     }
 
+    // Fix permissions for production@megakemglobal.com
+    try {
+      const targetUser = await User.findOne({ email: 'production@megakemglobal.com' });
+      if (targetUser) {
+        let changed = false;
+        if (!targetUser.permissions) targetUser.permissions = {};
+        
+        const permsToDisable = ['canViewScans', 'canManageQRCodes', 'canPrintQRCodes', 'canViewQRAnalytics'];
+        for (const p of permsToDisable) {
+          if (targetUser.permissions[p] !== false) {
+            targetUser.permissions[p] = false;
+            changed = true;
+          }
+        }
+        if (targetUser.adminType) {
+          targetUser.adminType = null;
+          changed = true;
+        }
+        
+        if (changed) {
+          await targetUser.save();
+          console.log('✅ Fixed permissions for production@megakemglobal.com');
+        }
+      }
+    } catch (e) {
+      console.error('⚠️  Error fixing user permissions:', e.message);
+    }
+
     // ── Auto-fix member/scan roles based on memberId prefix ──────────────────
     // MA* → applicator  |  MH* / CUS-* → customer
     // Safe to run on every startup (updateMany with $ne guard = no-op when already correct)

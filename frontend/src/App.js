@@ -3319,11 +3319,6 @@ function App() {
       return true;
     }
 
-    // Auto-grant scans database access to all admins and co-admins
-    if (permission === 'canViewScans' && user && (user.role === 'admin' || user.role === 'co-admin')) {
-      return true;
-    }
-
     // Check user state's direct permissions first (populated during login)
     if (user && user.permissions) {
       return user.permissions[permission] === true;
