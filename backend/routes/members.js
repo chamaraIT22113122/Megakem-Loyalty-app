@@ -53,7 +53,8 @@ router.get('/stats/summary', protect, async (req, res) => {
         completeApplicators,
         incompleteApplicators,
         completeHardwares,
-        incompleteHardwares
+        incompleteHardwares,
+        memberLocations: allMembers.map(m => ({ location: m.location, equipment: m.equipment, role: m.role }))
       }
     });
   } catch (error) {

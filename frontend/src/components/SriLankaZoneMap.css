@@ -1,0 +1,123 @@
+.sri-lanka-map-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 20px;
+  background-color: transparent;
+}
+
+.map-svg-wrapper {
+  flex: 1;
+  max-width: 500px;
+  position: relative;
+}
+
+/* Base style for map paths */
+.svg-map__location {
+  fill: #f0f0f0;
+  cursor: pointer;
+  stroke: #FFFFFF;
+  stroke-width: 1;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+/* Zone Colors */
+.zone-1 { fill: #CCCCCC; } /* Grey */
+.zone-2 { fill: #00AEEF; } /* Light Blue */
+.zone-3 { fill: #C4D82D; } /* Green */
+.zone-4 { fill: #1E2B58; } /* Dark Blue */
+.zone-5 { fill: #00AEEF; } /* Light Blue */
+
+/* Hover & Selected States */
+.svg-map__location.hovered {
+  filter: brightness(1.15);
+  stroke: #333333;
+  stroke-width: 1.5;
+}
+
+.svg-map__location.selected {
+  filter: brightness(0.9);
+  stroke: #333333;
+  stroke-width: 2;
+  box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
+}
+
+/* District Text Labels */
+.district-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  pointer-events: none; /* Let clicks pass through to SVG */
+  text-shadow: 0px 0px 3px rgba(255, 255, 255, 0.7);
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.district-label.highlight {
+  font-weight: 700;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Zone Stats Popup */
+.zone-stats-popup {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(5px);
+  border-radius: 12px;
+  padding: 15px 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 260px;
+  border: 1px solid rgba(255,255,255,0.4);
+}
+
+.zone-stat-header {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+  padding-bottom: 10px;
+  border-bottom: 3px solid #eee;
+  display: flex;
+  align-items: center;
+}
+
+.zone-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.1rem;
+  padding: 5px 0;
+}
+
+.zone-stat-label {
+  color: #555;
+  font-weight: 500;
+}
+
+.zone-stat-value {
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+
+.zone-instruction {
+  margin-top: auto;
+  font-size: 0.85rem;
+  color: #888;
+  font-style: italic;
+  text-align: center;
+  padding-top: 15px;
+  border-top: 1px dashed #eee;
+}
+
+/* Responsive adjustments */
+@media (max-width: 800px) {
+  .district-label {
+    font-size: 9px;
+  }
+}

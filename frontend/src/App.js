@@ -9,6 +9,7 @@ import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, 
 import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI } from './services/api';
 import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
+import SriLankaZoneMap from './components/SriLankaZoneMap';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
@@ -5539,7 +5540,7 @@ function App() {
 
             {/* Sri Lanka Zone Distribution Map */}
             <Grid item xs={12}>
-              <ZoneSLMap members={members} />
+              <SriLankaZoneMap members={applicatorStats?.memberLocations || members} />
             </Grid>
             
             <Grid item xs={12} md={6}>
