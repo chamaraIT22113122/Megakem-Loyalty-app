@@ -187,44 +187,42 @@ const SriLankaZoneMap = ({ members = [] }) => {
         })}
       </div>
       
-      <div className="zone-stats-container">
-        {activeZoneInfo && (
-          <div 
-            className={`zone-stats-popup ${hoveredZone ? 'is-hovering' : 'is-selected'}`}
-            style={typeof window !== 'undefined' && window.innerWidth >= 768 && hoveredZone ? {
-              position: 'fixed',
-              left: tooltip.x + 300 > window.innerWidth ? tooltip.x - 280 : tooltip.x + 20,
-              top: tooltip.y + 20 > window.innerHeight - 200 ? tooltip.y - 180 : tooltip.y + 20,
-              zIndex: 9999,
-              pointerEvents: 'none'
-            } : {}}
-          >
-            <div className="zone-stat-header" style={{ borderBottomColor: activeZoneInfo?.color }}>
-              <span style={{ 
-                display: 'inline-block', 
-                width: 16, 
-                height: 16, 
-                backgroundColor: activeZoneInfo?.color, 
-                borderRadius: '50%', 
-                marginRight: 8,
-                verticalAlign: 'middle'
-              }}></span>
-              {activeZoneInfo.name}
-            </div>
-            <div className="zone-stat-item">
-              <span className="zone-stat-label">Applicators:</span>
-              <span className="zone-stat-value" style={{ color: activeZoneInfo?.color }}>{currentZoneData.applicators}</span>
-            </div>
-            <div className="zone-stat-item">
-              <span className="zone-stat-label">Hardware Stores:</span>
-              <span className="zone-stat-value" style={{ color: activeZoneInfo?.color }}>{currentZoneData.hardware}</span>
-            </div>
-            <div className="zone-instruction">
-              Data is synced in real-time from the Member database.
-            </div>
+      {tooltip.visible && hoveredZone && activeZoneInfo && (
+        <div 
+          className="zone-stats-popup"
+          style={{
+            position: 'fixed',
+            left: tooltip.x + 20,
+            top: tooltip.y + 20,
+            zIndex: 9999,
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="zone-stat-header" style={{ borderBottomColor: activeZoneInfo?.color }}>
+            <span style={{ 
+              display: 'inline-block', 
+              width: 16, 
+              height: 16, 
+              backgroundColor: activeZoneInfo?.color, 
+              borderRadius: '50%', 
+              marginRight: 8,
+              verticalAlign: 'middle'
+            }}></span>
+            {activeZoneInfo.name}
           </div>
-        )}
-      </div>
+          <div className="zone-stat-item">
+            <span className="zone-stat-label">Applicators:</span>
+            <span className="zone-stat-value" style={{ color: activeZoneInfo?.color }}>{currentZoneData.applicators}</span>
+          </div>
+          <div className="zone-stat-item">
+            <span className="zone-stat-label">Hardware Stores:</span>
+            <span className="zone-stat-value" style={{ color: activeZoneInfo?.color }}>{currentZoneData.hardware}</span>
+          </div>
+          <div className="zone-instruction">
+            Data is synced in real-time from the Member database.
+          </div>
+        </div>
+      )}
     </div>
   );
 };
