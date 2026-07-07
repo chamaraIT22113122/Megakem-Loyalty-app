@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /reports/
+
+Sitemap: https://megakem-loyalty-app.onrender.com/sitemap.xml
