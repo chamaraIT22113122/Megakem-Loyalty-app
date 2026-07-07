@@ -884,6 +884,7 @@ function App() {
   
   // Applicator & Hardware Info States
   const [applicatorInfo, setApplicatorInfo] = useState([]);
+  const [applicatorStats, setApplicatorStats] = useState(null);
   const [applicatorDialog, setApplicatorDialog] = useState({ open: false, data: null });
   const [applicatorFormData, setApplicatorFormData] = useState({
     name: '',
@@ -2162,6 +2163,15 @@ function App() {
       }));
       setApplicatorInfo(applicators);
       setApplicatorsTotalCount(res.data?.pagination?.total || applicators.length);
+
+      try {
+        const statsRes = await membersAPI.getStats();
+        if (statsRes.data?.success) {
+          setApplicatorStats(statsRes.data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch applicator stats:', err);
+      }
     } catch (error) {
       console.error('Error fetching paginated members:', error);
       showNotification('Failed to load paginated members.', 'error');
@@ -7926,7 +7936,7 @@ function App() {
                   <CardContent>
                     <Typography variant='caption' color='text.secondary'>Total Applicators</Typography>
                     <Typography variant='h4' fontWeight={700} color='primary.main'>
-                      {applicatorInfo.filter(a => a.equipment !== 'Hardware').length}
+                      {applicatorStats?.totalApplicators || 0}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -7936,7 +7946,7 @@ function App() {
                   <CardContent>
                     <Typography variant='caption' color='text.secondary'>Total Hardwares</Typography>
                     <Typography variant='h4' fontWeight={700} color='success.main'>
-                      {applicatorInfo.filter(a => a.equipment === 'Hardware').length}
+                      {applicatorStats?.totalHardwares || 0}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -7946,14 +7956,9 @@ function App() {
                   <CardContent>
                     <Typography variant='caption' color='text.secondary'>Complete Profiles ({applicatorTypeFilter === 'Hardware' ? 'Hardwares' : 'Applicators'})</Typography>
                     <Typography variant='h4' fontWeight={700} color='info.main'>
-                      {applicatorInfo.filter(a => {
-                        const matchesType = applicatorTypeFilter === 'Hardware' ? a.equipment === 'Hardware' : a.equipment !== 'Hardware';
-                        if (!matchesType) return false;
-                        if (a.equipment === 'Hardware') {
-                          return !!(a.name && a.hardwareAddress && a.phoneNumber && a.whatsappNumber && a.contactPersonName && a.contactPersonMobile && a.location && a.zone);
-                        }
-                        return !!(a.name && a.phoneNumber && a.whatsappNumber && a.nic && a.birthday && a.location && a.zone);
-                      }).length}
+                      {applicatorTypeFilter === 'Hardware' 
+                        ? (applicatorStats?.completeHardwares || 0) 
+                        : (applicatorStats?.completeApplicators || 0)}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -7963,14 +7968,9 @@ function App() {
                   <CardContent>
                     <Typography variant='caption' color='text.secondary'>Incomplete Profiles ({applicatorTypeFilter === 'Hardware' ? 'Hardwares' : 'Applicators'})</Typography>
                     <Typography variant='h4' fontWeight={700} color='warning.main'>
-                      {applicatorInfo.filter(a => {
-                        const matchesType = applicatorTypeFilter === 'Hardware' ? a.equipment === 'Hardware' : a.equipment !== 'Hardware';
-                        if (!matchesType) return false;
-                        if (a.equipment === 'Hardware') {
-                          return !a.name || !a.hardwareAddress || !a.phoneNumber || !a.whatsappNumber || !a.contactPersonName || !a.contactPersonMobile || !a.location || !a.zone;
-                        }
-                        return !a.name || !a.phoneNumber || !a.whatsappNumber || !a.nic || !a.birthday || !a.location || !a.zone;
-                      }).length}
+                      {applicatorTypeFilter === 'Hardware' 
+                        ? (applicatorStats?.incompleteHardwares || 0) 
+                        : (applicatorStats?.incompleteApplicators || 0)}
                     </Typography>
                   </CardContent>
                 </Card>

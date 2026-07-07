@@ -520,8 +520,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     try {
       setLoading(true);
       
-      // Fetch QR codes
-      const qrResponse = await api.get('/qr-codes');
+      // Fetch QR codes (pass high limit because frontend uses client-side pagination)
+      const qrResponse = await api.get('/qr-codes?limit=100000');
       setQRCodes(qrResponse.data.data || []);
       
       // Fetch batch summary

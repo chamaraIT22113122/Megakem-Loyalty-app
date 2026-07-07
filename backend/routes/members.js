@@ -6,6 +6,61 @@ const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { protect } = require('../middleware/auth');
 const { logAction } = require('../middleware/audit');
 
+// @route   GET /api/members/stats/summary
+// @desc    Get summary statistics for applicators and hardwares
+// @access  Private/Admin
+router.get('/stats/summary', protect, async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    const isCoAdmin = req.user.role === 'co-admin';
+    const hasUsersPerm = req.user.permissions?.canManageUsers === true;
+    const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
+
+    if (!isAdmin && !(isCoAdmin && (hasUsersPerm || hasApplicatorsPerm))) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    // Get all applicators and hardwares
+    const allMembers = await Member.find({ role: { $in: ['applicator', 'customer'] } })
+      .select('equipment memberName phone whatsappNumber nic birthday location zone hardwareAddress contactPersonName contactPersonMobile');
+
+    let totalApplicators = 0;
+    let totalHardwares = 0;
+    let completeApplicators = 0;
+    let incompleteApplicators = 0;
+    let completeHardwares = 0;
+    let incompleteHardwares = 0;
+
+    allMembers.forEach(m => {
+      if (m.equipment === 'Hardware') {
+        totalHardwares++;
+        const isComplete = !!(m.memberName && m.hardwareAddress && m.phone && m.whatsappNumber && m.contactPersonName && m.contactPersonMobile && m.location && m.zone);
+        if (isComplete) completeHardwares++;
+        else incompleteHardwares++;
+      } else {
+        totalApplicators++;
+        const isComplete = !!(m.memberName && m.phone && m.whatsappNumber && m.nic && m.birthday && m.location && m.zone);
+        if (isComplete) completeApplicators++;
+        else incompleteApplicators++;
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalApplicators,
+        totalHardwares,
+        completeApplicators,
+        incompleteApplicators,
+        completeHardwares,
+        incompleteHardwares
+      }
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
 // @route   GET /api/members
 // @desc    Get all members (customers and applicators)
 // @access  Private/Admin
