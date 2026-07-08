@@ -75,10 +75,13 @@ const getZoneId = (districtId) => {
   return null;
 };
 
-const SriLankaZoneMap = ({ members = [] }) => {
+const SriLankaZoneMap = ({ members = [], onZoneSelect, selectedZone: externalSelectedZone }) => {
   const [hoveredZone, setHoveredZone] = useState(null);
   const [selectedZone, setSelectedZone] = useState(4); // Default to a prominent zone
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0 });
+
+  // Sync external zone to internal highlight
+  const activeExternalZone = externalSelectedZone ? parseInt(externalSelectedZone) : null;
 
   const zoneData = useMemo(() => {
     // Calculate stats based on real members
@@ -126,13 +129,15 @@ const SriLankaZoneMap = ({ members = [] }) => {
     const zoneId = getZoneId(event.target.id);
     if (zoneId) {
       setSelectedZone(zoneId);
+      if (onZoneSelect) onZoneSelect(zoneId); // Propagate to parent
     }
   };
 
   const getLocationClassName = (location, index) => {
     const zoneId = getZoneId(location.id);
     let className = `svg-map__location zone-${zoneId}`;
-    if (zoneId === selectedZone) {
+    const isActive = activeExternalZone ? zoneId === activeExternalZone : zoneId === selectedZone;
+    if (isActive) {
       className += ' selected';
     } else if (zoneId === hoveredZone) {
       className += ' hovered';
@@ -140,7 +145,7 @@ const SriLankaZoneMap = ({ members = [] }) => {
     return className;
   };
 
-  const activeZone = hoveredZone || selectedZone;
+  const activeZone = hoveredZone || (activeExternalZone || selectedZone);
   const activeZoneInfo = zoneGroups[activeZone];
   const currentZoneData = activeZone ? zoneData[activeZone] : { applicators: 0, hardware: 0 };
 
@@ -170,7 +175,10 @@ const SriLankaZoneMap = ({ members = [] }) => {
                 left: label.left,
                 color: textColor
               }}
-              onClick={() => setSelectedZone(zoneId)}
+              onClick={() => {
+                setSelectedZone(zoneId);
+                if (onZoneSelect) onZoneSelect(zoneId);
+              }}
               onMouseOver={(e) => {
                 setHoveredZone(zoneId);
                 setTooltip({ visible: true, x: e.clientX, y: e.clientY });

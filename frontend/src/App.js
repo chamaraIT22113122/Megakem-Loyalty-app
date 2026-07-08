@@ -567,6 +567,8 @@ function App() {
   });
   const [adminPassword, setAdminPassword] = useState('');
   const [adminTab, setAdminTab] = useState('dashboard');
+  const [dashboardStartDate, setDashboardStartDate] = useState('');
+  const [dashboardEndDate, setDashboardEndDate] = useState('');
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [coAdminApprovedCount, setCoAdminApprovedCount] = useState(0);
   const [coAdminRequestsDialogOpen, setCoAdminRequestsDialogOpen] = useState(false);
@@ -1716,6 +1718,7 @@ function App() {
       }
     }
     if (cart.length === 0) return showNotification('List is empty', 'error');
+    if (role === 'applicator' && !connectedHardware) return showNotification('Please select where you purchased from', 'error');
     if (!memberId.trim()) return showNotification(role === 'customer' ? 'Please enter Phone Number' : 'Please enter Member ID', 'error');
     
     setLoading(true);
@@ -4609,8 +4612,9 @@ function App() {
                   renderInput={(params) => (
                     <TextField 
                       {...params} 
-                      label="Purchased From (Optional)" 
+                      label="Purchased From" 
                       placeholder="Search Hardware shops..."
+                      required
                       sx={{ 
                         '& .MuiOutlinedInput-root': { 
                           bgcolor: 'white', 
@@ -4624,7 +4628,7 @@ function App() {
                   fullWidth
                 />
               </Grid>
-              <Grid item xs={12}><Button fullWidth variant='contained' size='large' disabled={loading || cart.length === 0} onClick={handleSubmitAll} startIcon={loading ? <CircularProgress size={22} color='inherit' /> : <CheckCircle />} sx={{ py: { xs: 1.5, sm: 2 }, fontSize: { xs: '0.95rem', sm: '1.1rem' }, fontWeight: 800, background: loading ? undefined : 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', boxShadow: '0 8px 20px rgba(164,210,51,0.4)', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(164,210,51,0.5)' }, '&:disabled': { opacity: 0.6 } }}>{loading ? 'Submitting...' : `Submit ${cart.length} Items`}</Button></Grid>
+              <Grid item xs={12}><Button fullWidth variant='contained' size='large' disabled={loading || cart.length === 0 || (role === 'applicator' && !connectedHardware)} onClick={handleSubmitAll} startIcon={loading ? <CircularProgress size={22} color='inherit' /> : <CheckCircle />} sx={{ py: { xs: 1.5, sm: 2 }, fontSize: { xs: '0.95rem', sm: '1.1rem' }, fontWeight: 800, background: loading ? undefined : 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', boxShadow: '0 8px 20px rgba(164,210,51,0.4)', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(164,210,51,0.5)' }, '&:disabled': { opacity: 0.6 } }}>{loading ? 'Submitting...' : `Submit ${cart.length} Items`}</Button></Grid>
             </Grid>
           </Paper>
         </Box>}
@@ -4734,7 +4738,16 @@ function App() {
             </Tabs>
           </Paper>
 
-          {adminTab === 'dashboard' && stats && <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+          {adminTab === 'dashboard' && stats && (() => {
+            const filteredDashboardScans = scanHistory.filter(scan => {
+              if (!dashboardStartDate && !dashboardEndDate) return true;
+              const scanDate = new Date(scan.timestamp);
+              if (dashboardStartDate && scanDate < new Date(dashboardStartDate)) return false;
+              if (dashboardEndDate && scanDate > new Date(dashboardEndDate).setHours(23, 59, 59, 999)) return false;
+              return true;
+            });
+            return (
+              <Grid container spacing={{ xs: 1.5, sm: 2 }}>
             {/* Dashboard Header with Controls */}
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
@@ -4743,6 +4756,24 @@ function App() {
                 </Typography>
                 
                 <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <TextField
+                    type="date"
+                    size="small"
+                    label="Start Date"
+                    InputLabelProps={{ shrink: true }}
+                    value={dashboardStartDate}
+                    onChange={(e) => setDashboardStartDate(e.target.value)}
+                    sx={{ width: 140, bgcolor: 'white' }}
+                  />
+                  <TextField
+                    type="date"
+                    size="small"
+                    label="End Date"
+                    InputLabelProps={{ shrink: true }}
+                    value={dashboardEndDate}
+                    onChange={(e) => setDashboardEndDate(e.target.value)}
+                    sx={{ width: 140, bgcolor: 'white' }}
+                  />
                   {/* Date Filter */}
                   <ToggleButtonGroup
                     value={dateFilter}
@@ -5410,8 +5441,8 @@ function App() {
 
                   {/* List of scans with relative time and type badges */}
                   <List sx={{ maxHeight: 300, overflow: 'auto', p: 0 }}>
-                    {scanHistory && scanHistory.length > 0 ? (
-                      scanHistory.slice(0, 10).map((scan, index) => {
+                    {filteredDashboardScans && filteredDashboardScans.length > 0 ? (
+                      filteredDashboardScans.slice(0, 10).map((scan, index) => {
                         const isManual = scan.isManual || scan.type === 'manual' || !scan.qrCodeId;
                         const isApplicator = scan.memberRole?.toLowerCase() === 'applicator' || (members.find(m => m.memberId === scan.memberId)?.role?.toLowerCase() === 'applicator');
                         const memberName = scan.memberName || members.find(m => m.memberId === scan.memberId)?.name || scan.memberId || 'Unknown Member';
@@ -5522,7 +5553,7 @@ function App() {
                                 }
                               />
                             </ListItem>
-                            {index < Math.min(scanHistory.length, 10) - 1 && <Divider component="li" sx={{ opacity: 0.6 }} />}
+                            {index < Math.min(filteredDashboardScans.length, 10) - 1 && <Divider component="li" sx={{ opacity: 0.6 }} />}
                           </Box>
                         );
                       })
@@ -5555,7 +5586,7 @@ function App() {
                   '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
                 }}
                 onClick={() => {
-                  const allLocations = scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                  const allLocations = filteredDashboardScans.filter(s => s.location).reduce((acc, scan) => { 
                     const existing = acc.find(l => l.location === scan.location); 
                     if (existing) { existing.count++; } 
                     else { acc.push({ location: scan.location, count: 1 }); } 
@@ -5569,14 +5600,14 @@ function App() {
                     <Typography variant='h6' sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
                       📍 Top Cities
                     </Typography>
-                    {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                    {filteredDashboardScans.filter(s => s.location).reduce((acc, scan) => { 
                       const existing = acc.find(l => l.location === scan.location); 
                       if (existing) { existing.count++; } 
                       else { acc.push({ location: scan.location, count: 1 }); } 
                       return acc; 
                     }, []).length > 6 && (
                       <Chip 
-                        label={`+${scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                        label={`+${filteredDashboardScans.filter(s => s.location).reduce((acc, scan) => { 
                           const existing = acc.find(l => l.location === scan.location); 
                           if (existing) { existing.count++; } 
                           else { acc.push({ location: scan.location, count: 1 }); } 
@@ -5588,7 +5619,7 @@ function App() {
                     )}
                   </Box>
                   <List dense>
-                    {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                    {filteredDashboardScans.filter(s => s.location).reduce((acc, scan) => { 
                       const existing = acc.find(l => l.location === scan.location); 
                       if (existing) { existing.count++; } 
                       else { acc.push({ location: scan.location, count: 1 }); } 
@@ -5623,7 +5654,7 @@ function App() {
                   '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
                 }}
                 onClick={() => {
-                  const productStats = scanHistory.reduce((acc, scan) => { 
+                  const productStats = filteredDashboardScans.reduce((acc, scan) => { 
                     const product = products.find(p => 
                       p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
                       p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
@@ -5661,7 +5692,7 @@ function App() {
                       💵 Price Estimation by Product
                     </Typography>
                     {(() => {
-                      const productStats = scanHistory.reduce((acc, scan) => { 
+                      const productStats = filteredDashboardScans.reduce((acc, scan) => { 
                         const key = `${scan.productNo}-${scan.qty || 'N/A'}`;
                         if (!acc[key]) acc[key] = true;
                         return acc; 
@@ -5689,7 +5720,7 @@ function App() {
                       </TableHead>
                       <TableBody>
                         {(() => { 
-                          const productStats = scanHistory.reduce((acc, scan) => { 
+                          const productStats = filteredDashboardScans.reduce((acc, scan) => { 
                             const product = products.find(p => 
                               p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
                               p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
@@ -5741,7 +5772,7 @@ function App() {
                   <Box sx={{ mt: 2, p: 2, bgcolor: 'success.50', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant='body1' fontWeight={700} color='success.dark'>Grand Total Estimated Value:</Typography>
                     <Typography variant='h5' fontWeight={800} color='success.dark'>
-                      Rs. {scanHistory.reduce((total, scan) => { 
+                      Rs. {filteredDashboardScans.reduce((total, scan) => { 
                         const product = products.find(p => 
                           p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
                           p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
@@ -5773,17 +5804,17 @@ function App() {
                         </Typography>
                         <Typography variant='h5' fontWeight={700} color='primary.main'>
                           {(() => {
-                            const locations = scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                            const locations = filteredDashboardScans.filter(s => s.location).reduce((acc, scan) => { 
                               const existing = acc.find(l => l.location === scan.location); 
                               if (existing) { existing.count++; } 
                               else { acc.push({ location: scan.location, count: 1 }); } 
                               return acc; 
                             }, []);
-                            return locations.length > 0 ? Math.round(scanHistory.length / locations.length) : 0;
+                            return locations.length > 0 ? Math.round(filteredDashboardScans.length / locations.length) : 0;
                           })()}
                         </Typography>
                         <Typography variant='caption' color='success.main' sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                          <TrendingUp sx={{ fontSize: '0.9rem' }} /> Active cities: {scanHistory.filter(s => s.location).reduce((acc, scan) => { 
+                          <TrendingUp sx={{ fontSize: '0.9rem' }} /> Active cities: {filteredDashboardScans.filter(s => s.location).reduce((acc, scan) => { 
                             const existing = acc.find(l => l.location === scan.location); 
                             if (existing) { existing.count++; } 
                             else { acc.push({ location: scan.location, count: 1 }); } 
@@ -5803,7 +5834,7 @@ function App() {
                         <Typography variant='h5' fontWeight={700} color='secondary.main'>
                           {(() => {
                             const hourCounts = {};
-                            scanHistory.forEach(scan => {
+                            filteredDashboardScans.forEach(scan => {
                               try {
                                 let scanDate = null;
                                 if (scan.scannedAt) scanDate = new Date(scan.scannedAt);
@@ -5835,12 +5866,12 @@ function App() {
                         </Typography>
                         <Typography variant='h5' fontWeight={700} color='warning.main'>
                           {(() => {
-                            const uniqueMembers = [...new Set(scanHistory.map(s => s.memberId))].length;
-                            return uniqueMembers > 0 ? (scanHistory.length / uniqueMembers).toFixed(1) : 0;
+                            const uniqueMembers = [...new Set(filteredDashboardScans.map(s => s.memberId))].length;
+                            return uniqueMembers > 0 ? (filteredDashboardScans.length / uniqueMembers).toFixed(1) : 0;
                           })()}
                         </Typography>
                         <Typography variant='caption' color='text.secondary' sx={{ mt: 0.5, display: 'block' }}>
-                          Active members: {[...new Set(scanHistory.map(s => s.memberId))].length}
+                          Active members: {[...new Set(filteredDashboardScans.map(s => s.memberId))].length}
                         </Typography>
                       </CardContent>
                     </Card>
@@ -5927,7 +5958,7 @@ function App() {
                     size='small'
                     startIcon={<FileDownload />}
                     onClick={handleExportAllScans}
-                    disabled={scanHistory.length === 0}
+                    disabled={filteredDashboardScans.length === 0}
                   >
                     Export All Scans
                   </Button>
@@ -5958,7 +5989,7 @@ function App() {
             </Grid>
             
             <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>⏰ Peak Activity Hours</Typography><List dense>{(() => {
-              const hourCounts = scanHistory.reduce((acc, scan) => {
+              const hourCounts = filteredDashboardScans.reduce((acc, scan) => {
                 if (scan.timestamp) {
                   const hour = new Date(scan.timestamp).getHours();
                   acc[hour] = (acc[hour] || 0) + 1;
@@ -5980,7 +6011,7 @@ function App() {
             })()}</List></CardContent></Card></Grid>
             
             <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📅 Weekly Trends</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>Scans by Day of Week</Typography>{(() => {
-              const dayCounts = scanHistory.reduce((acc, scan) => {
+              const dayCounts = filteredDashboardScans.reduce((acc, scan) => {
                 if (scan.timestamp) {
                   const day = new Date(scan.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
                   acc[day] = (acc[day] || 0) + 1;
@@ -6005,20 +6036,48 @@ function App() {
             <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🎯 Performance Metrics</Typography><Box sx={{ mt: 2 }}>
               <Box sx={{ mb: 2, p: 2, bgcolor: 'success.50', borderRadius: 2 }}>
                 <Typography variant='body2' color='text.secondary'>Avg Scans/Day</Typography>
-                <Typography variant='h5' fontWeight='bold' color='success.dark'>{(scanHistory.length / Math.max(1, Math.ceil((Date.now() - new Date(scanHistory[scanHistory.length - 1]?.timestamp || Date.now()).getTime()) / (1000 * 60 * 60 * 24)))).toFixed(1)}</Typography>
+                <Typography variant='h5' fontWeight='bold' color='success.dark'>{(filteredDashboardScans.length / Math.max(1, Math.ceil((Date.now() - new Date(filteredDashboardScans[filteredDashboardScans.length - 1]?.timestamp || Date.now()).getTime()) / (1000 * 60 * 60 * 24)))).toFixed(1)}</Typography>
               </Box>
               <Box sx={{ mb: 2, p: 2, bgcolor: 'info.50', borderRadius: 2 }}>
                 <Typography variant='body2' color='text.secondary'>Unique Products</Typography>
-                <Typography variant='h5' fontWeight='bold' color='info.dark'>{new Set(scanHistory.map(s => s.productNo)).size}</Typography>
+                <Typography variant='h5' fontWeight='bold' color='info.dark'>{new Set(filteredDashboardScans.map(s => s.productNo)).size}</Typography>
               </Box>
               <Box sx={{ p: 2, bgcolor: 'warning.50', borderRadius: 2 }}>
                 <Typography variant='body2' color='text.secondary'>Unique Cities</Typography>
-                <Typography variant='h5' fontWeight='bold' color='warning.dark'>{new Set(scanHistory.filter(s => s.location).map(s => s.location)).size}</Typography>
+                <Typography variant='h5' fontWeight='bold' color='warning.dark'>{new Set(filteredDashboardScans.filter(s => s.location).map(s => s.location)).size}</Typography>
               </Box>
             </Box></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📊 Member Activity Ranking</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Rank</TableCell><TableCell sx={{ fontWeight: 700 }}>Member</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Role</TableCell></TableRow></TableHead><TableBody>{(() => {
-              const memberStats = scanHistory.reduce((acc, scan) => {
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>💎 Tier Distribution</Typography><Box sx={{ mt: 2 }}>{(() => {
+              const tierCounts = filteredDashboardScans.reduce((acc, scan) => {
+                const member = members.find(m => m.memberId === scan.memberId);
+                const tier = member?.tier || 'bronze';
+                acc[tier] = (acc[tier] || 0) + 1;
+                return acc;
+              }, { bronze: 0, silver: 0, gold: 0, platinum: 0 });
+              
+              const total = Object.values(tierCounts).reduce((a, b) => a + b, 0) || 1;
+              const tiers = [
+                { id: 'bronze', color: '#cd7f32', label: 'Bronze' },
+                { id: 'silver', color: '#c0c0c0', label: 'Silver' },
+                { id: 'gold', color: '#ffd700', label: 'Gold' },
+                { id: 'platinum', color: '#e5e4e2', label: 'Platinum' }
+              ];
+              return tiers.map(t => (
+                <Box key={t.id} sx={{ mb: 1.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant='caption' fontWeight={600} sx={{ color: t.color, textShadow: '0 0 1px rgba(0,0,0,0.2)' }}>{t.label}</Typography>
+                    <Typography variant='caption'>{((tierCounts[t.id]/total)*100).toFixed(1)}%</Typography>
+                  </Box>
+                  <Box sx={{ height: 8, bgcolor: 'grey.200', borderRadius: 1, overflow: 'hidden' }}>
+                    <Box sx={{ height: '100%', bgcolor: t.color, width: `${(tierCounts[t.id]/total)*100}%`, transition: 'width 0.3s' }} />
+                  </Box>
+                </Box>
+              ));
+            })()}</Box></CardContent></Card></Grid>
+
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📊 Member Activity Ranking</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Rank</TableCell><TableCell sx={{ fontWeight: 700 }}>Member</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Role</TableCell></TableRow></TableHead><TableBody>{(() => {
+              const memberStats = filteredDashboardScans.reduce((acc, scan) => {
                 const key = scan.memberId || 'unknown';
                 if (!acc[key]) {
                   acc[key] = { memberId: scan.memberId, memberName: scan.memberName, role: scan.role, count: 0 };
@@ -6039,7 +6098,7 @@ function App() {
                 ));
             })()}</TableBody></Table></TableContainer></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={6}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography><List dense>{activityLog.slice(0, 8).map((log, i) => (
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography><List dense>{activityLog.slice(0, 8).map((log, i) => (
               <ListItem key={log.id} sx={{ borderLeft: '3px solid', borderLeftColor: log.severity === 'error' ? 'error.main' : log.severity === 'warning' ? 'warning.main' : log.severity === 'success' ? 'success.main' : 'info.main', mb: 0.5, bgcolor: 'grey.50', borderRadius: 1, flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 0.5 }}>
                   <Typography variant='body2' fontWeight={600}>{log.action}</Typography>
@@ -6049,7 +6108,9 @@ function App() {
                 <Chip label={log.user} size='small' sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />
               </ListItem>
             ))}{activityLog.length === 0 && <Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center', py: 2 }}>No recent activity</Typography>}</List></CardContent></Card></Grid>
-          </Grid>}
+          </Grid>
+            );
+          })()}
 
           {adminTab === 'scans' && <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
             <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>

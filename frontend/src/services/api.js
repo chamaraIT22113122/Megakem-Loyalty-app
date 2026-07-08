@@ -102,7 +102,7 @@ export const scansAPI = {
   create: (scanData) => api.post('/scans', scanData),
   createBatch: (scans) => api.post('/scans/batch', { scans }),
   delete: (id) => api.delete(`/scans/${id}`),
-  getStats: () => api.get('/scans/stats/summary'),
+  getStats: (params) => api.get('/scans/stats/summary', { params }),
 };
 
 // Products API

@@ -292,6 +292,11 @@ router.post('/', optionalAuth, async (req, res) => {
     }).catch(() => {});
     // ───────────────────────────────────────────────────────────────────
 
+    // Emit real-time WebSocket event
+    if (req.io) {
+      req.io.emit('new_scan', scan);
+    }
+
     if (req.user) {
       const user = await User.findById(req.user._id);
       if (user) {
@@ -527,26 +532,48 @@ router.delete('/:id', protect, hasPermission('canDelete'), async (req, res) => {
 // @access  Public
 router.get('/stats/summary', async (req, res) => {
   try {
-    const totalScans = await Scan.countDocuments();
-    const applicatorScans = await Scan.countDocuments({ role: 'applicator' });
-    const customerScans = await Scan.countDocuments({ role: 'customer' });
+    const Member = require('../models/Member'); // Ensure Member is loaded
+    
+    let matchQuery = {};
+    
+    // ── Zone Filtering ──────────────────────────────────────────────────
+    if (req.query.zone) {
+      const membersInZone = await Member.find({ zone: req.query.zone }).select('memberId');
+      const memberIds = membersInZone.map(m => m.memberId.toUpperCase());
+      matchQuery = { memberId: { $in: memberIds } };
+    }
+    // ───────────────────────────────────────────────────────────────────
+
+    const totalScans = await Scan.countDocuments(matchQuery);
+    const applicatorScans = await Scan.countDocuments({ ...matchQuery, role: 'applicator' });
+    const customerScans = await Scan.countDocuments({ ...matchQuery, role: 'customer' });
     
     // Get scans from last 24 hours
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const recentScans = await Scan.countDocuments({ 
+      ...matchQuery,
       timestamp: { $gte: yesterday } 
     });
 
-    // Get scans from last 7 days
+    // Get scans from last 7 days (current week)
     const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const weeklyScans = await Scan.countDocuments({ 
+      ...matchQuery,
       timestamp: { $gte: lastWeek } 
+    });
+
+    // Get scans from previous 7 days (for trend comparison)
+    const previousWeekStart = new Date(lastWeek.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const previousWeekScans = await Scan.countDocuments({
+      ...matchQuery,
+      timestamp: { $gte: previousWeekStart, $lt: lastWeek }
     });
 
     // Get daily breakdown for last 7 days
     const dailyStats = await Scan.aggregate([
       {
         $match: {
+          ...matchQuery,
           timestamp: { $gte: lastWeek }
         }
       },
@@ -564,6 +591,9 @@ router.get('/stats/summary', async (req, res) => {
     // Get top products
     const topProducts = await Scan.aggregate([
       {
+        $match: matchQuery
+      },
+      {
         $group: {
           _id: "$productName",
           count: { $sum: 1 }
@@ -577,6 +607,44 @@ router.get('/stats/summary', async (req, res) => {
       }
     ]);
 
+    // Get top hardware stores
+    // Since hardware stores are members with role='customer' (MH prefixes usually), 
+    // or maybe we should lookup Member collection to get totalScans.
+    // However, we only want to return it as part of stats if requested, or we can just fetch top members.
+    // The easiest way is to group by memberId, then lookup member info to filter role='customer'.
+    const topHardwareStores = await Scan.aggregate([
+      { $match: { ...matchQuery, role: 'customer' } },
+      {
+        $group: {
+          _id: "$memberId",
+          count: { $sum: 1 },
+          points: { $sum: "$points" }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: 'members',
+          localField: '_id',
+          foreignField: 'memberId',
+          as: 'memberInfo'
+        }
+      },
+      {
+        $unwind: { path: "$memberInfo", preserveNullAndEmptyArrays: true }
+      },
+      {
+        $project: {
+          memberId: "$_id",
+          memberName: "$memberInfo.memberName",
+          count: 1,
+          points: 1,
+          location: "$memberInfo.location"
+        }
+      }
+    ]);
+
     res.json({
       success: true,
       data: {
@@ -585,8 +653,10 @@ router.get('/stats/summary', async (req, res) => {
         customer: customerScans,
         last24Hours: recentScans,
         lastWeek: weeklyScans,
+        previousWeek: previousWeekScans, // Trend indicator data
         dailyStats,
-        topProducts
+        topProducts,
+        topHardwareStores
       }
     });
   } catch (error) {
