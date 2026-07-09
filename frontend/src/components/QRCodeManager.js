@@ -983,6 +983,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       html += `<div class="page">`;
       
       pageQRs.forEach(qr => {
+        const product = products.find(p => p.productNo && qr.productNo && p.productNo.toUpperCase() === qr.productNo.toUpperCase());
+        const isLoyaltyEnabled = product ? (product.isLoyaltyEnabled !== false) : true;
+
         const mfgDateToShow = qr.manufactureDate 
           ? getFormattedDate(qr.manufactureDate) 
           : extractDateFromBatch(qr.batchNo);
@@ -1007,7 +1010,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         html += `
           <div class="label">
             <div class="qr-container">
-              <img src="${qr.qrData}" alt="QR">
+              ${isLoyaltyEnabled ? `<img src="${qr.qrData}" alt="QR">` : ''}
             </div>
             <div class="batch-info">
               BATCH: <strong>${qr.batchNo}</strong><br>
