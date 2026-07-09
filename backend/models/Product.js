@@ -41,6 +41,10 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isLoyaltyEnabled: {
+    type: Boolean,
+    default: true
+  },
   batches: [{
     batchNo: String,
     manufactureDate: Date,

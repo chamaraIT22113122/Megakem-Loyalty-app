@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
+import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -13,6 +13,10 @@ import SriLankaZoneMap from './components/SriLankaZoneMap';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
+// Validation Helpers
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const isValidPassword = (password) => password.length >= 6; // Basic validation, can be enhanced
+const isValidPhone = (phone) => /^\d{10}$/.test(phone);
 
 
 const getTheme = () => createTheme({
@@ -1821,6 +1825,9 @@ function App() {
   const handleAdminLogin = async (e) => {
     e.preventDefault();
     if (!adminEmail || !adminPassword) return showNotification('Please enter email and password', 'error');
+    if (!isValidEmail(adminEmail)) return showNotification('Please enter a valid email address', 'error');
+    if (!isValidPassword(adminPassword)) return showNotification('Password must be at least 6 characters long', 'error');
+    
     setLoading(true);
     try {
       const response = await authAPI.adminLogin({ email: adminEmail, password: adminPassword });
@@ -1856,6 +1863,9 @@ function App() {
   const handleUserLogin = async (e) => {
     e.preventDefault();
     if (!userLoginEmail || !userLoginPassword) return showNotification('Please enter email and password', 'error');
+    if (!isValidEmail(userLoginEmail)) return showNotification('Please enter a valid email address', 'error');
+    if (!isValidPassword(userLoginPassword)) return showNotification('Password must be at least 6 characters long', 'error');
+    
     setLoading(true);
     try {
       const response = await authAPI.login({ email: userLoginEmail, password: userLoginPassword });
@@ -2670,6 +2680,8 @@ function App() {
   }, [pendingScan, role, view, products, cart]);
 
   const handleUpdateProfile = async () => {
+    if (!profileData.username || !profileData.email) return showNotification('Please enter username and email', 'error');
+    if (!isValidEmail(profileData.email)) return showNotification('Please enter a valid email address', 'error');
     setLoading(true);
     try {
       await authAPI.updateProfile(profileData);
@@ -2684,6 +2696,12 @@ function App() {
   };
 
   const handleChangePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      return showNotification('Please fill all password fields', 'error');
+    }
+    if (!isValidPassword(passwordData.newPassword)) {
+      return showNotification('New password must be at least 6 characters long', 'error');
+    }
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       return showNotification('Passwords do not match', 'error');
     }
@@ -2814,6 +2832,12 @@ function App() {
       
       if (!username || !email) {
         showNotification('Please fill all required fields', 'error');
+        setLoading(false);
+        return;
+      }
+
+      if (!isValidEmail(email)) {
+        showNotification('Please enter a valid email address', 'error');
         setLoading(false);
         return;
       }
@@ -4612,9 +4636,9 @@ function App() {
                   renderInput={(params) => (
                     <TextField 
                       {...params} 
-                      label="Purchased From" 
+                      label="Purchased From *" 
                       placeholder="Search Hardware shops..."
-                      required
+
                       sx={{ 
                         '& .MuiOutlinedInput-root': { 
                           bgcolor: 'white', 
@@ -5170,6 +5194,8 @@ function App() {
                                               {scan.productNo} ({scan.qty || 'N/A'}) • {isManual ? 'Manual' : 'QR'}
                                             </Typography>
                                           }
+                                          primaryTypographyProps={{ component: 'div' }}
+                                          secondaryTypographyProps={{ component: 'div' }}
                                         />
                                       </ListItem>
                                     );
@@ -5551,6 +5577,8 @@ function App() {
                                     </Box>
                                   </Box>
                                 }
+                                primaryTypographyProps={{ component: 'div' }}
+                                secondaryTypographyProps={{ component: 'div' }}
                               />
                             </ListItem>
                             {index < Math.min(filteredDashboardScans.length, 10) - 1 && <Divider component="li" sx={{ opacity: 0.6 }} />}
@@ -5629,7 +5657,8 @@ function App() {
                         <ListItemText 
                           primary={<Typography variant='body1' fontWeight={600}>{loc.location}</Typography>} 
                           secondary={<Chip label={`${loc.count} scans`} size='small' color={i === 0 ? 'success' : 'default'} />} 
-                          secondaryTypographyProps={{ component: 'span' }}
+                          primaryTypographyProps={{ component: 'div' }}
+                          secondaryTypographyProps={{ component: 'div' }}
                         />
                       </ListItem>
                     )}
@@ -5933,6 +5962,7 @@ function App() {
                               <Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography>
                             </Box>
                           } 
+                          primaryTypographyProps={{ component: 'div' }}
                           secondaryTypographyProps={{ component: 'div' }}
                         />
                       </ListItem>
@@ -6004,7 +6034,8 @@ function App() {
                     <ListItemText 
                       primary={<Typography variant='body2' fontWeight={600}>{hour}:00 - {hour}:59</Typography>}
                       secondary={<Chip label={`${count} scans`} size='small' color={i === 0 ? 'primary' : 'default'} />}
-                      secondaryTypographyProps={{ component: 'span' }}
+                      primaryTypographyProps={{ component: 'div' }}
+                      secondaryTypographyProps={{ component: 'div' }}
                     />
                   </ListItem>
                 ));
@@ -6246,9 +6277,8 @@ function App() {
                         renderInput={(params) => (
                           <TextField 
                             {...params} 
-                            label="Purchased From Hardware Shop" 
+                            label="Purchased From Hardware Shop *" 
                             size="small" 
-                            required 
                             placeholder="Search Hardware shops..."
                           />
                         )}
@@ -6257,8 +6287,8 @@ function App() {
                     </Grid>
                   )}
                   <Grid item xs={12} md={6}>
-                    <FormControl fullWidth size="small" required>
-                      <InputLabel>Product</InputLabel>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Product *</InputLabel>
                       <Select
                         value={manualScanForm.productNo}
                         onChange={(e) => {
@@ -6286,8 +6316,7 @@ function App() {
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
-                      label="Number of which batch"
-                      required
+                      label="Number of which batch *"
                       value={manualScanForm.batchIndex || ''}
                       onChange={(e) => setManualScanForm({...manualScanForm, batchIndex: e.target.value})}
                       placeholder="e.g., 010"
@@ -6297,9 +6326,8 @@ function App() {
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
-                      label="Manufacture Date"
+                      label="Manufacture Date *"
                       type="date"
-                      required
                       InputLabelProps={{ shrink: true }}
                       value={manualScanForm.mfgDate || ''}
                       onChange={(e) => setManualScanForm({...manualScanForm, mfgDate: e.target.value})}
@@ -6309,9 +6337,8 @@ function App() {
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
-                      label="Expiry Date"
+                      label="Expiry Date *"
                       type="date"
-                      required
                       InputLabelProps={{ shrink: true }}
                       value={manualScanForm.expiryDate || ''}
                       onChange={(e) => setManualScanForm({...manualScanForm, expiryDate: e.target.value})}
@@ -6321,8 +6348,7 @@ function App() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Bag/Package Number"
-                      required
+                      label="Bag/Package Number *"
                       value={manualScanForm.bagNo}
                       onChange={(e) => setManualScanForm({...manualScanForm, bagNo: e.target.value})}
                       placeholder="e.g., 050"
@@ -6332,8 +6358,7 @@ function App() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Quantity / Pack Size"
-                      required
+                      label="Quantity / Pack Size *"
                       value={manualScanForm.qty}
                       onChange={(e) => setManualScanForm({...manualScanForm, qty: e.target.value})}
                       placeholder="e.g., 32 Kg, 5 Ltr"
@@ -6343,7 +6368,7 @@ function App() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Price (Rs.)"
+                      label="Price (Rs.) *"
                       type="number"
                       value={manualScanForm.price}
                       onChange={(e) => setManualScanForm({...manualScanForm, price: parseFloat(e.target.value) || 0})}
@@ -6415,6 +6440,12 @@ function App() {
                           (manualScanForm.role === 'applicator' && !manualScanForm.connectedHardware)
                         }
                         onClick={async () => {
+                          if (manualScanForm.role === 'applicator' && !manualScanForm.connectedHardware) {
+                            return showNotification('Please select where you purchased from', 'error');
+                          }
+                          if (!manualScanForm.productNo || !manualScanForm.batchIndex || !manualScanForm.mfgDate || !manualScanForm.expiryDate || !manualScanForm.bagNo || !manualScanForm.qty || manualScanForm.price <= 0) {
+                            return showNotification('Please fill in all required fields, including price', 'error');
+                          }
                           setManualScanLoading(true);
                           try {
                             const response = await api.post('/scans', manualScanForm);
@@ -7772,7 +7803,7 @@ function App() {
                 <Button 
                   variant='contained' 
                   startIcon={<Add />} 
-                  onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0 } })}
+                  onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0, isLoyaltyEnabled: true } })}
                   disabled={!hasPermission('canManageProducts')}
                 >
                   Add Product
@@ -8574,6 +8605,17 @@ function App() {
                 rows={3} 
                 value={productDialog.product?.description || ''} 
                 onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, description: e.target.value } })} 
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={productDialog.product?.isLoyaltyEnabled !== false}
+                    onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, isLoyaltyEnabled: e.target.checked } })}
+                    color="primary"
+                  />
+                }
+                label="Loyalty Program / QR Code Enabled"
+                sx={{ mt: 2 }}
               />
             </DialogContent>
             <DialogActions><Button onClick={() => setProductDialog({ open: false, product: null })}>Cancel</Button><Button variant='contained' onClick={handleSaveProduct} disabled={loading}>Save</Button></DialogActions>

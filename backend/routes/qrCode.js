@@ -306,31 +306,38 @@ router.get('/', protect, qrAdmin, async (req, res) => {
     const Scan = require('../models/Scan');
     let scans = [];
     if (qrCodes.length > 0) {
-      const scanQuery = qrCodes.map(q => ({
-        productNo: q.productNo,
-        batchNo: q.batchNo,
-        bagNo: q.packageNo || ''
-      }));
-      scans = await Scan.find({ $or: scanQuery });
+      const batchNos = [...new Set(qrCodes.map(q => q.batchNo))];
+      scans = await Scan.find({ batchNo: { $in: batchNos } });
+    }
+
+    // Optimize Lookups using Maps for O(1) access
+    const requestsByQr = {};
+    for (const req of activeRequests) {
+      const qrStr = req.qrCode.toString();
+      if (!requestsByQr[qrStr]) requestsByQr[qrStr] = { approved: null, pending: null, completedCount: 0 };
+      if (req.status === 'approved') requestsByQr[qrStr].approved = req;
+      if (req.status === 'pending') requestsByQr[qrStr].pending = req;
+      if (req.status === 'completed') requestsByQr[qrStr].completedCount++;
+    }
+
+    const scansByQr = {};
+    for (const s of scans) {
+      const key = `${s.productNo}-${s.batchNo}-${s.bagNo || ''}`;
+      scansByQr[key] = s;
     }
 
     const dataWithRequests = qrCodes.map(qr => {
-      const reqObj = activeRequests.find(r => r.qrCode.toString() === qr._id.toString() && r.status === 'approved');
-      const pendingObj = activeRequests.find(r => r.qrCode.toString() === qr._id.toString() && r.status === 'pending');
-      const completedRequests = activeRequests.filter(r => r.qrCode.toString() === qr._id.toString() && r.status === 'completed');
-      
-      const matchingScan = scans.find(s => 
-        s.productNo === qr.productNo && 
-        s.batchNo === qr.batchNo && 
-        s.bagNo === (qr.packageNo || '')
-      );
+      const qrStr = qr._id.toString();
+      const reqStats = requestsByQr[qrStr] || {};
+      const scanKey = `${qr.productNo}-${qr.batchNo}-${qr.packageNo || ''}`;
+      const matchingScan = scansByQr[scanKey];
 
       return {
         ...qr.toObject(),
-        reprintApproved: !!reqObj,
-        reprintPending: !!pendingObj,
-        reprintRequestId: reqObj?._id || pendingObj?._id,
-        reprintCount: completedRequests.length,
+        reprintApproved: !!reqStats.approved,
+        reprintPending: !!reqStats.pending,
+        reprintRequestId: reqStats.approved?._id || reqStats.pending?._id,
+        reprintCount: reqStats.completedCount || 0,
         scannedByMemberId: matchingScan?.memberId || null,
         scannedByMemberName: matchingScan?.memberName || null,
         scanPoints: matchingScan?.points || 0,
@@ -372,7 +379,9 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
           lastPrintDate: {
             $max: '$printedDate'
           },
-          minExpiryDate: { $min: '$expiryDate' }
+          minExpiryDate: { $min: '$expiryDate' },
+          product: { $first: '$product' },
+          productNo: { $first: '$productNo' }
         }
       }
     ]);
@@ -399,7 +408,9 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
           scanned: 0,
           generated: 0,
           lastPrintDate: null,
-          minExpiryDate: null
+          minExpiryDate: null,
+          product: item.product,
+          productNo: item.productNo
         };
       }
 

@@ -49,7 +49,8 @@ import {
   GetApp,
   Close,
   Save,
-  Lock
+  Lock,
+  Search
 } from '@mui/icons-material';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -139,10 +140,24 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     return product ? (product.price || 0) : 0;
   };
 
+  const getProductDetails = (qr) => {
+    if (!qr || !products || products.length === 0) return null;
+    const prodId = qr.product?._id || qr.product;
+    if (prodId) {
+      const product = products.find(p => p._id === prodId);
+      if (product) return product;
+    }
+    const product = products.find(p => 
+      p.productNo && qr.productNo && p.productNo.toUpperCase() === qr.productNo.toUpperCase()
+    );
+    return product || null;
+  };
+
   const [loading, setLoading] = useState(false);
   const [qrCodes, setQRCodes] = useState([]);
   const [products, setProducts] = useState(initialProducts || []);
   const [batchSummary, setBatchSummary] = useState([]);
+  const [batchSearchQuery, setBatchSearchQuery] = useState('');
   
   // Dialog states
   const [openGenerateDialog, setOpenGenerateDialog] = useState(false);
@@ -1284,9 +1299,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               onChange={(e) => setSelectedProducts(e.target.value)}
               label="Select Products"
             >
-              {products.map(product => (
+              {products.filter(p => p.isLoyaltyEnabled !== false).map(product => (
                 <MenuItem key={product._id} value={product._id}>
-                  {product.name} ({product.productNo})
+                  {product.name} ({product.productNo}) - Rs. {product.price ? product.price.toLocaleString() : 0}
                 </MenuItem>
               ))}
             </Select>
@@ -1360,9 +1375,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               onChange={(e) => setSelectedProduct(e.target.value)}
               label="Select Product"
             >
-              {products.map(product => (
+              {products.filter(p => p.isLoyaltyEnabled !== false).map(product => (
                 <MenuItem key={product._id} value={product._id}>
-                  {product.name} ({product.productNo})
+                  {product.name} ({product.productNo}) - Rs. {product.price ? product.price.toLocaleString() : 0}
                 </MenuItem>
               ))}
             </Select>
@@ -2055,26 +2070,48 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
           {/* Tab 0: Production Batch History */}
           {activeTab === 'batches' && (
-            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300 }}>
+            <Box>
+              <Box sx={{ mb: 2 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Search by Batch No"
+                  variant="outlined"
+                  value={batchSearchQuery}
+                  onChange={(e) => setBatchSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 'bold' }}>Batch No</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Product</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Price</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold' }}>Total QRs</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold' }}>Printed</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Scanned</TableCell>
+                    {isMainAdmin && (
+                      <TableCell align="center" sx={{ fontWeight: 'bold' }}>Scanned</TableCell>
+                    )}
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Last Print Date</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {batchSummary.length === 0 ? (
+                  {batchSummary.filter(batch => batch._id && batch._id.toLowerCase().includes(batchSearchQuery.toLowerCase())).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                      <TableCell colSpan={isMainAdmin ? 7 : 6} align="center" sx={{ py: 3 }}>
                         <Typography variant="body2" color="textSecondary">No batches found</Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    batchSummary.map(batch => (
+                    batchSummary.filter(batch => batch._id && batch._id.toLowerCase().includes(batchSearchQuery.toLowerCase())).map(batch => (
                       <TableRow key={batch._id} hover>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -2085,6 +2122,12 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                             )}
                           </Box>
                         </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{getProductDetails(batch)?.name || 'Unknown'}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{getProductDetails(batch)?.price ? `Rs. ${getProductDetails(batch).price}` : 'N/A'}</Typography>
+                        </TableCell>
                         <TableCell align="center">{batch.totalQRs}</TableCell>
                         <TableCell align="center">
                           <Chip 
@@ -2093,24 +2136,26 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                             color={(isMainAdmin ? batch.printed : (batch.printed + batch.generated)) === batch.totalQRs ? "success" : "warning"}
                           />
                         </TableCell>
-                        <TableCell align="center">
-                          {/* Upgrade 5: Scan rate with progress bar */}
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 80 }}>
-                            <Box sx={{ flexGrow: 1 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={batch.scanRate || 0}
-                                sx={{ height: 6, borderRadius: 3,
-                                  bgcolor: 'grey.200',
-                                  '& .MuiLinearProgress-bar': { bgcolor: batch.scanRate >= 80 ? 'success.main' : batch.scanRate >= 40 ? 'warning.main' : 'info.main' }
-                                }}
-                              />
+                        {isMainAdmin && (
+                          <TableCell align="center">
+                            {/* Upgrade 5: Scan rate with progress bar */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 80 }}>
+                              <Box sx={{ flexGrow: 1 }}>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={batch.scanRate || 0}
+                                  sx={{ height: 6, borderRadius: 3,
+                                    bgcolor: 'grey.200',
+                                    '& .MuiLinearProgress-bar': { bgcolor: batch.scanRate >= 80 ? 'success.main' : batch.scanRate >= 40 ? 'warning.main' : 'info.main' }
+                                  }}
+                                />
+                              </Box>
+                              <Typography variant="caption" fontWeight="bold" sx={{ minWidth: 32, textAlign: 'right' }}>
+                                {batch.scanned}
+                              </Typography>
                             </Box>
-                            <Typography variant="caption" fontWeight="bold" sx={{ minWidth: 32, textAlign: 'right' }}>
-                              {batch.scanned}
-                            </Typography>
-                          </Box>
-                        </TableCell>
+                          </TableCell>
+                        )}
                         <TableCell align="right">
                           {batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : 'N/A'}
                         </TableCell>
@@ -2120,6 +2165,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 </TableBody>
               </Table>
             </TableContainer>
+            </Box>
           )}
 
           {/* Tab 1: Scan Attempt Logs */}
