@@ -271,6 +271,32 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
   }
 });
 
+// Update all QR codes in a batch
+router.put('/batches/:batchNo', protect, qrAdmin, async (req, res) => {
+  try {
+    const { batchNo } = req.params;
+    const { manufactureDate, expiryDate, description } = req.body;
+
+    const updateData = {};
+    if (manufactureDate !== undefined) updateData.manufactureDate = manufactureDate;
+    if (expiryDate !== undefined) updateData.expiryDate = expiryDate;
+    if (description !== undefined) updateData.description = description;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No data provided to update' });
+    }
+
+    const result = await QRCodeModel.updateMany(
+      { batchNo },
+      { $set: updateData }
+    );
+
+    res.json({ message: 'Batch updated successfully', updated: result.modifiedCount });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get QR codes with filters
 router.get('/', protect, qrAdmin, async (req, res) => {
   try {

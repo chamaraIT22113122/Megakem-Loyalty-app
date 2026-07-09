@@ -164,6 +164,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [openBulkDialog, setOpenBulkDialog] = useState(false);
   const [openPreviewDialog, setOpenPreviewDialog] = useState(false);
   const [openBulkDeleteDialog, setOpenBulkDeleteDialog] = useState(false);
+  const [openEditBatchDialog, setOpenEditBatchDialog] = useState(false);
+  const [editingBatch, setEditingBatch] = useState(null);
   const [bulkDeleteBatchNo, setBulkDeleteBatchNo] = useState('');
   const [selectedQRCode, setSelectedQRCode] = useState(null);
   
@@ -785,6 +787,47 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const openEditBatch = async (batchNo) => {
+    try {
+      setLoading(true);
+      const res = await api.get('/qr-codes', { params: { batchNo, limit: 1 } });
+      if (res.data.qrCodes && res.data.qrCodes.length > 0) {
+        const qr = res.data.qrCodes[0];
+        setEditingBatch({
+          batchNo: qr.batchNo,
+          manufactureDate: qr.manufactureDate ? new Date(qr.manufactureDate).toISOString().split('T')[0] : '',
+          expiryDate: qr.expiryDate ? new Date(qr.expiryDate).toISOString().split('T')[0] : '',
+          description: qr.description || ''
+        });
+        setOpenEditBatchDialog(true);
+      } else {
+        onShowNotification('Batch details not found', 'error');
+      }
+    } catch (err) {
+      onShowNotification('Error loading batch details', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateBatch = async () => {
+    try {
+      setLoading(true);
+      await api.put(`/qr-codes/batches/${editingBatch.batchNo}`, {
+        manufactureDate: editingBatch.manufactureDate || undefined,
+        expiryDate: editingBatch.expiryDate || undefined,
+        description: editingBatch.description
+      });
+      onShowNotification('Batch updated successfully', 'success');
+      setOpenEditBatchDialog(false);
+      loadData();
+    } catch (err) {
+      onShowNotification('Error updating batch: ' + (err.response?.data?.error || err.message), 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2104,12 +2147,15 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                       <TableCell align="center" sx={{ fontWeight: 'bold' }}>Scanned</TableCell>
                     )}
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Last Print Date</TableCell>
+                    {isMainAdmin && (
+                      <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                    )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {batchSummary.filter(batch => batch._id && batch._id.toLowerCase().includes(batchSearchQuery.toLowerCase())).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isMainAdmin ? 7 : 6} align="center" sx={{ py: 3 }}>
+                      <TableCell colSpan={isMainAdmin ? 8 : 6} align="center" sx={{ py: 3 }}>
                         <Typography variant="body2" color="textSecondary">No batches found</Typography>
                       </TableCell>
                     </TableRow>
@@ -2176,6 +2222,23 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                         <TableCell align="right">
                           {batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : 'N/A'}
                         </TableCell>
+                        {isMainAdmin && (
+                          <TableCell align="center">
+                            <Tooltip title="Edit Batch">
+                              <IconButton size="small" color="primary" onClick={() => openEditBatch(batch._id)}>
+                                <Edit fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete Batch">
+                              <IconButton size="small" color="error" onClick={() => {
+                                setBulkDeleteBatchNo(batch._id);
+                                setOpenBulkDeleteDialog(true);
+                              }}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))
                   )}
@@ -2387,6 +2450,53 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Batch Dialog */}
+      <Dialog open={openEditBatchDialog} onClose={() => setOpenEditBatchDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Batch - {editingBatch?.batchNo}</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              fullWidth
+              type="date"
+              label="Manufacture Date"
+              InputLabelProps={{ shrink: true }}
+              value={editingBatch?.manufactureDate || ''}
+              onChange={(e) => setEditingBatch({ ...editingBatch, manufactureDate: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              type="date"
+              label="Expiry Date"
+              InputLabelProps={{ shrink: true }}
+              value={editingBatch?.expiryDate || ''}
+              onChange={(e) => setEditingBatch({ ...editingBatch, expiryDate: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="Description"
+              multiline
+              rows={3}
+              value={editingBatch?.description || ''}
+              onChange={(e) => setEditingBatch({ ...editingBatch, description: e.target.value })}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenEditBatchDialog(false)} disabled={loading}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdateBatch} 
+            color="primary" 
+            variant="contained" 
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
+          >
+            {loading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Bulk Delete Dialog */}
       <Dialog open={openBulkDeleteDialog} onClose={() => setOpenBulkDeleteDialog(false)} maxWidth="sm" fullWidth>
