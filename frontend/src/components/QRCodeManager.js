@@ -1302,7 +1302,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               onChange={(e) => setSelectedProducts(e.target.value)}
               label="Select Products"
             >
-              {products.filter(p => p.isLoyaltyEnabled !== false).map(product => (
+              {products.map(product => (
                 <MenuItem key={product._id} value={product._id}>
                   {product.name} ({product.productNo}) - Rs. {product.price ? product.price.toLocaleString() : 0}
                 </MenuItem>
@@ -1378,7 +1378,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               onChange={(e) => setSelectedProduct(e.target.value)}
               label="Select Product"
             >
-              {products.filter(p => p.isLoyaltyEnabled !== false).map(product => (
+              {products.map(product => (
                 <MenuItem key={product._id} value={product._id}>
                   {product.name} ({product.productNo}) - Rs. {product.price ? product.price.toLocaleString() : 0}
                 </MenuItem>
@@ -2127,6 +2127,20 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">{getProductDetails(batch)?.name || 'Unknown'}</Typography>
+                          {(() => {
+                            const prod = getProductDetails(batch);
+                            if (prod) {
+                              return (
+                                <Chip 
+                                  label={prod.isLoyaltyEnabled !== false ? "QR Enabled" : "QR Disabled"} 
+                                  size="small" 
+                                  color={prod.isLoyaltyEnabled !== false ? "success" : "default"} 
+                                  sx={{ mt: 0.5, height: 20, fontSize: '0.65rem' }}
+                                />
+                              );
+                            }
+                            return null;
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">{getProductDetails(batch)?.price ? `Rs. ${getProductDetails(batch).price}` : 'N/A'}</Typography>
