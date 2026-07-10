@@ -598,6 +598,14 @@ function App() {
   const [rewards, setRewards] = useState([]);
   const [redemptions, setRedemptions] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLogTotal, setAuditLogTotal] = useState(0);
+  const [auditLogPage, setAuditLogPage] = useState(0);
+  const [auditLogRowsPerPage, setAuditLogRowsPerPage] = useState(25);
+  const [auditLogSearch, setAuditLogSearch] = useState('');
+  const [auditLogModuleFilter, setAuditLogModuleFilter] = useState('');
+  const [auditLogActionFilter, setAuditLogActionFilter] = useState('');
+  const [auditLogStartDate, setAuditLogStartDate] = useState('');
+  const [auditLogEndDate, setAuditLogEndDate] = useState('');
   const [manualScanForm, setManualScanForm] = useState({
     memberName: '',
     memberId: '',
@@ -2280,12 +2288,7 @@ function App() {
         } catch (e) { console.warn('Error loading rewards/redemptions', e); }
       }
 
-      if (isMainAdmin()) {
-        try {
-          const logsRes = await auditLogsAPI.getAll({ limit: 100 });
-          setAuditLogs(logsRes.data.data || []);
-        } catch (e) { console.warn('Error loading audit logs', e); }
-      }
+      // Audit logs fetch moved to a dedicated useEffect to handle pagination and filtering
 
       console.log('📦 Products response:', productsRes.data);
       setStats(statsRes.data?.data || {});
@@ -2495,6 +2498,32 @@ function App() {
       setCalendarViewMonth(calendarViewMonth + 1);
     }
   };
+
+  const loadAuditLogs = async () => {
+    if (!adminAuth || !isMainAdmin() || adminTab !== 'audit-logs') return;
+    try {
+      const params = {
+        page: auditLogPage + 1,
+        limit: auditLogRowsPerPage
+      };
+      if (auditLogSearch) params.search = auditLogSearch;
+      if (auditLogModuleFilter) params.module = auditLogModuleFilter;
+      if (auditLogActionFilter) params.action = auditLogActionFilter;
+      if (auditLogStartDate) params.startDate = auditLogStartDate;
+      if (auditLogEndDate) params.endDate = auditLogEndDate;
+
+      const res = await auditLogsAPI.getAll(params);
+      setAuditLogs(res.data.data || []);
+      setAuditLogTotal(res.data.total || 0);
+    } catch (e) {
+      console.warn('Error loading audit logs', e);
+      showNotification('Error fetching audit logs', 'error');
+    }
+  };
+
+  useEffect(() => {
+    loadAuditLogs();
+  }, [adminAuth, adminTab, auditLogPage, auditLogRowsPerPage, auditLogModuleFilter, auditLogActionFilter, auditLogStartDate, auditLogEndDate]);
 
   useEffect(() => {
     if (adminAuth) {
@@ -7603,14 +7632,81 @@ function App() {
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h5"><Security sx={{ mr: 1, verticalAlign: 'middle' }}/> System Audit Logs</Typography>
-                <Button variant="outlined" startIcon={<Refresh />} onClick={async () => {
-                  try {
-                    const res = await auditLogsAPI.getAll({ limit: 100 });
-                    setAuditLogs(res.data.data || []);
-                    showNotification('Audit logs refreshed', 'success');
-                  } catch (e) { showNotification('Error fetching logs', 'error'); }
-                }}>Refresh</Button>
+                <Button variant="outlined" startIcon={<Refresh />} onClick={() => loadAuditLogs()}>Refresh</Button>
               </Box>
+              
+              <Paper sx={{ p: 2, mb: 2 }}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField 
+                      fullWidth 
+                      size="small" 
+                      label="Search User/Email" 
+                      value={auditLogSearch} 
+                      onChange={e => setAuditLogSearch(e.target.value)} 
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={2}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Module</InputLabel>
+                      <Select 
+                        value={auditLogModuleFilter} 
+                        label="Module" 
+                        onChange={e => setAuditLogModuleFilter(e.target.value)}
+                      >
+                        <MenuItem value="">All Modules</MenuItem>
+                        <MenuItem value="AUTH">Auth</MenuItem>
+                        <MenuItem value="USERS">Users</MenuItem>
+                        <MenuItem value="MEMBERS">Members</MenuItem>
+                        <MenuItem value="PRODUCTS">Products</MenuItem>
+                        <MenuItem value="QR_CODES">QR Codes</MenuItem>
+                        <MenuItem value="REWARDS">Rewards</MenuItem>
+                        <MenuItem value="SETTINGS">Settings</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField 
+                      fullWidth 
+                      size="small" 
+                      label="From Date" 
+                      type="date" 
+                      InputLabelProps={{ shrink: true }}
+                      value={auditLogStartDate} 
+                      onChange={e => setAuditLogStartDate(e.target.value)} 
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField 
+                      fullWidth 
+                      size="small" 
+                      label="To Date" 
+                      type="date" 
+                      InputLabelProps={{ shrink: true }}
+                      value={auditLogEndDate} 
+                      onChange={e => setAuditLogEndDate(e.target.value)} 
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={12} md={1}>
+                    <Button 
+                      fullWidth 
+                      variant="outlined" 
+                      color="secondary"
+                      onClick={() => {
+                        setAuditLogSearch('');
+                        setAuditLogModuleFilter('');
+                        setAuditLogActionFilter('');
+                        setAuditLogStartDate('');
+                        setAuditLogEndDate('');
+                        setAuditLogPage(0);
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  </Grid>
+                </Grid>
+              </Paper>
+
               <Paper sx={{ p: 2 }}>
                 <TableContainer>
                   <Table size="small">
@@ -7676,11 +7772,23 @@ function App() {
                         </TableRow>
                       ))}
                       {auditLogs.length === 0 && (
-                        <TableRow><TableCell colSpan={5} align="center">No logs found</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} align="center">No logs found matching your filters</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
                 </TableContainer>
+                <TablePagination
+                  component="div"
+                  count={auditLogTotal}
+                  page={auditLogPage}
+                  onPageChange={(e, newPage) => setAuditLogPage(newPage)}
+                  rowsPerPage={auditLogRowsPerPage}
+                  onRowsPerPageChange={(e) => {
+                    setAuditLogRowsPerPage(parseInt(e.target.value, 10));
+                    setAuditLogPage(0);
+                  }}
+                  rowsPerPageOptions={[10, 25, 50, 100]}
+                />
               </Paper>
             </Box>
           )}
