@@ -7756,6 +7756,18 @@ function App() {
                                     case 'SYNC_MEMBERS': return `Synced members (Added: ${d.added}, Updated: ${d.updated})`;
                                     case 'FIX_ROLES': return `Fixed roles for ${d.membersFixed} members and ${d.scansFixed} scans`;
                                     case 'UPDATE_MEMBER_POINTS': return `Updated points for member ${d.memberId} (Points: ${d.points})`;
+                                    case 'UPDATE_USER': return `Updated user: ${d.updatedUserEmail} to role '${d.role}'`;
+                                    case 'RESET_USER_PASSWORD': return `Reset password for user: ${d.targetUserEmail}`;
+                                    case 'DELETE_USER': return `Deleted user: ${d.deletedUserEmail}`;
+                                    case 'CALCULATE_CASH_REWARDS': return `Calculated cash rewards for member ${d.memberId} (${d.year}-${d.month}) - Purchase: Rs. ${d.purchaseValue}, Reward: Rs. ${d.cashReward}`;
+                                    case 'PAY_CASH_REWARDS': return `Paid Rs. ${d.cashReward} cash rewards to member ${d.memberId} for ${d.year}-${d.month}`;
+                                    case 'GENERATE_QR_CODES': return `Generated ${d.count} QR codes for batch '${d.batchNo}'`;
+                                    case 'BULK_GENERATE_QR_CODES': return `Generated ${d.count} QR codes in bulk for batch '${d.batchNo}'`;
+                                    case 'UPDATE_QR_BATCH': return `Updated QR batch '${d.batchNo}'`;
+                                    case 'PRINT_QR_CODES': return `Queued ${d.count} QR codes for printing to ${d.printerModel}`;
+                                    case 'CREATE_REPRINT_REQUEST': return `Requested reprint of ${d.count} QR codes for batch '${d.batchNo}' (Reason: ${d.reason})`;
+                                    case 'REVIEW_REPRINT_REQUEST': return `Reviewed reprint request (Status: ${d.status})`;
+                                    case 'DELETE_REPRINT_REQUEST': return `Deleted reprint request`;
                                     default:
                                       return (
                                         <Box sx={{ p: 1, bgcolor: 'background.default', borderRadius: 1 }}>

@@ -756,6 +756,8 @@ router.put('/users/:id', protect, async (req, res) => {
       await updatedUser.save();
     }
 
+    await logAction(req, 'UPDATE_USER', 'USERS', { updatedUserEmail: updatedUser.email, role: updatedUser.role });
+
     res.json({
       success: true,
       data: {
@@ -811,6 +813,8 @@ router.put('/users/:id/reset-password', protect, async (req, res) => {
     // Update password
     user.password = newPassword;
     await user.save();
+
+    await logAction(req, 'RESET_USER_PASSWORD', 'USERS', { targetUserEmail: user.email });
 
     res.json({
       success: true,
@@ -925,6 +929,8 @@ router.delete('/users/:id', protect, async (req, res) => {
     }
 
     await User.findByIdAndDelete(req.params.id);
+
+    await logAction(req, 'DELETE_USER', 'USERS', { deletedUserEmail: user.email });
 
     res.json({
       success: true,

@@ -4,6 +4,7 @@ const Member = require('../models/Member');
 const Scan = require('../models/Scan');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { protect, authorize, hasPermission } = require('../middleware/auth');
+const { logAction } = require('../middleware/audit');
 
 // @route   GET /api/cash-rewards/:memberId
 // @desc    Get cash rewards for a specific member
@@ -186,6 +187,8 @@ router.post('/calculate/:memberId', protect, hasPermission('canExport'), async (
       p => p.year === parseInt(year) && p.month === parseInt(month)
     );
 
+    await logAction(req, 'CALCULATE_CASH_REWARDS', 'CASH_REWARDS', { memberId: member.memberId, year, month, purchaseValue, cashReward });
+
     res.json({
       success: true,
       data: {
@@ -249,6 +252,8 @@ router.put('/mark-paid/:memberId', protect, hasPermission('canExport'), async (r
       member.totalCashRewards += purchase.cashReward;
       await member.save();
     }
+
+    await logAction(req, 'PAY_CASH_REWARDS', 'CASH_REWARDS', { memberId: member.memberId, year, month, cashReward: purchase.cashReward });
 
     res.json({
       success: true,
