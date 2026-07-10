@@ -155,6 +155,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
   const [loading, setLoading] = useState(false);
   const [qrCodes, setQRCodes] = useState([]);
+  const [totalQRCodes, setTotalQRCodes] = useState(0);
   const [products, setProducts] = useState(initialProducts || []);
   const [batchSummary, setBatchSummary] = useState([]);
   const [batchSearchQuery, setBatchSearchQuery] = useState('');
@@ -537,9 +538,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     try {
       setLoading(true);
       
-      // Fetch QR codes (pass high limit because frontend uses client-side pagination)
-      const qrResponse = await api.get('/qr-codes?limit=100000');
-      setQRCodes(qrResponse.data.data || []);
+      // QR codes are now fetched by loadQRCodes in a separate useEffect
       
       // Fetch batch summary
       const batchResponse = await api.get('/qr-codes/batches/summary');
@@ -591,6 +590,40 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setLoading(false);
     }
   };
+
+  const loadQRCodes = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      params.append('page', page + 1);
+      params.append('limit', rowsPerPage);
+      if (filterBatch) params.append('batchNo', filterBatch);
+      if (filterStatus) {
+        if (!isMainAdmin && filterStatus === 'printed') {
+          // Handled similarly by api if we adjust or pass printed/generated
+        } else if (!isMainAdmin && filterStatus === 'generated') {
+          // hide generated for non-main admin
+        } else {
+          params.append('status', filterStatus);
+        }
+      }
+      if (searchQuery) params.append('search', searchQuery);
+
+      const qrResponse = await api.get(`/qr-codes?${params.toString()}`);
+      setQRCodes(qrResponse.data.data || []);
+      setTotalQRCodes(qrResponse.data.pagination?.total || 0);
+    } catch (error) {
+      console.error('Error loading QR codes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Only load if active tab is qrCodes or batches depending on need
+    // but better to always load when deps change
+    loadQRCodes();
+  }, [page, rowsPerPage, filterBatch, filterStatus, searchQuery, isMainAdmin]);
 
   const savePrintLayout = async () => {
     try {
@@ -649,6 +682,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setOpenGenerateDialog(false);
       resetForm();
       loadData();
+      loadQRCodes();
       if (!isMainAdmin && response.data.qrCodes && response.data.qrCodes.length > 0) {
         printQRLabels(response.data.qrCodes);
       }
@@ -689,6 +723,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setOpenBulkDialog(false);
       resetForm();
       loadData();
+      loadQRCodes();
       if (!isMainAdmin && response.data.qrCodes && response.data.qrCodes.length > 0) {
         printQRLabels(response.data.qrCodes);
       }
@@ -716,6 +751,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       setSelectedQRIdsForReprint([]);
       setSelectedQRForReprint(null);
       loadData();
+      loadQRCodes();
     } catch (error) {
       onShowNotification('Error requesting reprint: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
@@ -729,6 +765,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       await api.put(`/qr-codes/reprint-requests/${reqId}/approve`);
       onShowNotification('Reprint request approved successfully', 'success');
       loadData();
+      loadQRCodes();
     } catch (error) {
       onShowNotification('Error approving request: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
@@ -742,6 +779,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       await api.put(`/qr-codes/reprint-requests/${reqId}/reject`);
       onShowNotification('Reprint request rejected successfully', 'success');
       loadData();
+      loadQRCodes();
     } catch (error) {
       onShowNotification('Error rejecting request: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
@@ -760,6 +798,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       onShowNotification(`Marked ${response.data.updated} QR codes as printed`, 'success');
       setSelectedForPrint([]);
       loadData();
+      loadQRCodes();
     } catch (error) {
       onShowNotification('Error marking as printed: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
@@ -782,6 +821,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         onShowNotification(`Deleted ${response.data.deleted} QR codes`, 'success');
         setSelectedForPrint([]);
         loadData();
+        loadQRCodes();
       } catch (error) {
         onShowNotification('Error deleting QR codes: ' + (error.response?.data?.error || error.message), 'error');
       } finally {
@@ -1100,57 +1140,22 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   };
 
   const getUniqueBatchesCount = (qrs) => {
+    if (!qrs) return 0;
     const unique = new Set();
     qrs.forEach(qr => {
       const batchNo = qr.batchNo || '';
-      let prefix = batchNo;
       const parts = batchNo.trim().split(/[_\s]+/);
       if (parts.length >= 4) {
         const delimiter = batchNo.includes('_') ? '_' : ' ';
-        prefix = parts.slice(0, 3).join(delimiter);
+        unique.add(parts.slice(0, 3).join(delimiter));
       } else if (parts.length === 5) {
-        prefix = parts.slice(0, 4).join(' ');
-      }
-      if (prefix) {
-        unique.add(prefix);
+        unique.add(parts.slice(0, 4).join(' '));
+      } else {
+        unique.add(batchNo);
       }
     });
     return unique.size;
   };
-
-  const filteredQRCodes = qrCodes.filter(qr => {
-    if (filterBatch) {
-      const cleanBatchNo = (qr.batchNo || '').trim();
-      const parts = cleanBatchNo.split(/[_\s]+/);
-      const actualBatchNo = parts.length >= 2 ? parts[1] : cleanBatchNo;
-      
-      const query = filterBatch.trim().toLowerCase();
-      const batchLower = actualBatchNo.toLowerCase();
-      const fullBatchLower = cleanBatchNo.toLowerCase();
-      
-      const isMatch = batchLower.includes(query) || (query.length > 3 && fullBatchLower.includes(query));
-      if (!isMatch) return false;
-    }
-    if (filterStatus) {
-      if (!isMainAdmin && filterStatus === 'printed') {
-        if (qr.status !== 'printed' && qr.status !== 'generated') return false;
-      } else if (!isMainAdmin && filterStatus === 'generated') {
-        return false;
-      } else {
-        if (qr.status !== filterStatus) return false;
-      }
-    }
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const match = (
-        qr.productName?.toLowerCase().includes(query) ||
-        qr.batchNo?.toLowerCase().includes(query) ||
-        qr.packageNo?.toLowerCase().includes(query)
-      );
-      if (!match) return false;
-    }
-    return true;
-  });
 
   return (
     <Box sx={{ p: 3 }}>
@@ -1199,7 +1204,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="h6" color="textSecondary">Batches</Typography>
-            <Typography variant="h4" color="info.main">{getUniqueBatchesCount(filteredQRCodes)}</Typography>
+            <Typography variant="h4" color="info.main">{getUniqueBatchesCount(qrCodes)}</Typography>
           </Paper>
         </Grid>
       </Grid>
@@ -1916,10 +1921,10 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                   <TableCell padding="checkbox">
                     <Checkbox
-                      checked={selectedForPrint.length === filteredQRCodes.length && filteredQRCodes.length > 0}
+                      checked={selectedForPrint.length === qrCodes.length && qrCodes.length > 0}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedForPrint(filteredQRCodes.map(q => q._id));
+                          setSelectedForPrint(qrCodes.map(q => q._id));
                         } else {
                           setSelectedForPrint([]);
                         }
@@ -1936,7 +1941,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredQRCodes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(qr => (
+                {qrCodes.map(qr => (
                   <TableRow key={qr._id}>
                     <TableCell padding="checkbox">
                       <Checkbox
@@ -2072,7 +2077,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             </Table>
           </TableContainer>
 
-          {filteredQRCodes.length === 0 && (
+          {qrCodes.length === 0 && (
             <Alert severity="info" sx={{ mt: 2 }}>
               No QR codes found. Start by generating new QR codes.
             </Alert>
@@ -2081,7 +2086,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           {/* Pagination */}
           <TablePagination
             component="div"
-            count={filteredQRCodes.length}
+            count={totalQRCodes}
             page={page}
             onPageChange={(e, newPage) => setPage(newPage)}
             rowsPerPage={rowsPerPage}

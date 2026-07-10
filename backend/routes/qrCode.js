@@ -300,11 +300,11 @@ router.put('/batches/:batchNo', protect, qrAdmin, async (req, res) => {
 // Get QR codes with filters
 router.get('/', protect, qrAdmin, async (req, res) => {
   try {
-    const { batchNo, productNo, status, startDate, endDate, page = 1, limit = 50 } = req.query;
+    const { batchNo, productNo, status, startDate, endDate, page = 1, limit = 50, search } = req.query;
 
     let filter = {};
     
-    if (batchNo) filter.batchNo = batchNo;
+    if (batchNo) filter.batchNo = { $regex: batchNo, $options: 'i' };
     if (productNo) filter.productNo = productNo;
     if (status) filter.status = status;
     
@@ -312,6 +312,14 @@ router.get('/', protect, qrAdmin, async (req, res) => {
       filter.createdAt = {};
       if (startDate) filter.createdAt.$gte = new Date(startDate);
       if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    if (search) {
+      filter.$or = [
+        { productName: { $regex: search, $options: 'i' } },
+        { batchNo: { $regex: search, $options: 'i' } },
+        { packageNo: { $regex: search, $options: 'i' } }
+      ];
     }
 
     const skip = (page - 1) * limit;

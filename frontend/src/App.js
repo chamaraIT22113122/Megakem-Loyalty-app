@@ -570,7 +570,10 @@ function App() {
     return localStorage.getItem('adminEmail') || '';
   });
   const [adminPassword, setAdminPassword] = useState('');
-  const [adminTab, setAdminTab] = useState('dashboard');
+  const [adminTab, setAdminTab] = useState(() => localStorage.getItem('adminTab') || 'dashboard');
+  useEffect(() => {
+    localStorage.setItem('adminTab', adminTab);
+  }, [adminTab]);
   const [dashboardStartDate, setDashboardStartDate] = useState('');
   const [dashboardEndDate, setDashboardEndDate] = useState('');
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
