@@ -527,7 +527,8 @@ router.delete('/', protect, qrAdmin, hasPermission('canDelete'), async (req, res
     const { qrIds, batchNo } = req.body;
 
     if (batchNo) {
-      const deleted = await QRCodeModel.deleteMany({ batchNo });
+      const escapedBatchNo = batchNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const deleted = await QRCodeModel.deleteMany({ batchNo: { $regex: new RegExp(`^${escapedBatchNo}`, 'i') } });
       await logAction(req, 'BULK_DELETE_QR_CODES', 'QR_CODES', { batchNo, deletedCount: deleted.deletedCount });
       return res.json({
         message: `Deleted ${deleted.deletedCount} QR codes for batch ${batchNo}`,
