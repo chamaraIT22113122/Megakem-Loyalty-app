@@ -7631,8 +7631,46 @@ function App() {
                           <TableCell>{log.action}</TableCell>
                           <TableCell>{log.performedBy ? `${log.performedBy.username} (${log.performedBy.email})` : 'System/Unknown'}</TableCell>
                           <TableCell>
-                            <Box sx={{ maxHeight: 100, overflow: 'auto', fontSize: '0.75rem', p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
-                              <pre style={{ margin: 0 }}>{JSON.stringify(log.details, null, 2)}</pre>
+                            <Box sx={{ maxHeight: 150, overflow: 'auto', fontSize: '0.85rem' }}>
+                              {(() => {
+                                try {
+                                  const d = log.details;
+                                  if (!d || Object.keys(d).length === 0) return '-';
+                                  
+                                  switch(log.action) {
+                                    case 'BULK_DELETE_QR_CODES': return `Deleted ${d.deletedCount} QR codes for batch '${d.batchNo}'`;
+                                    case 'DELETE_QR_CODES': return `Deleted ${d.deletedCount} individual QR codes`;
+                                    case 'CREATE_USER': return `Created user: ${d.username} (${d.email}) with role '${d.role}'`;
+                                    case 'CREATE_MEMBER': return `Created member: ${d.name} (${d.phone})`;
+                                    case 'UPDATE_MEMBER': return `Updated member: ${d.name || d.phone || d.memberId}`;
+                                    case 'DELETE_MEMBER': return `Deleted member: ${d.name || d.memberId}`;
+                                    case 'BULK_DELETE_MEMBERS': return `Deleted ${d.deletedCount} members`;
+                                    case 'CREATE_PRODUCT': return `Created product: ${d.name} (Points: ${d.points})`;
+                                    case 'UPDATE_PRODUCT': return `Updated product: ${d.name || d.productId}`;
+                                    case 'DELETE_PRODUCT': return `Deleted product: ${d.name || d.productId}`;
+                                    case 'CREATE_REWARD': return `Created reward: ${d.name} (Cost: ${d.pointsCost} points)`;
+                                    case 'UPDATE_REWARD': return `Updated reward: ${d.name || d.rewardId}`;
+                                    case 'DELETE_REWARD': return `Deleted reward: ${d.name || d.rewardId}`;
+                                    case 'UPDATE_LOYALTY_CONFIG': return `Updated loyalty settings: ${Object.keys(d).join(', ')}`;
+                                    case 'UPDATE_PRODUCT_POINTS': return `Updated points for multiple products`;
+                                    case 'UPDATE_REDEMPTION_STATUS': return `Changed redemption status to '${d.status}'`;
+                                    case 'REGISTER_USER': return `Registered new user: ${d.username} (${d.email})`;
+                                    case 'ADMIN_LOGIN': return `Login successful`;
+                                    case 'CHANGE_PASSWORD': return `Changed password`;
+                                    case 'SYNC_MEMBERS': return `Synced members (Added: ${d.added}, Updated: ${d.updated})`;
+                                    case 'FIX_ROLES': return `Fixed roles for ${d.membersFixed} members and ${d.scansFixed} scans`;
+                                    case 'UPDATE_MEMBER_POINTS': return `Updated points for member ${d.memberId} (Points: ${d.points})`;
+                                    default:
+                                      return (
+                                        <Box sx={{ p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
+                                          <pre style={{ margin: 0, fontSize: '0.75rem' }}>{JSON.stringify(d, null, 2)}</pre>
+                                        </Box>
+                                      );
+                                  }
+                                } catch (e) {
+                                  return JSON.stringify(log.details);
+                                }
+                              })()}
                             </Box>
                           </TableCell>
                         </TableRow>
