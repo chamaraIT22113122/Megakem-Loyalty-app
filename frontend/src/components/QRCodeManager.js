@@ -1182,14 +1182,14 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="h6" color="textSecondary">Total QR Codes</Typography>
-            <Typography variant="h4" color="primary">{qrCodes.length}</Typography>
+            <Typography variant="h4" color="primary">{batchSummary.reduce((sum, b) => sum + b.totalQRs, 0)}</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="h6" color="textSecondary">Printed</Typography>
             <Typography variant="h4" color="success.main">
-              {qrCodes.filter(q => q.status === 'printed' || (!isMainAdmin && q.status === 'generated')).length}
+              {batchSummary.reduce((sum, b) => sum + b.printed + (!isMainAdmin ? b.generated : 0), 0)}
             </Typography>
           </Paper>
         </Grid>
@@ -1197,14 +1197,14 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           <Paper sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="h6" color="textSecondary">Generated</Typography>
             <Typography variant="h4" color="warning.main">
-              {isMainAdmin ? qrCodes.filter(q => q.status === 'generated').length : 0}
+              {isMainAdmin ? batchSummary.reduce((sum, b) => sum + b.generated, 0) : 0}
             </Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="h6" color="textSecondary">Batches</Typography>
-            <Typography variant="h4" color="info.main">{getUniqueBatchesCount(qrCodes)}</Typography>
+            <Typography variant="h4" color="info.main">{batchSummary.length}</Typography>
           </Paper>
         </Grid>
       </Grid>
