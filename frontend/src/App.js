@@ -7040,7 +7040,7 @@ function App() {
           );
         })()}
 
-          {adminTab === 'co-admins' && isMainAdmin() && <Box>
+          {adminTab === 'co-admins' && hasPermission('canManageCoAdmins') && <Box>
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Button 
                 variant='contained' 
@@ -7082,7 +7082,7 @@ function App() {
                   startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
                 }}
               />
-              <Typography variant='body2' color='text.secondary'>Total Co-Admins: {users.filter(u => u.role === 'admin' || u.role === 'co-admin').length}</Typography>
+              <Typography variant='body2' color='text.secondary'>Total Co-Admins: {users.filter(u => (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com').length}</Typography>
             </Box>
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table><TableHead><TableRow>
@@ -7095,7 +7095,7 @@ function App() {
                 <TableCell><strong>Actions</strong></TableCell>
               </TableRow></TableHead>
                 <TableBody>{users.filter(u => 
-                  (u.role === 'admin' || u.role === 'co-admin') && 
+                  (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com' && 
                   (!coAdminSearchQuery || u.username?.toLowerCase().includes(coAdminSearchQuery.toLowerCase()) || u.email?.toLowerCase().includes(coAdminSearchQuery.toLowerCase()))
                 ).map(u => <TableRow key={u._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
                   <TableCell>
