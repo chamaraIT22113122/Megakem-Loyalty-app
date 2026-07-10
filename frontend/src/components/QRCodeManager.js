@@ -888,6 +888,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         setBulkDeleteBatchNo('');
         setSelectedForPrint([]);
         loadData();
+        loadQRCodes();
       } catch (error) {
         onShowNotification('Error deleting QR codes: ' + (error.response?.data?.error || error.message), 'error');
       } finally {
