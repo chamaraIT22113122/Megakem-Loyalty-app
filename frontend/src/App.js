@@ -4773,7 +4773,7 @@ function App() {
               {hasPermission('canManageCoAdmins') && <Tab icon={<People />} label='Co-Admins' value='co-admins' />}
               {hasPermission('canManageUsers') && <Tab icon={<EmojiEvents />} label='Members & Loyalty' value='members' />}
               {hasPermission('canViewRewards') && <Tab icon={<CardGiftcard />} label='Cash Rewards' value='rewards' />}
-              {hasPermission('canManageProducts') && <Tab icon={<Star />} label='Rewards Catalog' value='catalog' />}
+              {/* {hasPermission('canManageProducts') && <Tab icon={<Star />} label='Rewards Catalog' value='catalog' />} HIDDEN FOR NOW */}
               {hasPermission('canViewLeaderboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
               {isMainAdmin() && <Tab icon={<Security />} label='Audit Logs' value='audit-logs' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
