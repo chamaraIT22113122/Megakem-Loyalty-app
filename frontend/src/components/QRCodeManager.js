@@ -56,6 +56,21 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import api, { qrCodesAPI } from '../services/api';
 
+const formatPerfectTime = (dateString, fallback = '-') => {
+  if (!dateString) return fallback;
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return fallback;
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+};
+
 // Helper to extract date from batch number (returns string DD/MM/YYYY or null)
 const extractDateFromBatch = (batchNo) => {
   if (!batchNo) return null;
@@ -1936,6 +1951,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   <TableCell><strong>Batch No</strong></TableCell>
                   <TableCell><strong>Package</strong></TableCell>
                   <TableCell><strong>Status</strong></TableCell>
+                  <TableCell><strong>Generated</strong></TableCell>
                   <TableCell><strong>Printed</strong></TableCell>
                   {(isMainAdmin || hasPermission('canViewScans')) && <TableCell><strong>Scan & Reprint Info</strong></TableCell>}
                   <TableCell><strong>Actions</strong></TableCell>
@@ -1976,7 +1992,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                         variant={qr.status === 'scanned' ? 'filled' : 'outlined'}
                       />
                     </TableCell>
-                    <TableCell>{qr.printedDate ? new Date(qr.printedDate).toLocaleDateString() : '-'}</TableCell>
+                    <TableCell>{formatPerfectTime(qr.createdAt)}</TableCell>
+                    <TableCell>{formatPerfectTime(qr.printedDate)}</TableCell>
                     {(isMainAdmin || hasPermission('canViewScans')) && (
                       <TableCell>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -2152,7 +2169,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     {isMainAdmin && (
                       <TableCell align="center" sx={{ fontWeight: 'bold' }}>Scanned</TableCell>
                     )}
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Last Print Date</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>First Generated Time</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Last Print Time</TableCell>
                     {isMainAdmin && (
                       <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                     )}
@@ -2226,7 +2244,10 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                           </TableCell>
                         )}
                         <TableCell align="right">
-                          {batch.lastPrintDate ? new Date(batch.lastPrintDate).toLocaleDateString() : 'N/A'}
+                          {formatPerfectTime(batch.firstGeneratedDate, 'N/A')}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatPerfectTime(batch.lastPrintDate, 'N/A')}
                         </TableCell>
                         {isMainAdmin && (
                           <TableCell align="center">

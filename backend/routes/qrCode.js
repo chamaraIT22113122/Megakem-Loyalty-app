@@ -417,6 +417,7 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
           lastPrintDate: {
             $max: '$printedDate'
           },
+          firstGeneratedDate: { $min: '$createdAt' },
           minExpiryDate: { $min: '$expiryDate' },
           product: { $first: '$product' },
           productNo: { $first: '$productNo' }
@@ -446,6 +447,7 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
           scanned: 0,
           generated: 0,
           lastPrintDate: null,
+          firstGeneratedDate: null,
           minExpiryDate: null,
           product: item.product,
           productNo: item.productNo
@@ -461,6 +463,13 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
         const itemDate = new Date(item.lastPrintDate);
         if (!grouped[prefix].lastPrintDate || itemDate > new Date(grouped[prefix].lastPrintDate)) {
           grouped[prefix].lastPrintDate = item.lastPrintDate;
+        }
+      }
+
+      if (item.firstGeneratedDate) {
+        const itemDate = new Date(item.firstGeneratedDate);
+        if (!grouped[prefix].firstGeneratedDate || itemDate < new Date(grouped[prefix].firstGeneratedDate)) {
+          grouped[prefix].firstGeneratedDate = item.firstGeneratedDate;
         }
       }
       
@@ -921,15 +930,14 @@ router.post('/reprint-requests', protect, qrAdmin, async (req, res) => {
       reason
     }));
 
-    // In a real implementation, this would connect to a print spooler
-    // For now, we'll just update the status to printed
+    const createdRequests = await ReprintRequest.insertMany(newRequests);
     
-    await logAction(req, 'PRINT_QR_CODES', 'QR_CODES', { count: qrIds.length, printerModel });
+    await logAction(req, 'CREATE_REPRINT_REQUEST', 'QR_CODES', { count: idsToCreate.length });
 
     res.json({
       success: true,
-      message: `Successfully queued ${qrIds.length} QR codes for printing`
-    });  data: createdRequests
+      message: `Successfully created ${idsToCreate.length} reprint requests`,
+      data: createdRequests
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
