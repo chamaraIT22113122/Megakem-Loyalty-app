@@ -1,5 +1,30 @@
 const express = require('express');
 const router = express.Router();
+
+// Temporary debug route
+router.get('/debug-points', async (req, res) => {
+  try {
+    const Scan = require('../models/Scan');
+    const Product = require('../models/Product');
+    
+    const scan = await Scan.findOne({ memberId: 'MA4502' }).sort({ timestamp: -1 });
+    if (!scan) return res.json({ error: 'Scan not found' });
+    
+    const product = await Product.findOne({ productNo: scan.productNo ? scan.productNo.toUpperCase() : null });
+    
+    // Strict Points using product.pointsPerProduct
+    let basePoints = product && product.pointsPerProduct != null ? product.pointsPerProduct : 0;
+
+    res.json({
+      scan: { productNo: scan.productNo, qty: scan.qty, price: scan.price, points: scan.points, pointsEarned: scan.pointsEarned },
+      product: product ? { productNo: product.productNo } : null,
+      calculatedBasePoints: basePoints,
+      message: 'System strictly uses 1 Point = 1 Rs'
+    });
+  } catch (error) {
+    res.json({ error: error.message, stack: error.stack });
+  }
+});
 const crypto = require('crypto');
 const Scan = require('../models/Scan');
 const User = require('../models/User');
@@ -263,6 +288,7 @@ router.post('/', optionalAuth, async (req, res) => {
 
     // Calculate loyalty points based on product and loyalty configuration
     scanData.points = await calculatePointsForScan(scanData);
+    scanData.pointsEarned = scanData.points;
 
     // Add user ID if authenticated
     if (req.user) {
@@ -421,6 +447,7 @@ router.post('/batch', optionalAuth, async (req, res) => {
         validScans.push({
           ...currentScan,
           points: calculatedPoints,
+          pointsEarned: calculatedPoints,
           userId: req.user ? req.user._id : undefined
         });
       }
@@ -670,48 +697,16 @@ router.get('/stats/summary', async (req, res) => {
 // Helper function to calculate points for a scan
 async function calculatePointsForScan(scan) {
   try {
-    // Get loyalty config
-    const config = await LoyaltyConfig.getConfig();
-    const pointsConfig = config.pointsCalculation || { method: 'price_based', priceDivisor: 1000, applicatorBonus: 0.1 };
-
-    // Find product
-    const product = await Product.findOne({ 
-      productNo: scan.productNo.toUpperCase() 
-    });
-
-    let basePoints = 0;
-
-    // Check product specific points first
-    if (product) {
-      // Check pack size specific points first
-      if (product.pointsPerPackSize && product.pointsPerPackSize.length > 0 && scan.qty) {
-        const packSizePoints = product.pointsPerPackSize.find(p => 
-          p.packSize.toUpperCase() === scan.qty.toUpperCase()
-        );
-        if (packSizePoints) {
-          basePoints = packSizePoints.points || 0;
-        }
-      }
-
-      // Check fixed product points
-      if (basePoints === 0 && product.pointsPerProduct !== null && product.pointsPerProduct !== undefined) {
-        basePoints = product.pointsPerProduct;
-      }
+    const Product = require('../models/Product');
+    if (!scan.productNo) return 0;
+    
+    const product = await Product.findOne({ productNo: scan.productNo.toUpperCase() });
+    
+    if (product && product.pointsPerProduct != null) {
+      return product.pointsPerProduct;
     }
-
-    // If pointsConfig method is price_based OR if basePoints is still 0 (fallback)
-    if ((pointsConfig.method === 'price_based' || basePoints === 0) && scan.price) {
-      basePoints = Math.floor(scan.price / (pointsConfig.priceDivisor || 1000));
-    }
-
-    // Add bonus for applicators
-    let totalPoints = basePoints;
-    if (scan.role === 'applicator' && pointsConfig.applicatorBonus) {
-      const bonus = Math.floor(basePoints * pointsConfig.applicatorBonus);
-      totalPoints = basePoints + bonus;
-    }
-
-    return totalPoints;
+    
+    return 0;
   } catch (error) {
     console.error('Error calculating points:', error);
     return 0;
@@ -755,7 +750,7 @@ async function updateMemberFromScan(scan) {
     }
 
     // Use points from scan (already calculated during scan creation)
-    const pointsEarned = scan.points || 0;
+    const pointsEarned = scan.pointsEarned || scan.points || 0;
     member.points += pointsEarned;
     member.totalScans += 1;
     member.lastScanDate = scan.timestamp || new Date();
@@ -771,16 +766,18 @@ async function updateMemberFromScan(scan) {
     }
 
     // Track monthly purchase value for cash rewards (only for applicators)
-    if (scan.role === 'applicator' && scan.price && scan.price > 0) {
+    if (scan.role === 'applicator') {
       const scanDate = scan.timestamp || new Date();
       const year = scanDate.getFullYear();
       const month = scanDate.getMonth() + 1; // getMonth() returns 0-11
-      member.addMonthlyPurchase(scan.price, year, month);
+      const scanPrice = scan.price || 0;
+      member.addMonthlyPurchase(scanPrice, pointsEarned, year, month);
     }
 
     // Update tier
     const config = await LoyaltyConfig.getConfig();
     member.updateTier(config.tierThresholds);
+    member.calculateAnnualPointsAndTier(config.annualTiers);
 
     await member.save();
     return member;
@@ -838,6 +835,7 @@ router.post('/sync-members', protect, hasPermission('canManageUsers'), async (re
         // Update tier
         const config = await LoyaltyConfig.getConfig();
         member.updateTier(config.tierThresholds);
+        member.calculateAnnualPointsAndTier(config.annualTiers);
 
         await member.save();
       } catch (error) {

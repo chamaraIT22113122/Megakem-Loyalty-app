@@ -1,0 +1,1 @@
+require('dotenv').config(); const mongoose = require('mongoose'); const seedPoints = require('./scripts/seedPoints'); mongoose.connect(process.env.MONGODB_URI).then(async () => { await seedPoints(); process.exit(0); }).catch(console.error);

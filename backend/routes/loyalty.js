@@ -45,7 +45,9 @@ router.put('/config', protect, [
   body('tierNames.platinum').optional().isString().trim().notEmpty(),
   body('pointsCalculation.method').optional().isIn(['price_based', 'product_based', 'fixed']),
   body('pointsCalculation.priceDivisor').optional().isFloat({ min: 1 }),
-  body('pointsCalculation.applicatorBonus').optional().isFloat({ min: 0, max: 1 })
+  body('pointsCalculation.applicatorBonus').optional().isFloat({ min: 0, max: 1 }),
+  body('pointsReset.intervalMonths').optional().isInt({ min: 0 }),
+  body('pointsReset.resetDay').optional().isInt({ min: 1, max: 28 })
 ], async (req, res) => {
   try {
     if (req.user.role !== 'admin' && !(req.user.role === 'co-admin' && req.user.permissions?.canManageProducts === true)) {
@@ -80,6 +82,14 @@ router.put('/config', protect, [
     
     if (req.body.cashRewardTiers) {
       config.cashRewardTiers = { ...config.cashRewardTiers, ...req.body.cashRewardTiers };
+    }
+    
+    if (req.body.annualTiers) {
+      config.annualTiers = req.body.annualTiers;
+    }
+    
+    if (req.body.pointsReset) {
+      config.pointsReset = { ...config.pointsReset, ...req.body.pointsReset };
     }
 
     await config.save();

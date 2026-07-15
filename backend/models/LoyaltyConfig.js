@@ -62,6 +62,21 @@ const loyaltyConfigSchema = new mongoose.Schema({
       max: 1
     }
   },
+  // Annual Tiers
+  annualTiers: {
+    type: [{
+      name: { type: String, required: true },
+      minPoints: { type: Number, required: true, min: 0 },
+      maxPoints: { type: Number, default: Infinity },
+      benefits: { type: String, default: '' }
+    }],
+    default: [
+      { name: 'Bronze', minPoints: 0, maxPoints: 5000, benefits: 'Basic Member' },
+      { name: 'Silver', minPoints: 5000, maxPoints: 15000, benefits: 'Silver Member Perks' },
+      { name: 'Gold', minPoints: 15000, maxPoints: 30000, benefits: 'Gold Member Perks' },
+      { name: 'Platinum', minPoints: 30000, maxPoints: null, benefits: 'Platinum Member Perks' }
+    ]
+  },
   // Cash reward tiers
   cashRewardTiers: {
     tier1: {
@@ -93,6 +108,24 @@ const loyaltyConfigSchema = new mongoose.Schema({
       default: 6.5,
       min: 0,
       max: 100
+    }
+  },
+  // Automated point reset schedule
+  pointsReset: {
+    intervalMonths: {
+      type: Number,
+      default: 0, // 0 = never reset
+      min: 0
+    },
+    resetDay: {
+      type: Number,
+      default: 1, // 1st day of the month
+      min: 1,
+      max: 28
+    },
+    lastResetDate: {
+      type: Date,
+      default: null
     }
   }
 }, {

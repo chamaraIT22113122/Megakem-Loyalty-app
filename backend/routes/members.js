@@ -166,42 +166,21 @@ router.post('/sync-from-scans', protect, async (req, res) => {
     // Helper function to calculate points
     const calculatePointsForScan = async (scan) => {
       try {
-        const config = await LoyaltyConfig.getConfig();
-        const pointsConfig = config.pointsCalculation || { method: 'price_based', priceDivisor: 1000, applicatorBonus: 0.1 };
-
         const product = await Product.findOne({ 
           productNo: scan.productNo.toUpperCase() 
         });
 
-        let basePoints = 0;
-
-        if (pointsConfig.method === 'product_based' && product) {
-          if (product.pointsPerProduct) {
-            basePoints = product.pointsPerProduct;
-          } else if (product.pointsPerPackSize && scan.qty) {
-            const packSizePoints = product.pointsPerPackSize.find(p => 
-              p.packSize.toLowerCase() === scan.qty.toLowerCase()
-            );
-            if (packSizePoints) {
-              basePoints = packSizePoints.points;
-            }
-          }
-        } else if (pointsConfig.method === 'price_based' && scan.price) {
-          basePoints = Math.floor(scan.price / (pointsConfig.priceDivisor || 1000));
+        if (product && product.pointsPerProduct != null) {
+          return product.pointsPerProduct;
         }
 
-        let totalPoints = basePoints;
-        if (scan.role === 'applicator' && pointsConfig.applicatorBonus) {
-          const bonus = Math.floor(basePoints * pointsConfig.applicatorBonus);
-          totalPoints = basePoints + bonus;
-        }
-
-        return totalPoints;
+        return 0;
       } catch (error) {
-        console.error('Error calculating points:', error);
+        console.error('Error calculating points for scan:', error);
         return 0;
       }
     };
+
 
     const allScans = await Scan.find().sort({ timestamp: 1 });
     const config = await LoyaltyConfig.getConfig();

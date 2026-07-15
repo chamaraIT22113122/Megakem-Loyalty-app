@@ -69,6 +69,41 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// @route   POST /api/products/sync-loyalty-status
+// @desc    Sync loyalty status based on points (bulk action)
+// @access  Private (Admin only)
+router.post('/sync-loyalty-status', protect, hasPermission('canManageProducts'), async (req, res) => {
+  try {
+    const products = await Product.find({});
+    let updatedCount = 0;
+
+    for (const product of products) {
+      const shouldBeEnabled = (product.pointsPerProduct !== null && product.pointsPerProduct !== undefined);
+      if (product.isLoyaltyEnabled !== shouldBeEnabled) {
+        product.isLoyaltyEnabled = shouldBeEnabled;
+        await product.save();
+        updatedCount++;
+      }
+    }
+
+    // Audit Log
+    await logAction(req, 'BULK_SYNC_LOYALTY', 'PRODUCTS', { 
+      updatedCount 
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully updated loyalty status for ${updatedCount} products.`,
+      updatedCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // @route   POST /api/products
 // @desc    Create new product
 // @access  Private (Admin only)

@@ -112,6 +112,7 @@ export const productsAPI = {
   create: (productData) => api.post('/products', productData),
   update: (id, productData) => api.put(`/products/${id}`, productData),
   delete: (id) => api.delete(`/products/${id}`),
+  syncLoyaltyStatus: () => api.post('/products/sync-loyalty-status'),
 };
 
 // Analytics API
@@ -149,7 +150,10 @@ export const loyaltyAPI = {
 export const cashRewardsAPI = {
   getMemberRewards: (memberId, params) => api.get(`/cash-rewards/${memberId}`, { params }),
   getAllRewards: (params) => api.get('/cash-rewards', { params }),
+  getYtdAnalytics: (params) => api.get('/cash-rewards/ytd-analytics', { params }),
   calculateReward: (memberId, data) => api.post(`/cash-rewards/calculate/${memberId}`, data),
+  requestApproval: (memberId, data) => api.put(`/cash-rewards/request-approval/${memberId}`, data),
+  approveReward: (memberId, data) => api.put(`/cash-rewards/approve/${memberId}`, data),
   markAsPaid: (memberId, data) => api.put(`/cash-rewards/mark-paid/${memberId}`, data),
 };
 

@@ -11,7 +11,7 @@
     "@svg-maps/sri-lanka": "^2.0.0",
     "axios": "^1.7.9",
     "jspdf": "^3.0.4",
-    "jspdf-autotable": "^5.0.2",
+    "jspdf-autotable": "^5.0.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-scripts": "5.0.1",

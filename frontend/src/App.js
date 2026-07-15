@@ -1,9 +1,9 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, IconButton, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Switch, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf } from '@mui/icons-material';
+import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
+import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI } from './services/api';
@@ -598,6 +598,8 @@ function App() {
   const [rewards, setRewards] = useState([]);
   const [redemptions, setRedemptions] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [approvalDialog, setApprovalDialog] = useState({ open: false, memberId: null, year: null, month: null, password: '' });
+  const [ytdAnalytics, setYtdAnalytics] = useState([]);
   const [auditLogTotal, setAuditLogTotal] = useState(0);
   const [auditLogPage, setAuditLogPage] = useState(0);
   const [auditLogRowsPerPage, setAuditLogRowsPerPage] = useState(25);
@@ -854,6 +856,8 @@ function App() {
   }, [cart]);
   const [coAdminSearchQuery, setCoAdminSearchQuery] = useState('');
   const [rewardSearchQuery, setRewardSearchQuery] = useState('');
+  const [rewardStatusFilter, setRewardStatusFilter] = useState('ALL');
+  const [selectedRewards, setSelectedRewards] = useState([]);
   const [applicatorSearchQuery, setApplicatorSearchQuery] = useState('');
   const [selectedApplicators, setSelectedApplicators] = useState([]);
   const [applicatorTypeFilter, setApplicatorTypeFilter] = useState('Applicator');
@@ -2213,6 +2217,115 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicatorsPage, applicatorsRowsPerPage, applicatorSearchQuery, adminAuth]);
 
+  const generatePDFStatement = (reward) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(0, 51, 102); // Primary color
+    doc.text('MEGAKEM CASH REWARDS STATEMENT', 14, 22);
+    
+    // Subheader
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    const monthName = new Date(selectedYear, selectedMonth - 1).toLocaleString('default', { month: 'long' });
+    doc.text(`Statement Period: ${monthName} ${selectedYear}`, 14, 32);
+    doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 14, 38);
+    
+    // Member Info Box
+    doc.setDrawColor(200);
+    doc.setFillColor(245, 247, 250);
+    doc.rect(14, 45, 182, 35, 'FD');
+    
+    doc.setTextColor(0);
+    doc.setFontSize(11);
+    doc.text(`Member ID: ${reward.memberId}`, 20, 55);
+    doc.text(`Name: ${reward.memberName}`, 20, 63);
+    doc.text(`Role: ${reward.role === 'applicator' ? 'Applicator' : 'Hardware'}`, 20, 71);
+    
+    // Summary
+    doc.setFontSize(14);
+    doc.setTextColor(0, 51, 102);
+    doc.text('Monthly Summary', 14, 95);
+    
+    // Using autoTable for summary
+    doc.autoTable({
+      startY: 100,
+      head: [['Description', 'Amount']],
+      body: [
+        ['Total Qualifying Purchases', `Rs. ${reward.totalPurchaseValue?.toLocaleString() || 0}`],
+        ['Cash Reward Earned', `Rs. ${reward.cashReward?.toLocaleString() || 0}`],
+        ['Status', reward.status || 'CALCULATED']
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [0, 51, 102] },
+      styles: { fontSize: 11, cellPadding: 5 }
+    });
+
+    // Breakdown (simulating the logic to get the breakdown)
+    const tiers = loyaltyConfig?.annualTiers?.length > 0 
+      ? [...loyaltyConfig.annualTiers].sort((a, b) => a.minPoints - b.minPoints)
+      : [
+          { name: 'First Rs. 250,000', min: 0, max: 250000, rate: 4.5 },
+          { name: 'Next Rs. 250,000', min: 250001, max: 500000, rate: 5.0 },
+          { name: 'Next Rs. 250,000', min: 500001, max: 750000, rate: 5.5 },
+          { name: 'Next Rs. 250,000', min: 750001, max: 1000000, rate: 6.0 },
+          { name: 'Above Rs. 1,000,000', min: 1000001, max: null, rate: 6.5 }
+        ];
+
+    const breakdown = [];
+    let remainingAmount = reward.totalPurchaseValue || 0;
+    
+    tiers.forEach(tier => {
+      if (remainingAmount > 0) {
+        const tMax = tier.max === null ? Infinity : tier.max;
+        const tierMax = tMax === Infinity ? remainingAmount : Math.min(tMax, remainingAmount + tier.min);
+        const amountInTier = Math.max(0, tierMax - tier.min);
+        const tierReward = amountInTier * (tier.rate / 100);
+        
+        if (amountInTier > 0) {
+          breakdown.push([
+            tier.name,
+            `${tier.rate}%`,
+            `Rs. ${amountInTier.toLocaleString()}`,
+            `Rs. ${tierReward.toLocaleString()}`
+          ]);
+          remainingAmount -= amountInTier;
+        }
+      }
+    });
+
+    doc.setFontSize(14);
+    doc.setTextColor(0, 51, 102);
+    doc.text('Reward Calculation Breakdown', 14, doc.lastAutoTable.finalY + 15);
+
+    doc.autoTable({
+      startY: doc.lastAutoTable.finalY + 20,
+      head: [['Tier', 'Rate', 'Amount in Tier', 'Reward']],
+      body: breakdown,
+      theme: 'striped',
+      headStyles: { fillColor: [70, 70, 70] },
+      styles: { fontSize: 10 }
+    });
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(9);
+      doc.setTextColor(150);
+      doc.text(
+        `Page ${i} of ${pageCount} | Megakem Loyalty System`, 
+        doc.internal.pageSize.getWidth() / 2, 
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    }
+    
+    // Save PDF
+    doc.save(`Statement_${reward.memberId}_${monthName}_${selectedYear}.pdf`);
+  };
+
   const loadAdminData = async () => {
     if (!adminAuth) return;
     try {
@@ -2622,6 +2735,26 @@ function App() {
     }
   }, [view]);
 
+  // Auto-calculate and load cash rewards when tab or date changes
+  useEffect(() => {
+    if (view === 'admin' && adminTab === 'rewards' && selectedYear && selectedMonth) {
+      const loadRewards = async () => {
+        setLoading(true);
+        try {
+          const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
+          setCashRewards(response.data.data || []);
+          
+          const ytdRes = await cashRewardsAPI.getYtdAnalytics({ year: selectedYear });
+          setYtdAnalytics(ytdRes.data.data || []);
+        } catch (error) {
+          showNotification('Failed to auto-calculate rewards', 'error');
+        }
+        setLoading(false);
+      };
+      loadRewards();
+    }
+  }, [view, adminTab, selectedYear, selectedMonth]);
+
   // Load member data for profile view
   useEffect(() => {
     if (view === 'profile' && memberId) {
@@ -2759,6 +2892,23 @@ function App() {
       showNotification('User status updated!', 'success');
     } catch (error) {
       showNotification('Failed to update user', 'error');
+    }
+  };
+
+  const handleSyncLoyaltyStatus = async () => {
+    if (!window.confirm('This will turn ON loyalty for products with fixed points and OFF for products without. Continue?')) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await productsAPI.syncLoyaltyStatus();
+      showNotification(res.data.message || 'Loyalty status synced successfully', 'success');
+      const productsRes = await productsAPI.getAll();
+      setProducts(productsRes.data.data);
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to sync loyalty status', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2993,7 +3143,8 @@ function App() {
         tierThresholds: loyaltyConfig.tierThresholds,
         tierNames: loyaltyConfig.tierNames,
         pointsCalculation: loyaltyConfig.pointsCalculation,
-        cashRewardTiers: loyaltyConfig.cashRewardTiers
+        annualTiers: loyaltyConfig.annualTiers,
+        pointsReset: loyaltyConfig.pointsReset
       });
       
       setLoyaltyConfig(response.data.data);
@@ -3515,31 +3666,6 @@ function App() {
               Search Purchase History
             </Button>
           </Box>
-          {memberId && (
-            <Box sx={{ mt: 4 }}>
-              <Divider sx={{ mb: 3 }}><Chip label="Member Account" color="primary" /></Divider>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('profile')}>
-                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                      <Person sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                      <Typography variant="h6" fontWeight={600}>My Profile & Rewards</Typography>
-                      <Typography variant="caption" color="text.secondary">View stats & redeem points</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Card sx={{ cursor: 'pointer', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }} onClick={() => setView('leaderboard')}>
-                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                      <EmojiEvents sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
-                      <Typography variant="h6" fontWeight={600}>Leaderboard</Typography>
-                      <Typography variant="caption" color="text.secondary">Top contributors</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-            </Box>
-          )}
         </Box>}
 
         {view === 'history' && <Box sx={{ py: { xs: 2, sm: 3 }, animation: 'fadeIn 0.5s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
@@ -3580,26 +3706,7 @@ function App() {
                   startAdornment: <Inventory2 sx={{ mr: 1, color: 'primary.main' }} />
                 }}
               />
-              <Box sx={{ display: 'flex', alignItems: 'center', my: 2 }}>
-                <Divider sx={{ flex: 1 }} />
-                <Typography variant='body2' color='text.secondary' sx={{ px: 2, fontWeight: 600 }}>OR</Typography>
-                <Divider sx={{ flex: 1 }} />
-              </Box>
-              <TextField 
-                fullWidth 
-                label='Phone Number (for Hardwares)' 
-                placeholder='e.g., 0712345678' 
-              value={searchPhone} 
-              onChange={(e) => {
-                setSearchPhone(e.target.value);
-                setSearchMemberId('');
-              }}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-              sx={{ mb: 3 }}
-              InputProps={{
-                startAdornment: <Person sx={{ mr: 1, color: 'secondary.main' }} />
-              }}
-            />
+
             <Button 
               fullWidth 
               variant='contained' 
@@ -3906,42 +4013,37 @@ function App() {
                               {currentMember.memberName || currentMember.memberId}
                             </Typography>
                             <Typography variant="body1" sx={{ opacity: 0.9, mb: 1, fontWeight: 600 }}>
-                              {currentMember.memberId}
+                              {currentMember.mobile || 'No mobile'}
                             </Typography>
-                            {currentMember.phone && (
-                              <Typography variant="body2" sx={{ opacity: 0.85, mb: 2 }}>
-                                📞 {currentMember.phone}
-                              </Typography>
-                            )}
-                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                               <Chip 
-                                 label={currentMember.role === 'applicator' ? 'Applicator' : 'Hardware'}
-                                 sx={{ 
-                                   bgcolor: 'secondary.main',
-                                   color: 'white',
-                                   fontWeight: 700,
-                                   fontSize: '0.85rem',
-                                   px: 1,
-                                   py: 1.5,
-                                   boxShadow: 2
-                                 }}
-                               />
-                               <Chip 
-                                 label={getTierDisplayName(currentMember.tier)}
-                                 sx={{ 
-                                   bgcolor: 
-                                     currentMember.tier === 'platinum' ? '#E5E4E2' :
-                                     currentMember.tier === 'gold' ? '#FFD700' :
-                                     currentMember.tier === 'silver' ? '#C0C0C0' : '#CD7F32',
-                                   color: currentMember.tier === 'platinum' || currentMember.tier === 'gold' || currentMember.tier === 'silver' ? 'black' : 'white',
-                                   fontWeight: 800,
-                                   fontSize: '0.85rem',
-                                   px: 1,
-                                   py: 1.5,
-                                   boxShadow: 2
-                                 }}
-                               />
-                             </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                                  <Chip 
+                                    label={currentMember.role === 'applicator' ? 'Applicator' : 'Hardware'}
+                                    sx={{ 
+                                      bgcolor: 'secondary.main',
+                                      color: 'white',
+                                      fontWeight: 700,
+                                      fontSize: '0.85rem',
+                                      px: 1,
+                                      py: 1.5,
+                                      boxShadow: 2
+                                    }}
+                                  />
+                                  <Chip 
+                                    label={getTierDisplayName(currentMember.annualTier || currentMember.tier)}
+                                    sx={{ 
+                                      bgcolor: 
+                                        (currentMember.annualTier || currentMember.tier) === 'platinum' ? '#E5E4E2' :
+                                        (currentMember.annualTier || currentMember.tier) === 'gold' ? '#FFD700' :
+                                        (currentMember.annualTier || currentMember.tier) === 'silver' ? '#C0C0C0' : '#CD7F32',
+                                      color: (currentMember.annualTier || currentMember.tier) === 'platinum' || (currentMember.annualTier || currentMember.tier) === 'gold' || (currentMember.annualTier || currentMember.tier) === 'silver' ? 'black' : 'white',
+                                      fontWeight: 800,
+                                      fontSize: '0.85rem',
+                                      px: 1,
+                                      py: 1.5,
+                                      boxShadow: 2
+                                    }}
+                                  />
+                                </Box>
                             {currentMember.location && (
                               <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
                                 <Typography variant="body2" sx={{ opacity: 0.7, mb: 0.5 }}>
@@ -3958,7 +4060,7 @@ function App() {
                         {/* Stats Cards */}
                         <Grid item xs={12} md={7.5} lg={8.5}>
                           <Grid container spacing={3}>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={6} md={3}>
                               <Box sx={{ 
                                 bgcolor: 'rgba(255,255,255,0.95)',
                                 borderRadius: 3,
@@ -3980,7 +4082,7 @@ function App() {
                                 }}>
                                   <Typography variant="h4">📊</Typography>
                                 </Box>
-                                <Typography variant="h3" fontWeight={800} color="primary.main" sx={{ mb: 1, fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' } }}>
+                                <Typography variant="h3" fontWeight={800} color="primary.main" sx={{ mb: 1, fontSize: { xs: '2rem', sm: '2.5rem', md: '2.5rem' } }}>
                                   {totalScans}
                                 </Typography>
                                 <Typography variant="body1" color="text.secondary" fontWeight={600}>
@@ -3988,7 +4090,7 @@ function App() {
                                 </Typography>
                               </Box>
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={6} md={3}>
                               <Box sx={{ 
                                 bgcolor: 'rgba(255,255,255,0.95)',
                                 borderRadius: 3,
@@ -4010,7 +4112,7 @@ function App() {
                                 }}>
                                   <Typography variant="h4">💰</Typography>
                                 </Box>
-                                <Typography variant="h4" fontWeight={800} color="success.main" sx={{ mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem', lg: '2rem' } }}>
+                                <Typography variant="h4" fontWeight={800} color="success.main" sx={{ mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' } }}>
                                   Rs. {totalAmount.toLocaleString()}
                                 </Typography>
                                 <Typography variant="body1" color="text.secondary" fontWeight={600}>
@@ -4018,7 +4120,37 @@ function App() {
                                 </Typography>
                               </Box>
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={6} md={3}>
+                              <Box sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.95)',
+                                borderRadius: 3,
+                                p: 3,
+                                textAlign: 'center',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                height: '100%'
+                              }}>
+                                <Box sx={{ 
+                                  width: 60,
+                                  height: 60,
+                                  borderRadius: '50%',
+                                  bgcolor: 'secondary.lighter',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  mx: 'auto',
+                                  mb: 2
+                                }}>
+                                  <Typography variant="h4">⭐</Typography>
+                                </Box>
+                                <Typography variant="h4" fontWeight={800} color="secondary.main" sx={{ mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' } }}>
+                                  {(currentMember?.annualPoints || 0).toLocaleString()}
+                                </Typography>
+                                <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                                  Annual Points
+                                </Typography>
+                              </Box>
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={3}>
                               <Box sx={{ 
                                 bgcolor: 'rgba(255,255,255,0.95)',
                                 borderRadius: 3,
@@ -4040,7 +4172,7 @@ function App() {
                                 }}>
                                   <EmojiEvents sx={{ fontSize: '2rem', color: 'warning.main' }} />
                                 </Box>
-                                <Typography variant="h3" fontWeight={800} color="warning.main" sx={{ mb: 1, fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' } }}>
+                                <Typography variant="h3" fontWeight={800} color="warning.main" sx={{ mb: 1, fontSize: { xs: '2rem', sm: '2.5rem', md: '2.5rem' } }}>
                                   {totalPoints.toLocaleString()}
                                 </Typography>
                                 <Typography variant="body1" color="text.secondary" fontWeight={600}>
@@ -4054,7 +4186,7 @@ function App() {
                     </Box>
                   </Card>
 
-                  {/* Rewards Catalog Section */}
+                  {/* Rewards Catalog Section - HIDDEN FOR NOW
                   <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', mb: 3 }}>
                     <Box sx={{ p: 3, bgcolor: 'secondary.main', color: 'white' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -4134,6 +4266,65 @@ function App() {
                             </Table>
                           </TableContainer>
                         </Box>
+                      )}
+                    </Box>
+                  </Card>
+                  */}
+
+                  {/* Cash Rewards History Section */}
+                  <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', mb: 3 }}>
+                    <Box sx={{ p: 3, bgcolor: 'secondary.main', color: 'white' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="h4">💵</Typography>
+                        <Box>
+                          <Typography variant="h5" fontWeight={700}>Cash Rewards History</Typography>
+                          <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                            Monthly cash rewards details and payments
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+                    <Box sx={{ p: 3 }}>
+                      {currentMember?.monthlyPurchases?.length > 0 ? (
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell><strong>Month/Year</strong></TableCell>
+                                <TableCell><strong>Total Purchases (Rs.)</strong></TableCell>
+                                <TableCell><strong>Cash Reward (Rs.)</strong></TableCell>
+                                <TableCell><strong>Status</strong></TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {[...currentMember.monthlyPurchases]
+                                .sort((a, b) => (b.year * 12 + b.month) - (a.year * 12 + a.month))
+                                .map((record, index) => (
+                                <TableRow key={index} hover>
+                                  <TableCell>{new Date(record.year, record.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}</TableCell>
+                                  <TableCell>{record.totalPurchaseValue.toLocaleString()}</TableCell>
+                                  <TableCell>{record.cashReward.toLocaleString()}</TableCell>
+                                  <TableCell>
+                                    <Chip 
+                                      size="small" 
+                                      label={record.rewardPaid ? 'Paid' : (record.rewardCalculated ? 'Calculated' : 'Pending')} 
+                                      color={record.rewardPaid ? 'success' : (record.rewardCalculated ? 'info' : 'warning')} 
+                                    />
+                                    {record.rewardPaid && record.rewardPaidDate && (
+                                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                                        {new Date(record.rewardPaidDate).toLocaleDateString()}
+                                      </Typography>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Typography variant="body1" color="text.secondary" align="center" sx={{ py: 3 }}>
+                          No cash rewards history found.
+                        </Typography>
                       )}
                     </Box>
                   </Card>
@@ -4393,11 +4584,23 @@ function App() {
                                 </Box>
                                 <Box>
                                   <Typography variant="h6" fontWeight={700}>{member.memberName || member.memberId}</Typography>
-                                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                                     <Chip 
                                       label={member.role === 'applicator' ? 'Applicator' : 'Hardware'} 
                                       size="small" 
                                       color={member.role === 'applicator' ? 'warning' : 'info'}
+                                    />
+                                    <Chip 
+                                      label={getTierDisplayName(member.annualTier || member.tier)}
+                                      size="small"
+                                      sx={{ 
+                                        bgcolor: 
+                                          (member.annualTier || member.tier) === 'platinum' ? '#E5E4E2' :
+                                          (member.annualTier || member.tier) === 'gold' ? '#FFD700' :
+                                          (member.annualTier || member.tier) === 'silver' ? '#C0C0C0' : '#CD7F32',
+                                        color: (member.annualTier || member.tier) === 'platinum' || (member.annualTier || member.tier) === 'gold' || (member.annualTier || member.tier) === 'silver' ? 'black' : 'white',
+                                        fontWeight: 700
+                                      }}
                                     />
                                     {member.memberId === memberId?.toUpperCase() && (
                                       <Chip label="You" size="small" color="primary" />
@@ -4409,9 +4612,9 @@ function App() {
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
                                     <EmojiEvents sx={{ fontSize: '1rem', color: 'success.main' }} />
-                                    <Typography variant="h6" fontWeight={700} color="success.main">{member.points || 0}</Typography>
+                                    <Typography variant="h6" fontWeight={700} color="success.main">{member.annualPoints || member.points || 0}</Typography>
                                   </Box>
-                                  <Typography variant="caption" color="text.secondary">Loyalty Points</Typography>
+                                  <Typography variant="caption" color="text.secondary">Annual Points</Typography>
                                   <Divider sx={{ my: 0.5 }} />
                                   <Typography variant="h6" fontWeight={600} color="primary">{member.totalScans || 0}</Typography>
                                   <Typography variant="caption" color="text.secondary">Total Scans</Typography>
@@ -7269,23 +7472,20 @@ function App() {
                   ))}
                 </Select>
               </FormControl>
-              <Button 
-                variant='contained' 
-                startIcon={<Calculate />} 
-                onClick={async () => {
-                  setLoading(true);
-                  try {
-                    const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
-                    setCashRewards(response.data.data || []);
-                    showNotification('Cash rewards calculated successfully', 'success');
-                  } catch (error) {
-                    showNotification(error.response?.data?.message || 'Failed to calculate rewards', 'error');
-                  }
-                  setLoading(false);
-                }}
-              >
-                Calculate Rewards
-              </Button>
+
+              <FormControl sx={{ minWidth: 130 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={rewardStatusFilter}
+                  label="Status"
+                  onChange={(e) => setRewardStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="ALL">All Status</MenuItem>
+                  <MenuItem value="PAID">Paid</MenuItem>
+                  <MenuItem value="PENDING">Pending / Calculated</MenuItem>
+                </Select>
+              </FormControl>
+
               <Button 
                 variant='outlined' 
                 startIcon={<Refresh />} 
@@ -7344,6 +7544,141 @@ function App() {
                 </Button>
               )}
             </Box>
+            {/* Analytics Dashboard */}
+            {cashRewards.length > 0 && (
+              <Paper sx={{ p: 3, mb: 3 }}>
+                <Typography variant='h6' gutterBottom>
+                  Monthly Summary & Analytics
+                </Typography>
+                <Grid container spacing={3}>
+                  {/* KPI Cards */}
+                  <Grid item xs={12} md={4}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'primary.50' }}>
+                        <Typography variant='body2' color='text.secondary'>Total Eligible Members</Typography>
+                        <Typography variant='h4' color='primary.dark'>{cashRewards.length}</Typography>
+                      </Paper>
+                      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'success.50' }}>
+                        <Typography variant='body2' color='text.secondary'>Total Purchases</Typography>
+                        <Typography variant='h5' color='success.dark'>Rs. {cashRewards.reduce((sum, r) => sum + (r.totalPurchaseValue || 0), 0).toLocaleString()}</Typography>
+                      </Paper>
+                      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'warning.50' }}>
+                        <Typography variant='body2' color='text.secondary'>Total Rewards Liability</Typography>
+                        <Typography variant='h5' color='warning.dark'>Rs. {cashRewards.reduce((sum, r) => sum + (r.cashReward || 0), 0).toLocaleString()}</Typography>
+                      </Paper>
+                      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'info.50' }}>
+                        <Typography variant='body2' color='text.secondary'>Paid vs Unpaid</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant='h6' color='success.main'>{cashRewards.filter(r => r.rewardPaid).length}</Typography>
+                          <Typography variant='body2' color='text.secondary'>paid /</Typography>
+                          <Typography variant='h6' color='error.main'>{cashRewards.filter(r => !r.rewardPaid).length}</Typography>
+                          <Typography variant='body2' color='text.secondary'>pending</Typography>
+                        </Box>
+                      </Paper>
+                    </Box>
+                  </Grid>
+                  {/* Top Earners Chart */}
+                  <Grid item xs={12} md={4}>
+                    <Typography variant='subtitle1' gutterBottom color='text.secondary'>Top Earners (Rewards)</Typography>
+                    <Box sx={{ height: 350, pt: 2 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={
+                          [...cashRewards]
+                            .sort((a, b) => (b.cashReward || 0) - (a.cashReward || 0))
+                            .slice(0, 10)
+                            .map(r => ({
+                              name: (r.memberName || r.memberId).substring(0, 15),
+                              Reward: r.cashReward || 0
+                            }))
+                        }>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="name" tick={{fontSize: 12}} />
+                          <YAxis tickFormatter={(value) => `Rs.${value/1000}k`} />
+                          <RechartsTooltip formatter={(value) => `Rs. ${value.toLocaleString()}`} />
+                          <Bar dataKey="Reward" fill="#1976d2" radius={[4, 4, 0, 0]} barSize={40} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </Grid>
+
+                  {/* YTD Liability Chart */}
+                  <Grid item xs={12} md={4}>
+                    <Typography variant='subtitle1' gutterBottom color='text.secondary'>YTD Rewards Liability ({selectedYear})</Typography>
+                    <Box sx={{ height: 350, pt: 2 }}>
+                      {ytdAnalytics.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={ytdAnalytics}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="month" tick={{fontSize: 12}} />
+                            <YAxis tickFormatter={(value) => `Rs.${value/1000}k`} />
+                            <RechartsTooltip formatter={(value) => `Rs. ${value.toLocaleString()}`} />
+                            <Line type="monotone" dataKey="liability" stroke="#f57c00" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} name="Total Rewards" />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                          <Typography variant="body2" color="text.secondary">Loading YTD analytics...</Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+            )}
+
+            {/* Points Reset Schedule Settings */}
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant='h6' gutterBottom>
+                Points Expiration Schedule
+              </Typography>
+              <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
+                Configure when loyalty points automatically reset to zero. Set Interval to 0 to disable automated resets.
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <TextField
+                  label='Reset Interval (Months)'
+                  type='number'
+                  size='small'
+                  InputProps={{ inputProps: { min: 0 } }}
+                  value={loyaltyConfig?.pointsReset?.intervalMonths || 0}
+                  onChange={(e) => setLoyaltyConfig({
+                    ...loyaltyConfig,
+                    pointsReset: {
+                      ...(loyaltyConfig?.pointsReset || {}),
+                      intervalMonths: parseInt(e.target.value) || 0
+                    }
+                  })}
+                  helperText="0 = Never reset"
+                />
+                <TextField
+                  label='Reset Day of Month'
+                  type='number'
+                  size='small'
+                  InputProps={{ inputProps: { min: 1, max: 28 } }}
+                  value={loyaltyConfig?.pointsReset?.resetDay || 1}
+                  onChange={(e) => setLoyaltyConfig({
+                    ...loyaltyConfig,
+                    pointsReset: {
+                      ...(loyaltyConfig?.pointsReset || {}),
+                      resetDay: parseInt(e.target.value) || 1
+                    }
+                  })}
+                  helperText="e.g. 1 for the 1st of the month"
+                />
+                <Button 
+                  variant='contained' 
+                  onClick={handleUpdateLoyaltyConfig}
+                  sx={{ mb: '23px' }}
+                >
+                  Save Schedule
+                </Button>
+                {loyaltyConfig?.pointsReset?.lastResetDate && (
+                  <Typography variant='body2' color='text.secondary' sx={{ mb: '30px', ml: 'auto' }}>
+                    Last Reset: {new Date(loyaltyConfig.pointsReset.lastResetDate).toLocaleDateString()}
+                  </Typography>
+                )}
+              </Box>
+            </Paper>
 
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -7356,14 +7691,91 @@ function App() {
                   No cash rewards data for {new Date(selectedYear, selectedMonth - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
                 </Typography>
                 <Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
-                  Click "Calculate Rewards" to generate rewards for this month
+                  No purchases found to calculate rewards for this month
                 </Typography>
               </Paper>
             ) : (
-              <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-                <Table>
+              <Box>
+                {selectedRewards.length > 0 && (
+                  <Paper sx={{ mb: 2, p: 2, display: 'flex', gap: 2, alignItems: 'center', bgcolor: 'primary.lighter' }}>
+                    <Typography variant="body1" fontWeight={600} color="primary.dark">
+                      {selectedRewards.length} member(s) selected
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      {isMainAdmin() && (
+                        <>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={async () => {
+                              const password = window.prompt(`Approve ${selectedRewards.length} selected rewards?\n\nPlease enter your admin password to approve:`);
+                              if (password) {
+                                setLoading(true);
+                                try {
+                                  for (const memberId of selectedRewards) {
+                                    await cashRewardsAPI.approveReward(memberId, { year: selectedYear, month: selectedMonth, adminPassword: password });
+                                  }
+                                  const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
+                                  setCashRewards(response.data.data || []);
+                                  setSelectedRewards([]);
+                                  showNotification(`Successfully approved ${selectedRewards.length} rewards!`, 'success');
+                                } catch (error) {
+                                  showNotification('Failed to approve some rewards. Incorrect password?', 'error');
+                                }
+                                setLoading(false);
+                              }
+                            }}
+                          >
+                            Approve
+                          </Button>
+
+                          <Button
+                            variant="contained"
+                            color="success"
+                            startIcon={<CheckCircle />}
+                            onClick={async () => {
+                              if (window.confirm(`Mark ${selectedRewards.length} selected rewards as paid?`)) {
+                                setLoading(true);
+                                try {
+                                  for (const memberId of selectedRewards) {
+                                    await cashRewardsAPI.markAsPaid(memberId, { year: selectedYear, month: selectedMonth });
+                                  }
+                                  const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
+                                  setCashRewards(response.data.data || []);
+                                  setSelectedRewards([]);
+                                  showNotification(`Successfully marked ${selectedRewards.length} rewards as paid!`, 'success');
+                                } catch (error) {
+                                  showNotification('Failed to mark some rewards as paid', 'error');
+                                }
+                                setLoading(false);
+                              }
+                            }}
+                          >
+                            Mark Paid
+                          </Button>
+                        </>
+                      )}
+                    </Box>
+                  </Paper>
+                )}
+                <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+                  <Table>
                   <TableHead>
                     <TableRow>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          color="primary"
+                          indeterminate={selectedRewards.length > 0 && selectedRewards.length < cashRewards.length}
+                          checked={cashRewards.length > 0 && selectedRewards.length === cashRewards.length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRewards(cashRewards.map(r => r.memberId));
+                            } else {
+                              setSelectedRewards([]);
+                            }
+                          }}
+                        />
+                      </TableCell>
                       <TableCell><strong>Member ID</strong></TableCell>
                       <TableCell><strong>Member Name</strong></TableCell>
                       <TableCell><strong>Role</strong></TableCell>
@@ -7376,8 +7788,27 @@ function App() {
                   <TableBody>
                     {cashRewards
                       .filter(r => !rewardSearchQuery || r.memberName?.toLowerCase().includes(rewardSearchQuery.toLowerCase()) || r.memberId?.toLowerCase().includes(rewardSearchQuery.toLowerCase()))
+                      .filter(r => {
+                        if (rewardStatusFilter === 'PAID') return r.rewardPaid;
+                        if (rewardStatusFilter === 'PENDING') return !r.rewardPaid;
+                        return true;
+                      })
+                      .sort((a, b) => (b.cashReward || 0) - (a.cashReward || 0))
                       .map((reward) => (
                       <TableRow key={reward.memberId}>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            color="primary"
+                            checked={selectedRewards.includes(reward.memberId)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRewards([...selectedRewards, reward.memberId]);
+                              } else {
+                                setSelectedRewards(selectedRewards.filter(id => id !== reward.memberId));
+                              }
+                            }}
+                          />
+                        </TableCell>
                         <TableCell>{reward.memberId}</TableCell>
                         <TableCell>{reward.memberName}</TableCell>
                         <TableCell>
@@ -7397,9 +7828,9 @@ function App() {
                         </TableCell>
                         <TableCell align='center'>
                           <Chip 
-                            label={reward.rewardPaid ? 'PAID' : reward.rewardCalculated ? 'CALCULATED' : 'PENDING'} 
+                            label={reward.status || 'CALCULATED'} 
                             size='small'
-                            color={reward.rewardPaid ? 'success' : reward.rewardCalculated ? 'warning' : 'default'}
+                            color={reward.status === 'PAID' ? 'success' : reward.status === 'APPROVED' ? 'info' : reward.status === 'PENDING_APPROVAL' ? 'warning' : 'default'}
                           />
                         </TableCell>
                         <TableCell align='center'>
@@ -7409,31 +7840,44 @@ function App() {
                               onClick={() => {
                                 // Calculate breakdown
                                 const breakdown = [];
-                                const tiers = [
-                                  { name: 'First Rs. 250,000', min: 0, max: 250000, rate: 4.5 },
-                                  { name: 'Next Rs. 250,000', min: 250001, max: 500000, rate: 5.0 },
-                                  { name: 'Next Rs. 250,000', min: 500001, max: 750000, rate: 5.5 },
-                                  { name: 'Next Rs. 250,000', min: 750001, max: 1000000, rate: 6.0 },
-                                  { name: 'Above Rs. 1,000,000', min: 1000001, max: Infinity, rate: 6.5 }
-                                ];
+                                const isNewSystem = reward.year > 2026 || (reward.year === 2026 && reward.month >= 7);
                                 
-                                let remainingAmount = reward.totalPurchaseValue;
-                                tiers.forEach(tier => {
-                                  if (remainingAmount > 0) {
-                                    const tierMax = tier.max === Infinity ? remainingAmount : Math.min(tier.max, remainingAmount + tier.min);
-                                    const amountInTier = Math.max(0, tierMax - tier.min);
-                                    const tierReward = amountInTier * (tier.rate / 100);
-                                    if (amountInTier > 0) {
-                                      breakdown.push({
-                                        tier: tier.name,
-                                        amount: amountInTier,
-                                        rate: tier.rate,
-                                        reward: tierReward
-                                      });
-                                      remainingAmount -= amountInTier;
+                                if (isNewSystem) {
+                                  breakdown.push({
+                                    tier: 'Product Points (1 Point = Rs. 1)',
+                                    amount: reward.cashReward,
+                                    rate: '1:1',
+                                    reward: reward.cashReward,
+                                    isNewSystem: true
+                                  });
+                                } else {
+                                  const tiers = [
+                                    { name: 'First Rs. 250,000', min: 0, max: 250000, rate: 4.5 },
+                                    { name: 'Next Rs. 250,000', min: 250001, max: 500000, rate: 5.0 },
+                                    { name: 'Next Rs. 250,000', min: 500001, max: 750000, rate: 5.5 },
+                                    { name: 'Next Rs. 250,000', min: 750001, max: 1000000, rate: 6.0 },
+                                    { name: 'Above Rs. 1,000,000', min: 1000001, max: Infinity, rate: 6.5 }
+                                  ];
+                                  
+                                  let remainingAmount = reward.totalPurchaseValue;
+                                  tiers.forEach(tier => {
+                                    if (remainingAmount > 0) {
+                                      const tierMax = tier.max === Infinity ? remainingAmount : Math.min(tier.max, remainingAmount + tier.min);
+                                      const amountInTier = Math.max(0, tierMax - tier.min);
+                                      const tierReward = amountInTier * (tier.rate / 100);
+                                      if (amountInTier > 0) {
+                                        breakdown.push({
+                                          tier: tier.name,
+                                          amount: amountInTier,
+                                          rate: tier.rate,
+                                          reward: tierReward,
+                                          isNewSystem: false
+                                        });
+                                        remainingAmount -= amountInTier;
+                                      }
                                     }
-                                  }
-                                });
+                                  });
+                                }
                                 
                                 setRewardBreakdownDialog({
                                   open: true,
@@ -7445,7 +7889,35 @@ function App() {
                               <Visibility />
                             </IconButton>
                           </Tooltip>
-                          {!reward.rewardPaid && (
+                          <Tooltip title="Download PDF Statement">
+                            <IconButton
+                              size='small'
+                              color='secondary'
+                              onClick={() => generatePDFStatement(reward)}
+                            >
+                              <PictureAsPdf />
+                            </IconButton>
+                          </Tooltip>
+                          {isMainAdmin() && (reward.status === 'CALCULATED' || reward.status === 'PENDING_APPROVAL') && (
+                            <Tooltip title="Approve Reward">
+                              <IconButton 
+                                size='small'
+                                color='info'
+                                onClick={() => {
+                                  setApprovalDialog({
+                                    open: true,
+                                    memberId: reward.memberId,
+                                    year: selectedYear,
+                                    month: selectedMonth,
+                                    password: ''
+                                  });
+                                }}
+                              >
+                                <CheckCircle />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {isMainAdmin() && reward.status === 'APPROVED' && (
                             <Tooltip title="Mark as Paid">
                               <IconButton 
                                 size='small'
@@ -7479,58 +7951,54 @@ function App() {
                   </TableBody>
                 </Table>
               </TableContainer>
+              </Box>
             )}
 
-            {/* Summary Card */}
-            {cashRewards.length > 0 && (
-              <Paper sx={{ mt: 3, p: 3 }}>
-                <Typography variant='h6' gutterBottom>
-                  Monthly Summary
+            <Dialog open={approvalDialog.open} onClose={() => setApprovalDialog({ ...approvalDialog, open: false })}>
+              <DialogTitle>Approve Cash Reward</DialogTitle>
+              <DialogContent>
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  Please enter your admin password to approve this reward.
                 </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Total Members
-                      </Typography>
-                      <Typography variant='h5'>
-                        {cashRewards.length}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Total Purchases
-                      </Typography>
-                      <Typography variant='h5'>
-                        Rs. {cashRewards.reduce((sum, r) => sum + (r.totalPurchaseValue || 0), 0).toLocaleString()}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Total Rewards
-                      </Typography>
-                      <Typography variant='h5' color='success.main'>
-                        Rs. {cashRewards.reduce((sum, r) => sum + (r.cashReward || 0), 0).toLocaleString()}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Paid Rewards
-                      </Typography>
-                      <Typography variant='h5' color='primary.main'>
-                        {cashRewards.filter(r => r.rewardPaid).length} / {cashRewards.length}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Paper>
-            )}
+                <TextField
+                  fullWidth
+                  type="password"
+                  label="Password"
+                  variant="outlined"
+                  value={approvalDialog.password}
+                  onChange={(e) => setApprovalDialog({ ...approvalDialog, password: e.target.value })}
+                />
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setApprovalDialog({ ...approvalDialog, open: false })}>Cancel</Button>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  onClick={async () => {
+                    if (!approvalDialog.password) return showNotification('Password is required', 'error');
+                    setLoading(true);
+                    try {
+                      await cashRewardsAPI.approveReward(approvalDialog.memberId, {
+                        year: approvalDialog.year,
+                        month: approvalDialog.month,
+                        password: approvalDialog.password
+                      });
+                      const response = await cashRewardsAPI.getAllRewards({ year: approvalDialog.year, month: approvalDialog.month });
+                      setCashRewards(response.data.data || []);
+                      showNotification('Reward approved successfully', 'success');
+                      setApprovalDialog({ ...approvalDialog, open: false });
+                    } catch (error) {
+                      showNotification(getUserFriendlyError(error), 'error');
+                    }
+                    setLoading(false);
+                  }}
+                >
+                  Approve
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+
           </Box>}
 
           {/* Rewards Catalog Management Tab */}
@@ -7969,6 +8437,14 @@ function App() {
                 >
                   Add Product
                 </Button>
+                <Button 
+                  variant='outlined' 
+                  startIcon={<Sync />} 
+                  onClick={handleSyncLoyaltyStatus}
+                  disabled={loading || !hasPermission('canManageProducts')}
+                >
+                  Sync Loyalty Status
+                </Button>
               <TextField 
                 size='small' 
                 placeholder='Search products...' 
@@ -8015,15 +8491,8 @@ function App() {
                       // Calculate points display
                       let pointsDisplay = 'Not Set';
                       
-                      if (p.pointsPerPackSize && p.pointsPerPackSize.length > 0) {
-                        const pointsValues = p.pointsPerPackSize.map(ps => ps.points);
-                        const minPoints = Math.min(...pointsValues);
-                        const maxPoints = Math.max(...pointsValues);
-                        pointsDisplay = minPoints === maxPoints ? `${minPoints} pts` : `${minPoints}-${maxPoints} pts`;
-                      } else if (p.pointsPerProduct !== null && p.pointsPerProduct !== undefined) {
+                      if (p.pointsPerProduct !== null && p.pointsPerProduct !== undefined) {
                         pointsDisplay = `${p.pointsPerProduct} pts (Fixed)`;
-                      } else if (p.price > 0) {
-                        pointsDisplay = `~${Math.floor(p.price / 1000)} pts (Auto)`;
                       }
                       
                       return (
@@ -9219,7 +9688,7 @@ function App() {
                   Loyalty & Tier Configuration
                 </Typography>
                 <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.75)' }}>
-                  Customize tier names, point gaps & reward rules
+                  Customize lifetime tiers, legacy calculation rules, and Annual Tiers
                 </Typography>
               </Box>
             </Box>
@@ -9248,9 +9717,9 @@ function App() {
                     textColor="primary"
                     indicatorColor="primary"
                   >
-                    <Tab label="🏆 Tiers & Gaps" />
-                    <Tab label="⚙️ Calculation" />
-                    <Tab label="💰 Cash Rewards" />
+                    <Tab label="🏆 Lifetime Tiers" />
+                    <Tab label="🏅 Annual Tiers" />
+                    <Tab label="💰 Monthly Cash Rewards" />
                   </Tabs>
 
                   <Box sx={{ p: 3 }}>
@@ -9263,7 +9732,7 @@ function App() {
                         border: '1px solid', borderColor: 'primary.light'
                       }}>
                         <Typography variant='body2' color='primary.dark' fontWeight={500}>
-                          ℹ️ Edit the <strong>display name</strong> and <strong>minimum points threshold</strong> for each tier. Members are automatically re-classified based on their total points.
+                          ℹ️ Edit the <strong>display name</strong> and <strong>minimum points threshold</strong> for each lifetime tier. Members are classified based on their total points.
                         </Typography>
                       </Box>
 
@@ -9386,75 +9855,77 @@ function App() {
                     </Box>
                   )}
 
-                  {/* Tab 1: Points Calculation Rules */}
+                  {/* Tab 1: Annual Tiers */}
                   {loyaltyConfigTab === 1 && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <Box sx={{ p: 1.5, bgcolor: 'info.lighter', borderRadius: 2, border: '1px solid', borderColor: 'info.light' }}>
-                        <Typography variant='body2' color='info.dark' fontWeight={500}>
-                          ⚙️ Configure how loyalty points are calculated from member scan invoice values.
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box sx={{ p: 1.5, bgcolor: 'success.lighter', borderRadius: 2, border: '1px solid', borderColor: 'success.light' }}>
+                        <Typography variant='body2' color='success.dark' fontWeight={500}>
+                          🏆 Set annual points required for each tier and their benefits.
                         </Typography>
                       </Box>
 
-                      <FormControl fullWidth>
-                        <InputLabel>Calculation Method</InputLabel>
-                        <Select
-                          value={loyaltyConfig.pointsCalculation?.method || 'price_based'}
-                          label="Calculation Method"
-                          onChange={(e) => setLoyaltyConfig({
-                            ...loyaltyConfig,
-                            pointsCalculation: { ...loyaltyConfig.pointsCalculation, method: e.target.value }
-                          })}
-                        >
-                          <MenuItem value="price_based">💰 Price Based (Points = Price ÷ Divisor)</MenuItem>
-                          <MenuItem value="product_based">📦 Product Based (Points defined per Product)</MenuItem>
-                          <MenuItem value="fixed">🔒 Fixed Points per Scan</MenuItem>
-                        </Select>
-                      </FormControl>
+                      {loyaltyConfig.annualTiers?.map((t, idx) => (
+                        <Box key={idx} sx={{
+                          display: 'flex', alignItems: 'center', gap: 2,
+                          p: 1.5, borderRadius: 2, bgcolor: 'background.paper',
+                          border: '1px solid', borderColor: 'divider'
+                        }}>
+                          <Box sx={{ flexGrow: 1 }}>
+                            <TextField
+                              size='small'
+                              value={t.name}
+                              onChange={(e) => {
+                                const newTiers = [...loyaltyConfig.annualTiers];
+                                newTiers[idx].name = e.target.value;
+                                setLoyaltyConfig({ ...loyaltyConfig, annualTiers: newTiers });
+                              }}
+                              placeholder='Tier Name (e.g. Gold)'
+                              sx={{ mb: 1, width: '100%' }}
+                            />
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                              <Typography variant='caption'>Min Points:</Typography>
+                              <TextField
+                                size='small' type='number' value={t.minPoints}
+                                onChange={(e) => {
+                                  const newTiers = [...loyaltyConfig.annualTiers];
+                                  newTiers[idx].minPoints = Number(e.target.value);
+                                  setLoyaltyConfig({ ...loyaltyConfig, annualTiers: newTiers });
+                                }}
+                                sx={{ width: 120 }}
+                              />
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                              <Typography variant='caption'>Benefits (comma separated):</Typography>
+                              <TextField
+                                size='small' value={Array.isArray(t.benefits) ? t.benefits.join(', ') : (t.benefits || '')}
+                                onChange={(e) => {
+                                  const newTiers = [...loyaltyConfig.annualTiers];
+                                  newTiers[idx].benefits = e.target.value.split(',').map(b => b.trim()).filter(b => b);
+                                  setLoyaltyConfig({ ...loyaltyConfig, annualTiers: newTiers });
+                                }}
+                                sx={{ flexGrow: 1 }}
+                              />
+                            </Box>
+                          </Box>
+                          <IconButton color="error" onClick={() => {
+                             const newTiers = loyaltyConfig.annualTiers.filter((_, i) => i !== idx);
+                             setLoyaltyConfig({ ...loyaltyConfig, annualTiers: newTiers });
+                          }}>
+                            <Delete />
+                          </IconButton>
+                        </Box>
+                      ))}
 
-                      {loyaltyConfig.pointsCalculation?.method === 'price_based' && (
-                        <TextField
-                          fullWidth
-                          label="Price Divisor (LKR per Point)"
-                          type="number"
-                          value={loyaltyConfig.pointsCalculation?.priceDivisor || 1000}
-                          onChange={(e) => setLoyaltyConfig({
-                            ...loyaltyConfig,
-                            pointsCalculation: { ...loyaltyConfig.pointsCalculation, priceDivisor: parseFloat(e.target.value) || 1000 }
-                          })}
-                          inputProps={{ min: 1 }}
-                          InputProps={{
-                            endAdornment: <Typography variant='body2' color='text.secondary'>LKR / pt</Typography>
-                          }}
-                          helperText="How many LKR spent = 1 loyalty point (default: Rs. 1,000 = 1 Point)"
-                        />
-                      )}
-
-                      <TextField
-                        fullWidth
-                        label="Applicator Bonus Multiplier (%)"
-                        type="number"
-                        value={Math.round((loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1) * 100)}
-                        onChange={(e) => setLoyaltyConfig({
-                          ...loyaltyConfig,
-                          pointsCalculation: {
-                            ...loyaltyConfig.pointsCalculation,
-                            applicatorBonus: parseFloat(e.target.value) / 100 || 0
-                          }
-                        })}
-                        inputProps={{ min: 0, max: 100 }}
-                        InputProps={{
-                          endAdornment: <Typography variant='body2' color='text.secondary'>%</Typography>
+                      <Button 
+                        variant="outlined" 
+                        startIcon={<Add />}
+                        onClick={() => {
+                          const newTiers = [...(loyaltyConfig.annualTiers || []), { name: 'New Tier', minPoints: 0, benefits: [] }];
+                          setLoyaltyConfig({ ...loyaltyConfig, annualTiers: newTiers });
                         }}
-                        helperText="Extra % bonus points for Applicator-role members (default: 10%)"
-                      />
-
-                      <Box sx={{ p: 2, bgcolor: '#e8f5e9', borderRadius: 2, border: '1px solid #c8e6c9' }}>
-                        <Typography variant='body2' fontWeight={700} color='success.dark' gutterBottom>📊 Calculation Example</Typography>
-                        <Typography variant='caption' color='text.secondary' display='block'>Purchase of Rs. 15,000 (Price-Based, Divisor = 1,000):</Typography>
-                        <Typography variant='caption' color='text.secondary' display='block'>• Base points: 15,000 ÷ 1,000 = <strong>15 pts</strong></Typography>
-                        <Typography variant='caption' color='text.secondary' display='block'>• Applicator bonus: 15 × {Math.round((loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1) * 100)}% = <strong>{(15 * (loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1)).toFixed(1)} pts</strong></Typography>
-                        <Typography variant='caption' fontWeight={700} color='success.dark' display='block' sx={{ mt: 0.5 }}>✅ Total Credited: {Math.floor(15 + (15 * (loyaltyConfig.pointsCalculation?.applicatorBonus || 0.1)))} points</Typography>
-                      </Box>
+                      >
+                        Add Tier
+                      </Button>
                     </Box>
                   )}
 
@@ -9578,83 +10049,7 @@ function App() {
                     sx={{ mb: 3 }}
                   />
                   
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant='body2' fontWeight={600} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <EmojiEvents sx={{ fontSize: '1.2rem' }} />
-                      Pack Size Specific Points
-                    </Typography>
-                    <Typography variant='caption' color='text.secondary' sx={{ mb: 2, display: 'block' }}>
-                      Configure different loyalty points for different pack sizes. This overrides fixed points.
-                    </Typography>
-                    
-                    {productPointsDialog.product.packSizePricing && productPointsDialog.product.packSizePricing.length > 0 ? (
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-                        {productPointsDialog.product.packSizePricing.map((packSize, idx) => {
-                          const existingPoints = productPointsDialog.product.pointsPerPackSize?.find(p => p.packSize === packSize.packSize);
-                          return (
-                            <Box key={idx} sx={{ display: 'flex', gap: 2, alignItems: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                              <Box sx={{ flex: 1 }}>
-                                <Typography variant='body2' fontWeight={600}>{packSize.packSize}</Typography>
-                                <Typography variant='caption' color='text.secondary'>Price: Rs. {packSize.price?.toLocaleString() || 0}</Typography>
-                              </Box>
-                              <TextField
-                                label='Points'
-                                type='number'
-                                size='small'
-                                value={existingPoints?.points || ''}
-                                onChange={(e) => {
-                                  const newPoints = e.target.value ? parseInt(e.target.value) : 0;
-                                  const updatedPointsPerPackSize = [...(productPointsDialog.product.pointsPerPackSize || [])];
-                                  const existingIndex = updatedPointsPerPackSize.findIndex(p => p.packSize === packSize.packSize);
-                                  
-                                  if (existingIndex >= 0) {
-                                    updatedPointsPerPackSize[existingIndex] = { packSize: packSize.packSize, points: newPoints };
-                                  } else {
-                                    updatedPointsPerPackSize.push({ packSize: packSize.packSize, points: newPoints });
-                                  }
-                                  
-                                  setProductPointsDialog({
-                                    ...productPointsDialog,
-                                    product: {
-                                      ...productPointsDialog.product,
-                                      pointsPerPackSize: updatedPointsPerPackSize
-                                    }
-                                  });
-                                }}
-                                inputProps={{ min: 0 }}
-                                sx={{ width: 120 }}
-                              />
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    ) : (
-                      <Box sx={{ p: 2, bgcolor: 'warning.lighter', borderRadius: 1, border: '1px dashed', borderColor: 'warning.main' }}>
-                        <Typography variant='caption' color='warning.dark'>
-                          ⚠️ No pack sizes configured for this product. Add pack size pricing first to enable pack-size specific points.
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
-                  
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Box sx={{ p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
-                    <Typography variant='caption' color='info.dark' sx={{ display: 'block', fontWeight: 600, mb: 1 }}>
-                      💡 How Points are Calculated:
-                    </Typography>
-                    <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5 }}>
-                      1. If pack-size specific points are set → Use pack-size points
-                    </Typography>
-                    <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5 }}>
-                      2. Else if fixed points are set → Use fixed points
-                    </Typography>
-                    <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>
-                      3. Otherwise → Calculate based on price (1 point per Rs. 1000)
-                    </Typography>
-                  </Box>
+
                 </>
               )}
             </DialogContent>
@@ -9837,15 +10232,15 @@ function App() {
               </Paper>
 
               <Typography variant='h6' gutterBottom sx={{ mb: 2 }}>
-                Tier-by-Tier Calculation
+                {rewardBreakdownDialog.breakdown[0]?.isNewSystem ? 'Points-based Calculation' : 'Tier-by-Tier Calculation'}
               </Typography>
 
               <TableContainer component={Paper} variant='outlined' sx={{ overflowX: 'auto' }}>
                 <Table size='small'>
                   <TableHead>
                     <TableRow>
-                      <TableCell><strong>Tier</strong></TableCell>
-                      <TableCell align='right'><strong>Amount</strong></TableCell>
+                      <TableCell><strong>{rewardBreakdownDialog.breakdown[0]?.isNewSystem ? 'Method' : 'Tier'}</strong></TableCell>
+                      <TableCell align='right'><strong>{rewardBreakdownDialog.breakdown[0]?.isNewSystem ? 'Points Earned' : 'Amount'}</strong></TableCell>
                       <TableCell align='center'><strong>Rate</strong></TableCell>
                       <TableCell align='right'><strong>Reward</strong></TableCell>
                     </TableRow>
@@ -9855,10 +10250,10 @@ function App() {
                       <TableRow key={index}>
                         <TableCell>{tier.tier}</TableCell>
                         <TableCell align='right'>
-                          Rs. {tier.amount.toLocaleString()}
+                          {tier.isNewSystem ? tier.amount.toLocaleString() : `Rs. ${tier.amount.toLocaleString()}`}
                         </TableCell>
                         <TableCell align='center'>
-                          <Chip label={`${tier.rate}%`} size='small' color='primary' />
+                          <Chip label={tier.isNewSystem ? tier.rate : `${tier.rate}%`} size='small' color='primary' />
                         </TableCell>
                         <TableCell align='right'>
                           <Typography color='success.main' fontWeight='bold'>
@@ -9885,9 +10280,15 @@ function App() {
 
               <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1 }}>
                 <Typography variant='body2' color='text.secondary'>
-                  <strong>Note:</strong> Cash rewards are calculated based on tiered percentages. 
-                  The first Rs. 250,000 earns {rewardBreakdownDialog.breakdown[0]?.rate || 4.5}%, 
-                  the next Rs. 250,000 earns {rewardBreakdownDialog.breakdown[1]?.rate || 5.0}%, and so on.
+                  {rewardBreakdownDialog.breakdown[0]?.isNewSystem ? (
+                    <><strong>Note:</strong> Cash rewards are calculated based on direct product points mapping where 1 Point is equal to Rs. 1.</>
+                  ) : (
+                    <>
+                      <strong>Note:</strong> Cash rewards are calculated based on tiered percentages. 
+                      The first Rs. 250,000 earns {rewardBreakdownDialog.breakdown[0]?.rate || 4.5}%, 
+                      the next Rs. 250,000 earns {rewardBreakdownDialog.breakdown[1]?.rate || 5.0}%, and so on.
+                    </>
+                  )}
                 </Typography>
               </Box>
             </>

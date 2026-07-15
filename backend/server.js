@@ -12,6 +12,8 @@ const User = require('./models/User');
 const Product = require('./models/Product');
 const { performBackup } = require('./scripts/autoBackup');
 const { restoreBackup } = require('./scripts/restoreBackup');
+const { checkAndResetPoints } = require('./scripts/pointsReset');
+const seedPoints = require('./scripts/seedPoints');
 const http = require('http');
 const { Server } = require('socket.io');
 // Load environment variables
@@ -115,6 +117,13 @@ const initializeApp = async () => {
       console.error('⚠️  Error during role auto-fix:', roleFixError.message);
     }
     // ─────────────────────────────────────────────────────────────────────────
+    
+    // Seed points for loyalty products
+    try {
+      await seedPoints();
+    } catch (error) {
+      console.error('⚠️  Error seeding points:', error.message);
+    }
 
   } catch (error) {
     console.error('❌ FATAL: Database initialization failed:', error.message);
@@ -125,6 +134,7 @@ const initializeApp = async () => {
 // Schedule daily backup at midnight (0 0 * * *)
 cron.schedule('0 0 * * *', () => {
   performBackup();
+  checkAndResetPoints();
 });
 
 // Middleware
