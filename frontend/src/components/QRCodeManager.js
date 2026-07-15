@@ -1298,6 +1298,26 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 Delete Selected ({selectedForPrint.length})
               </Button>
             )}
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<Download />}
+              onClick={() => {
+                const qrsToExport = qrCodes.filter(q => selectedForPrint.includes(q._id));
+                const rows = qrsToExport.map(q => ({
+                  QR_ID: q.qrId,
+                  Product_Name: q.productName || (products.find(p => p._id === (q.product?._id || q.product))?.name),
+                  Batch_No: q.batchNo,
+                  Package_No: q.packageNo,
+                  QR_Link: q.qrLink,
+                  Status: q.status,
+                  Generated_Date: q.createdAt ? new Date(q.createdAt).toLocaleString() : ''
+                }));
+                exportCSV(rows, 'Megakem_QRCodes');
+              }}
+            >
+              Export CSV ({selectedForPrint.length})
+            </Button>
           </>
         )}
         <Button

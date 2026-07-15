@@ -198,6 +198,7 @@ app.use('/api/rewards', require('./routes/rewards'));
 app.use('/api/redemptions', require('./routes/redemptions'));
 app.use('/api/audit-logs', require('./routes/auditLogs'));
 app.use('/api/upload', require('./routes/upload'));
+app.use('/api/push', require('./routes/push'));
 
 // Health check
 app.get('/api/health', (req, res) => {

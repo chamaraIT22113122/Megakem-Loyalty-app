@@ -273,6 +273,98 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
   }
 });
 
+// Bulk Generate QR codes for a single product
+router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
+  try {
+    const {
+      productId,
+      batchNo,
+      quantity,
+      startNo,
+      endNo,
+      manufactureDate,
+      expiryDate,
+      customLink,
+      description,
+      printerModel = 'Zebra ZD320',
+      printSettings
+    } = req.body;
+
+    if (!productId || !batchNo || !quantity || quantity <= 0) {
+      return res.status(400).json({ error: 'Product ID, batch number, and valid quantity are required' });
+    }
+
+    const qty = parseInt(quantity, 10);
+    if (qty > 10000) {
+      return res.status(400).json({ error: 'Cannot generate more than 10,000 QR codes at once' });
+    }
+
+    let finalMfgDate = manufactureDate ? new Date(manufactureDate) : extractDateFromBatch(batchNo);
+    let finalExpDate = expiryDate ? new Date(expiryDate) : null;
+    if (finalMfgDate && isNaN(finalMfgDate.getTime())) finalMfgDate = extractDateFromBatch(batchNo);
+    if (finalMfgDate && !finalExpDate) {
+      finalExpDate = new Date(finalMfgDate);
+      finalExpDate.setFullYear(finalExpDate.getFullYear() + 2);
+    }
+
+    const baseUrl = process.env.FRONTEND_URL || 'https://megakemrewards.com';
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const generatedQRs = [];
+    // Determine starting package number based on existing QRs for this batch if startNo not provided
+    let startIndex = parseInt(startNo, 10);
+    if (isNaN(startIndex) || startIndex < 1) {
+      const existingCount = await QRCodeModel.countDocuments({ product: productId, batchNo: { $regex: batchNo } });
+      startIndex = existingCount + 1;
+    }
+    
+    for (let i = 0; i < qty; i++) {
+      const packageNo = String(startIndex + i).padStart(4, '0');
+      const formattedBatch = getFormattedBatch(product.productNo, batchNo, finalMfgDate, packageNo);
+      const qrId = `${product.productNo}-${formattedBatch.replace(/\s+/g, '_')}-${packageNo}-${Date.now()}-${i}`;
+      
+      const sig = signQRLink(product.productNo, formattedBatch, packageNo);
+      const qrLink = customLink || `${baseUrl}/?p=${encodeURIComponent(product.productNo)}&b=${encodeURIComponent(formattedBatch)}&pkg=${encodeURIComponent(packageNo)}&sig=${sig}`;
+      const qrDataUrl = await generateBrandedQR(qrLink);
+
+      generatedQRs.push({
+        qrId,
+        product: productId,
+        productName: product.name,
+        productNo: product.productNo,
+        batchNo: formattedBatch,
+        packageNo,
+        manufactureDate: finalMfgDate,
+        expiryDate: finalExpDate,
+        qrLink,
+        customLink,
+        description,
+        qrData: qrDataUrl,
+        printerModel,
+        printSettings: printSettings || { size: 'medium', dpi: 203, layout: 'standard' },
+        status: 'generated'
+      });
+    }
+
+    const inserted = await QRCodeModel.insertMany(generatedQRs);
+
+    res.status(201).json({
+      message: `Generated ${inserted.length} bulk QR codes`,
+      count: inserted.length,
+      // For large amounts, we only return the basic data to avoid huge payload
+      qrCodes: inserted.map(q => ({ _id: q._id, qrId: q.qrId, qrLink: q.qrLink, batchNo: q.batchNo, packageNo: q.packageNo }))
+    });
+    
+    await logAction(req, 'BULK_GENERATE_QR_CODES', 'QR_CODES', { batchNo, count: inserted.length });
+  } catch (error) {
+    console.error('Bulk QR generation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update all QR codes in a batch
 router.put('/batches/:batchNo', protect, qrAdmin, async (req, res) => {
   try {
