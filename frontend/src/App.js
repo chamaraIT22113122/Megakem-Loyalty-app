@@ -4673,7 +4673,7 @@ function App() {
                 {role === 'applicator' ? 'Waterproofing Technician - Instructions:' : 'Hardware - Instructions:'}
               </Typography>
               <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                📱 Scan QR code on product bags OR use manual entry below
+                📱 Scan QR code on product bags
               </Typography>
               <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
                 ✅ Multiple scans allowed - Add all your products
@@ -4803,19 +4803,6 @@ function App() {
                 </Box>
               )}
             </Box>
-          </Box>
-          <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10, bgcolor: 'rgba(255,255,255,0.98)', p: 2, borderTop: '2px solid', borderColor: 'primary.main' }}>
-            <Typography variant='subtitle2' fontWeight='bold' color='primary' gutterBottom>Manual Entry (Temporary Simulator)</Typography>
-            <Grid container spacing={1}>
-              <Grid item xs={12}>
-                <TextField fullWidth size='small' placeholder='Paste QR Code Data' onKeyPress={(e) => {
-                  if (e.key === 'Enter' && e.target.value.trim()) {
-                    handleScan(e.target.value);
-                    e.target.value = '';
-                  }
-                }} sx={{ bgcolor: 'white' }} />
-              </Grid>
-            </Grid>
           </Box>
 
         </Paper>}
