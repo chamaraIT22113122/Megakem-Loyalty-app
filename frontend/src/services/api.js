@@ -154,7 +154,8 @@ export const cashRewardsAPI = {
   calculateReward: (memberId, data) => api.post(`/cash-rewards/calculate/${memberId}`, data),
   requestApproval: (memberId, data) => api.put(`/cash-rewards/request-approval/${memberId}`, data),
   approveReward: (memberId, data) => api.put(`/cash-rewards/approve/${memberId}`, data),
-  markAsPaid: (memberId, data) => api.put(`/cash-rewards/mark-paid/${memberId}`, data),
+  markAsPaid: (memberId, data) => api.post(`/cash-rewards/pay/${memberId}`, data),
+  unmarkAsPaid: (memberId, data) => api.post(`/cash-rewards/unpay/${memberId}`, data),
 };
 
 // QR Codes API

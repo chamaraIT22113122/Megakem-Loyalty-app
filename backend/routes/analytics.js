@@ -360,4 +360,115 @@ router.get('/export', protect, hasPermission('canExport'), async (req, res) => {
   }
 });
 
+// @route   GET /api/analytics/sales-forecasting
+// @desc    Get sales forecasting based on historical scans
+// @access  Private/Admin
+router.get('/sales-forecasting', protect, hasPermission('canViewDashboard'), async (req, res) => {
+  try {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const scans = await Scan.aggregate([
+      { $match: { timestamp: { $gte: threeMonthsAgo } } },
+      {
+        $group: {
+          _id: {
+            productName: '$productName',
+            month: { $month: '$timestamp' },
+            year: { $year: '$timestamp' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id.productName',
+          history: {
+            $push: {
+              month: '$_id.month',
+              year: '$_id.year',
+              count: '$count'
+            }
+          },
+          totalScans: { $sum: '$count' },
+          avgMonthlyScans: { $avg: '$count' }
+        }
+      },
+      { $sort: { totalScans: -1 } },
+      { $limit: 10 }
+    ]);
+    
+    // Add a simple forecast (Simple Moving Average)
+    const forecasted = scans.map(product => {
+      // SMA is just the average of the last 3 months
+      const forecastCount = Math.round(product.avgMonthlyScans);
+      return {
+        productName: product._id,
+        historicalData: product.history,
+        totalRecentScans: product.totalScans,
+        forecastNextMonth: forecastCount
+      };
+    });
+
+    res.json({ success: true, data: forecasted });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/analytics/geographic-heatmap
+// @desc    Get scan distribution by location
+// @access  Private/Admin
+router.get('/geographic-heatmap', protect, hasPermission('canViewDashboard'), async (req, res) => {
+  try {
+    const locationData = await Scan.aggregate([
+      { $match: { location: { $exists: true, $ne: '' } } },
+      { 
+        $group: { 
+          _id: { $toLower: '$location' }, 
+          count: { $sum: 1 } 
+        } 
+      },
+      { $sort: { count: -1 } },
+      { $limit: 20 }
+    ]);
+
+    const formatted = locationData.map(item => ({
+      location: item._id ? item._id.charAt(0).toUpperCase() + item._id.slice(1) : 'Unknown',
+      count: item.count
+    }));
+
+    res.json({ success: true, data: formatted });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/analytics/churn-detection
+// @desc    Get list of applicators at risk of churning
+// @access  Private/Admin
+router.get('/churn-detection', protect, hasPermission('canViewDashboard'), async (req, res) => {
+  try {
+    const Member = require('../models/Member');
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const atRiskMembers = await Member.find({
+      role: 'applicator',
+      totalScans: { $gte: 5 }, // Ignore new/inactive users
+      $or: [
+        { lastScanDate: { $lt: thirtyDaysAgo } },
+        { lastScanDate: null }
+      ]
+    })
+    .select('memberName memberId phone lastScanDate totalScans tier')
+    .sort({ totalScans: -1 })
+    .limit(50);
+
+    res.json({ success: true, data: atRiskMembers });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

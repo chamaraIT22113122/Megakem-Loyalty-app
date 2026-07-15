@@ -45,6 +45,12 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  promotion: {
+    isActive: { type: Boolean, default: false },
+    multiplier: { type: Number, default: 2, min: 1 },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null }
+  },
   batches: [{
     batchNo: String,
     manufactureDate: Date,

@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -599,7 +599,15 @@ function App() {
   const [redemptions, setRedemptions] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [approvalDialog, setApprovalDialog] = useState({ open: false, memberId: null, year: null, month: null, password: '' });
+  const [cashRewardsPage, setCashRewardsPage] = useState(0);
+  const [cashRewardsRowsPerPage, setCashRewardsRowsPerPage] = useState(25);
   const [ytdAnalytics, setYtdAnalytics] = useState([]);
+  const [advancedInsights, setAdvancedInsights] = useState({
+    salesForecast: [],
+    geographicHeatmap: [],
+    churnDetection: []
+  });
+  const [loadingInsights, setLoadingInsights] = useState(false);
   const [auditLogTotal, setAuditLogTotal] = useState(0);
   const [auditLogPage, setAuditLogPage] = useState(0);
   const [auditLogRowsPerPage, setAuditLogRowsPerPage] = useState(25);
@@ -883,6 +891,7 @@ function App() {
   const [activityLog, setActivityLog] = useState([]);
   const [userPermissions, setUserPermissions] = useState({
     canViewDashboard: true,
+    canViewAdvancedInsights: false,
     canViewScans: true,
     canManageCoAdmins: true,
     canManageUsers: true,
@@ -2326,6 +2335,27 @@ function App() {
     doc.save(`Statement_${reward.memberId}_${monthName}_${selectedYear}.pdf`);
   };
 
+  const loadAdvancedInsights = async () => {
+    try {
+      setLoadingInsights(true);
+      const [salesRes, geoRes, churnRes] = await Promise.all([
+        api.get('/analytics/sales-forecasting', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
+        api.get('/analytics/geographic-heatmap', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
+        api.get('/analytics/churn-detection', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } })
+      ]);
+      setAdvancedInsights({
+        salesForecast: salesRes.data.success ? salesRes.data.data : [],
+        geographicHeatmap: geoRes.data.success ? geoRes.data.data : [],
+        churnDetection: churnRes.data.success ? churnRes.data.data : []
+      });
+    } catch (error) {
+      console.error('Error loading advanced insights:', error);
+      showNotification('Failed to load advanced insights data', 'error');
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
   const loadAdminData = async () => {
     if (!adminAuth) return;
     try {
@@ -2692,6 +2722,7 @@ function App() {
     if (adminAuth && user && view === 'admin') {
       const checkCurrentTab = () => {
         if (adminTab === 'dashboard' && !hasPermission('canViewDashboard')) return false;
+        if (adminTab === 'advanced-insights' && !hasPermission('canViewAdvancedInsights')) return false;
         if (adminTab === 'scans' && !hasPermission('canViewScans')) return false;
         if (adminTab === 'co-admins' && !hasPermission('canManageCoAdmins')) return false;
         if (adminTab === 'members' && !hasPermission('canManageUsers')) return false;
@@ -2706,6 +2737,7 @@ function App() {
 
       if (!checkCurrentTab()) {
         if (hasPermission('canViewDashboard')) setAdminTab('dashboard');
+        else if (hasPermission('canViewAdvancedInsights')) setAdminTab('advanced-insights');
         else if (hasPermission('canViewScans')) setAdminTab('scans');
         else if (hasPermission('canManageUsers')) setAdminTab('members');
         else if (hasPermission('canViewRewards')) setAdminTab('rewards');
@@ -2754,6 +2786,14 @@ function App() {
       loadRewards();
     }
   }, [view, adminTab, selectedYear, selectedMonth]);
+
+  // Load advanced insights when tab is selected
+  useEffect(() => {
+    if (view === 'admin' && adminTab === 'advanced-insights') {
+      loadAdvancedInsights();
+    }
+  }, [view, adminTab]);
+
 
   // Load member data for profile view
   useEffect(() => {
@@ -3036,6 +3076,7 @@ function App() {
         role: role || 'admin',
         permissions: {
           canViewDashboard: permissions?.canViewDashboard === true,
+          canViewAdvancedInsights: permissions?.canViewAdvancedInsights === true,
           canViewScans: permissions?.canViewScans === true,
           canManageCoAdmins: permissions?.canManageCoAdmins === true,
           canDelete: permissions?.canDelete === true,
@@ -4965,6 +5006,7 @@ function App() {
               {hasPermission('canViewRewards') && <Tab icon={<CardGiftcard />} label='Cash Rewards' value='rewards' />}
               {/* {hasPermission('canManageProducts') && <Tab icon={<Star />} label='Rewards Catalog' value='catalog' />} HIDDEN FOR NOW */}
               {hasPermission('canViewLeaderboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
+              {hasPermission('canViewAdvancedInsights') && <Tab icon={<Insights />} label='Advanced Insights' value='advanced-insights' />}
               {isMainAdmin() && <Tab icon={<Security />} label='Audit Logs' value='audit-logs' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
@@ -7276,6 +7318,7 @@ function App() {
                     role: 'admin', 
                     permissions: { 
                       canViewDashboard: false,
+                      canViewAdvancedInsights: false,
                       canViewScans: false,
                       canManageCoAdmins: false,
                       canDelete: false, 
@@ -7346,6 +7389,7 @@ function App() {
                       ) : (
                         <>
                           {u.permissions?.canViewDashboard === true && <Chip label='Dashboard' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canViewAdvancedInsights === true && <Chip label='Insights' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canViewScans === true && <Chip label='Scans' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageCoAdmins === true && <Chip label='Co-Admins' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageUsers === true && <Chip label='Members & Loyalty' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
@@ -7381,6 +7425,7 @@ function App() {
                             password: '',
                             permissions: {
                               canViewDashboard: u.permissions?.canViewDashboard === true,
+                              canViewAdvancedInsights: u.permissions?.canViewAdvancedInsights === true,
                               canViewScans: u.permissions?.canViewScans === true,
                               canManageCoAdmins: u.permissions?.canManageCoAdmins === true,
                               canDelete: u.permissions?.canDelete === true,
@@ -7740,6 +7785,30 @@ function App() {
                           >
                             Mark Paid
                           </Button>
+
+                          <Button
+                            variant="outlined"
+                            color="error"
+                            onClick={async () => {
+                              if (window.confirm(`Unmark ${selectedRewards.length} selected rewards?`)) {
+                                setLoading(true);
+                                try {
+                                  for (const memberId of selectedRewards) {
+                                    await cashRewardsAPI.unmarkAsPaid(memberId, { year: selectedYear, month: selectedMonth });
+                                  }
+                                  const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
+                                  setCashRewards(response.data.data || []);
+                                  setSelectedRewards([]);
+                                  showNotification(`Successfully unmarked ${selectedRewards.length} rewards!`, 'success');
+                                } catch (error) {
+                                  showNotification('Failed to unmark some rewards', 'error');
+                                }
+                                setLoading(false);
+                              }
+                            }}
+                          >
+                            Unmark
+                          </Button>
                         </>
                       )}
                     </Box>
@@ -7781,6 +7850,7 @@ function App() {
                         return true;
                       })
                       .sort((a, b) => (b.cashReward || 0) - (a.cashReward || 0))
+                      .slice(cashRewardsPage * cashRewardsRowsPerPage, cashRewardsPage * cashRewardsRowsPerPage + cashRewardsRowsPerPage)
                       .map((reward) => (
                       <TableRow key={reward.memberId}>
                         <TableCell padding="checkbox">
@@ -7938,6 +8008,27 @@ function App() {
                   </TableBody>
                 </Table>
               </TableContainer>
+              <TablePagination
+                component="div"
+                count={
+                  cashRewards
+                    .filter(r => !rewardSearchQuery || r.memberName?.toLowerCase().includes(rewardSearchQuery.toLowerCase()) || r.memberId?.toLowerCase().includes(rewardSearchQuery.toLowerCase()))
+                    .filter(r => {
+                      if (rewardStatusFilter === 'PAID') return r.rewardPaid;
+                      if (rewardStatusFilter === 'PENDING') return !r.rewardPaid;
+                      return true;
+                    })
+                    .length
+                }
+                page={cashRewardsPage}
+                onPageChange={(e, newPage) => setCashRewardsPage(newPage)}
+                rowsPerPage={cashRewardsRowsPerPage}
+                onRowsPerPageChange={(e) => {
+                  setCashRewardsRowsPerPage(parseInt(e.target.value, 10));
+                  setCashRewardsPage(0);
+                }}
+                rowsPerPageOptions={[10, 25, 50, 100]}
+              />
               </Box>
             )}
 
@@ -9028,6 +9119,174 @@ function App() {
           </Box>}
 
           {/* Profile Settings Tab */}
+          {adminTab === 'advanced-insights' && hasPermission('canViewAdvancedInsights') && (
+            <Box sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Insights color="primary" /> Advanced Analytics & Predictive Insights
+                </Typography>
+                <Button 
+                  variant="outlined" 
+                  startIcon={loadingInsights ? <CircularProgress size={20} /> : <Refresh />}
+                  onClick={loadAdvancedInsights}
+                  disabled={loadingInsights}
+                >
+                  Refresh Data
+                </Button>
+              </Box>
+
+              <Grid container spacing={3}>
+                {/* Sales Forecasting */}
+                <Grid item xs={12} lg={6}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <ShowChart color="primary" /> Sales Forecasting (Next Month)
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Predicted product scans based on the last 3 months moving average.
+                      </Typography>
+                      {loadingInsights ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
+                      ) : advancedInsights.salesForecast.length > 0 ? (
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                            <TableHead sx={{ bgcolor: 'grey.50' }}>
+                              <TableRow>
+                                <TableCell>Product</TableCell>
+                                <TableCell align="center">Recent Total (3m)</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', color: 'primary.main' }}>Forecast</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {advancedInsights.salesForecast.map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell>{item.productName}</TableCell>
+                                  <TableCell align="center">{item.totalRecentScans}</TableCell>
+                                  <TableCell align="right">
+                                    <Chip label={item.forecastNextMonth} color="primary" size="small" variant="outlined" />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Alert severity="info">Not enough historical data to generate forecast.</Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Geographic Heatmap */}
+                <Grid item xs={12} lg={6}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Assessment color="primary" /> Geographic Distribution
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Top scan locations by volume.
+                      </Typography>
+                      {loadingInsights ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
+                      ) : advancedInsights.geographicHeatmap.length > 0 ? (
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                            <TableHead sx={{ bgcolor: 'grey.50' }}>
+                              <TableRow>
+                                <TableCell>Location</TableCell>
+                                <TableCell align="right">Scan Volume</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {advancedInsights.geographicHeatmap.map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell>{item.location}</TableCell>
+                                  <TableCell align="right">
+                                    <Chip label={item.count} color="default" size="small" />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Alert severity="info">No location data available in recent scans.</Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Churn Detection */}
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <NotificationsOff color="error" /> Churn Detection (At-Risk Applicators)
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Applicators with 5+ total scans who haven't scanned anything in the last 30 days.
+                      </Typography>
+                      {loadingInsights ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
+                      ) : advancedInsights.churnDetection.length > 0 ? (
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                            <TableHead sx={{ bgcolor: 'grey.50' }}>
+                              <TableRow>
+                                <TableCell>Member ID</TableCell>
+                                <TableCell>Name</TableCell>
+                                <TableCell>Tier</TableCell>
+                                <TableCell align="center">Total Scans</TableCell>
+                                <TableCell>Last Scan Date</TableCell>
+                                <TableCell align="right">Action</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {advancedInsights.churnDetection.map((member, idx) => (
+                                <TableRow key={idx} sx={{ '&:last-child td, &:last-child th': { border: 0 }, bgcolor: idx % 2 === 0 ? 'inherit' : 'rgba(255,0,0,0.02)' }}>
+                                  <TableCell>{member.memberId}</TableCell>
+                                  <TableCell>{member.memberName}</TableCell>
+                                  <TableCell>
+                                    <Chip 
+                                      label={getTierDisplayName(member.tier)} 
+                                      size="small"
+                                      sx={{ 
+                                        bgcolor: member.tier === 'platinum' ? '#e5e4e2' : member.tier === 'gold' ? '#ffd700' : member.tier === 'silver' ? '#c0c0c0' : '#cd7f32',
+                                        color: member.tier === 'platinum' ? '#000' : member.tier === 'gold' ? '#000' : member.tier === 'silver' ? '#000' : '#fff',
+                                        fontWeight: 'bold'
+                                      }} 
+                                    />
+                                  </TableCell>
+                                  <TableCell align="center">{member.totalScans}</TableCell>
+                                  <TableCell>{member.lastScanDate ? new Date(member.lastScanDate).toLocaleDateString() : 'Unknown'}</TableCell>
+                                  <TableCell align="right">
+                                    <Button 
+                                      variant="outlined" 
+                                      color="primary" 
+                                      size="small"
+                                      onClick={() => showNotification('SMS notification system pending integration', 'info')}
+                                    >
+                                      Send SMS
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Alert severity="success" icon={<CheckCircle />}>No at-risk applicators detected. Everyone is active!</Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+
+          {/* Profile Settings Tab */}
           {adminTab === 'profile' && <Grid container spacing={3}>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Profile Settings</Typography>{!editingProfile ? <Box><Typography variant='body1'><strong>Username:</strong> {user?.username}</Typography><Typography variant='body1'><strong>Email:</strong> {user?.email}</Typography><Button variant='outlined' startIcon={<Edit />} onClick={() => { setEditingProfile(true); setProfileData({ username: user?.username, email: user?.email }); }} sx={{ mt: 2 }}>Edit Profile</Button></Box> : <Box><TextField fullWidth label='Username' value={profileData.username} onChange={(e) => setProfileData({ ...profileData, username: e.target.value })} sx={{ mb: 2 }} /><TextField fullWidth label='Email' type='email' value={profileData.email} onChange={(e) => setProfileData({ ...profileData, email: e.target.value })} sx={{ mb: 2 }} /><Box sx={{ display: 'flex', gap: 1 }}><Button variant='contained' startIcon={<Save />} onClick={handleUpdateProfile} disabled={loading}>Save</Button><Button variant='outlined' startIcon={<Cancel />} onClick={() => setEditingProfile(false)}>Cancel</Button></Box></Box>}</CardContent></Card></Grid>
             <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom>Change Password</Typography><TextField fullWidth type={showPassword.currentPassword ? 'text' : 'password'} label='Current Password' value={passwordData.currentPassword} onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, currentPassword: !showPassword.currentPassword })} edge="end" size="small">{showPassword.currentPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><TextField fullWidth type={showPassword.newPassword ? 'text' : 'password'} label='New Password' value={passwordData.newPassword} onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, newPassword: !showPassword.newPassword })} edge="end" size="small">{showPassword.newPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><TextField fullWidth type={showPassword.confirmPassword ? 'text' : 'password'} label='Confirm New Password' value={passwordData.confirmPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} sx={{ mb: 2 }} InputProps={{ endAdornment: ( <InputAdornment position="end"><IconButton onClick={() => setShowPassword({ ...showPassword, confirmPassword: !showPassword.confirmPassword })} edge="end" size="small">{showPassword.confirmPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment> ) }} /><Button variant='contained' onClick={handleChangePassword} disabled={loading}>Change Password</Button></CardContent></Card></Grid>
@@ -9227,6 +9486,76 @@ function App() {
                 label="Loyalty Program / QR Code Enabled"
                 sx={{ mt: 2 }}
               />
+
+              {/* Promotional Campaign Section */}
+              <Box sx={{ mt: 3, p: 2, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
+                <Typography variant='subtitle2' sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <EmojiEvents color="secondary" fontSize="small" /> Promotional Campaign (Points Multiplier)
+                </Typography>
+                
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={productDialog.product?.promotion?.isActive === true}
+                      onChange={(e) => {
+                        const promotion = { ...(productDialog.product?.promotion || {}) };
+                        promotion.isActive = e.target.checked;
+                        if (!promotion.multiplier) promotion.multiplier = 2; // Default 2x
+                        setProductDialog({ ...productDialog, product: { ...productDialog.product, promotion } });
+                      }}
+                      color="secondary"
+                    />
+                  }
+                  label="Enable Promotion"
+                />
+
+                {productDialog.product?.promotion?.isActive && (
+                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Multiplier (e.g. 2 for 2x points)"
+                        type="number"
+                        inputProps={{ min: 1, step: 0.1 }}
+                        value={productDialog.product?.promotion?.multiplier || ''}
+                        onChange={(e) => {
+                          const promotion = { ...(productDialog.product?.promotion || {}) };
+                          promotion.multiplier = parseFloat(e.target.value) || 1;
+                          setProductDialog({ ...productDialog, product: { ...productDialog.product, promotion } });
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Start Date"
+                        type="date"
+                        InputLabelProps={{ shrink: true }}
+                        value={productDialog.product?.promotion?.startDate ? new Date(productDialog.product.promotion.startDate).toISOString().split('T')[0] : ''}
+                        onChange={(e) => {
+                          const promotion = { ...(productDialog.product?.promotion || {}) };
+                          promotion.startDate = e.target.value ? new Date(e.target.value) : null;
+                          setProductDialog({ ...productDialog, product: { ...productDialog.product, promotion } });
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="End Date"
+                        type="date"
+                        InputLabelProps={{ shrink: true }}
+                        value={productDialog.product?.promotion?.endDate ? new Date(productDialog.product.promotion.endDate).toISOString().split('T')[0] : ''}
+                        onChange={(e) => {
+                          const promotion = { ...(productDialog.product?.promotion || {}) };
+                          promotion.endDate = e.target.value ? new Date(e.target.value) : null;
+                          setProductDialog({ ...productDialog, product: { ...productDialog.product, promotion } });
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+                )}
+              </Box>
             </DialogContent>
             <DialogActions><Button onClick={() => setProductDialog({ open: false, product: null })}>Cancel</Button><Button variant='contained' onClick={handleSaveProduct} disabled={loading}>Save</Button></DialogActions>
           </Dialog>
@@ -9303,6 +9632,28 @@ function App() {
                         user: { 
                           ...prev.user, 
                           permissions: { ...(prev.user?.permissions || {}), canViewDashboard: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='info' 
+                  />
+                </Box>
+
+                {/* 1.5. Advanced Insights */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can View Advanced Insights</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Advanced Insights tab</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canViewAdvancedInsights === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canViewAdvancedInsights: checked } 
                         } 
                       }));
                     }} 
@@ -10191,6 +10542,17 @@ function App() {
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant='body2' color='text.secondary'>
+                      Month / Year
+                    </Typography>
+                    <Typography variant='h6' color='primary.main'>
+                      {rewardBreakdownDialog.member.year && rewardBreakdownDialog.member.month ? 
+                        new Date(rewardBreakdownDialog.member.year, rewardBreakdownDialog.member.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' }) : 
+                        'N/A'
+                      }
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant='body2' color='text.secondary'>
                       Member
                     </Typography>
                     <Typography variant='h6'>
@@ -10207,6 +10569,23 @@ function App() {
                     <Typography variant='h5' color='primary.main'>
                       Rs. {rewardBreakdownDialog.member.totalPurchaseValue?.toLocaleString()}
                     </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant='body2' color='text.secondary'>
+                      Payment Status
+                    </Typography>
+                    <Chip 
+                      label={rewardBreakdownDialog.member.rewardPaid ? 'Paid' : 'Unpaid'} 
+                      color={rewardBreakdownDialog.member.rewardPaid ? 'success' : 'warning'} 
+                      size="small" 
+                      icon={rewardBreakdownDialog.member.rewardPaid ? <CheckCircle /> : undefined}
+                      sx={{ mt: 0.5 }}
+                    />
+                    {rewardBreakdownDialog.member.rewardPaid && rewardBreakdownDialog.member.rewardPaidDate && (
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                        on {new Date(rewardBreakdownDialog.member.rewardPaidDate).toLocaleDateString()}
+                      </Typography>
+                    )}
                   </Grid>
                 </Grid>
               </Paper>

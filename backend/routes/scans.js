@@ -703,7 +703,24 @@ async function calculatePointsForScan(scan) {
     const product = await Product.findOne({ productNo: scan.productNo.toUpperCase() });
     
     if (product && product.pointsPerProduct != null) {
-      return product.pointsPerProduct;
+      let points = product.pointsPerProduct;
+      
+      // Apply promotional multiplier if active and valid
+      if (product.promotion && product.promotion.isActive && product.promotion.multiplier > 1) {
+        const now = new Date();
+        const start = product.promotion.startDate ? new Date(product.promotion.startDate) : null;
+        const end = product.promotion.endDate ? new Date(product.promotion.endDate) : null;
+        
+        let isValid = true;
+        if (start && now < start) isValid = false;
+        if (end && now > end) isValid = false;
+        
+        if (isValid) {
+          points = Math.round(points * product.promotion.multiplier); // Ensure integer points
+        }
+      }
+      
+      return points;
     }
     
     return 0;

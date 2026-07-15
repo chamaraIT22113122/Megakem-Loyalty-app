@@ -101,6 +101,49 @@ function calculateRewardBreakdown(totalPurchaseValue, configTiers) {
   return breakdown;
 }
 
+// @route   GET /api/cash-rewards/ytd-analytics
+// @desc    Get Year-To-Date (YTD) analytics for cash rewards
+// @access  Private/Admin
+router.get('/ytd-analytics', protect, hasPermission('canViewRewards'), async (req, res) => {
+  try {
+    const year = parseInt(req.query.year || new Date().getFullYear());
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    const data = months.map((month) => ({
+      month,
+      liability: 0
+    }));
+
+    // Find all applicator members who have monthly purchases for the requested year
+    const members = await Member.find({ 
+      role: 'applicator',
+      'monthlyPurchases.year': year
+    }, 'monthlyPurchases');
+
+    // Aggregate liabilities
+    members.forEach(member => {
+      if (member.monthlyPurchases) {
+        member.monthlyPurchases.forEach(mp => {
+          if (mp.year === year && mp.month >= 1 && mp.month <= 12) {
+            data[mp.month - 1].liability += (mp.cashReward || 0);
+          }
+        });
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // @route   GET /api/cash-rewards/:memberId
 // @desc    Get cash rewards for a specific member
 // @access  Private
@@ -159,7 +202,9 @@ router.get('/:memberId', protect, async (req, res) => {
           totalPurchaseValue: purchase ? purchase.totalPurchaseValue : 0,
           cashReward: cashReward,
           rewardCalculated: purchase ? purchase.rewardCalculated : false,
-          rewardPaid: purchase ? purchase.rewardPaid : false
+          rewardPaid: purchase ? purchase.rewardPaid : false,
+          status: purchase ? purchase.status : null,
+          rewardPaidDate: purchase ? purchase.rewardPaidDate : null
         }
       });
     }
@@ -188,7 +233,7 @@ router.get('/:memberId', protect, async (req, res) => {
 // @route   GET /api/cash-rewards
 // @desc    Get all applicators' cash rewards (with optional filters)
 // @access  Private/Admin
-router.get('/', protect, hasPermission('canExport'), async (req, res) => {
+router.get('/', protect, hasPermission('canViewRewards'), async (req, res) => {
   try {
     const { year, month, role = 'applicator' } = req.query;
     
@@ -265,7 +310,9 @@ router.get('/', protect, hasPermission('canExport'), async (req, res) => {
           totalPurchaseValue: purchase ? purchase.totalPurchaseValue : 0,
           cashReward: cashReward,
           rewardCalculated: purchase ? purchase.rewardCalculated : false,
-          rewardPaid: purchase ? purchase.rewardPaid : false
+          rewardPaid: purchase ? purchase.rewardPaid : false,
+          status: purchase ? purchase.status : null,
+          rewardPaidDate: purchase ? purchase.rewardPaidDate : null
         });
       }
       
@@ -302,9 +349,9 @@ router.get('/', protect, hasPermission('canExport'), async (req, res) => {
 });
 
 // @route   POST /api/cash-rewards/calculate/:memberId
-// @desc    Calculate cash reward for a specific member and month
+// @desc    Manually trigger calculation of cash rewards for a member
 // @access  Private/Admin
-router.post('/calculate/:memberId', protect, hasPermission('canExport'), async (req, res) => {
+router.post('/calculate/:memberId', protect, hasPermission('canViewRewards'), async (req, res) => {
   try {
     const { year, month } = req.body;
 
@@ -370,7 +417,10 @@ router.post('/calculate/:memberId', protect, hasPermission('canExport'), async (
         totalPurchaseValue: purchase.totalPurchaseValue,
         cashReward: cashReward,
         breakdown,
-        rewardCalculated: purchase.rewardCalculated
+        rewardCalculated: purchase.rewardCalculated,
+        rewardPaid: purchase.rewardPaid,
+        status: purchase.status,
+        rewardPaidDate: purchase.rewardPaidDate
       }
     });
   } catch (error) {
@@ -382,9 +432,9 @@ router.post('/calculate/:memberId', protect, hasPermission('canExport'), async (
 });
 
 // @route   POST /api/cash-rewards/pay/:memberId
-// @desc    Mark cash reward as paid for a specific member and month
+// @desc    Mark a cash reward as paid for a specific month
 // @access  Private/Admin
-router.post('/pay/:memberId', protect, hasPermission('canExport'), async (req, res) => {
+router.post('/pay/:memberId', protect, hasPermission('canViewRewards'), async (req, res) => {
   try {
     const { year, month } = req.body;
 
@@ -444,6 +494,125 @@ router.post('/pay/:memberId', protect, hasPermission('canExport'), async (req, r
       success: false,
       message: error.message
     });
+  }
+});
+
+// @route   PUT /api/cash-rewards/request-approval/:memberId
+// @desc    Request approval for a calculated reward
+// @access  Private/Admin
+router.put('/request-approval/:memberId', protect, hasPermission('canViewRewards'), async (req, res) => {
+  try {
+    const { year, month } = req.body;
+
+    if (!year || !month) {
+      return res.status(400).json({ success: false, message: 'Year and month are required' });
+    }
+
+    const member = await Member.findOne({ memberId: req.params.memberId.toUpperCase() });
+    if (!member) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+
+    const purchase = member.monthlyPurchases.find(
+      p => p.year === parseInt(year) && p.month === parseInt(month)
+    );
+
+    if (!purchase) {
+      return res.status(404).json({ success: false, message: 'Monthly purchase record not found.' });
+    }
+
+    purchase.status = 'PENDING_APPROVAL';
+    await member.save();
+
+    res.json({ success: true, message: 'Approval requested' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/cash-rewards/approve/:memberId
+// @desc    Approve a calculated reward
+// @access  Private/Admin
+router.put('/approve/:memberId', protect, hasPermission('canViewRewards'), async (req, res) => {
+  try {
+    const { year, month } = req.body;
+
+    if (!year || !month) {
+      return res.status(400).json({ success: false, message: 'Year and month are required' });
+    }
+
+    const member = await Member.findOne({ memberId: req.params.memberId.toUpperCase() });
+    if (!member) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+
+    const purchase = member.monthlyPurchases.find(
+      p => p.year === parseInt(year) && p.month === parseInt(month)
+    );
+
+    if (!purchase) {
+      return res.status(404).json({ success: false, message: 'Monthly purchase record not found.' });
+    }
+
+    purchase.status = 'APPROVED';
+    await member.save();
+
+    res.json({ success: true, message: 'Reward approved' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/cash-rewards/unpay/:memberId
+// @desc    Unmark a cash reward as paid
+// @access  Private/Admin
+router.post('/unpay/:memberId', protect, hasPermission('canViewRewards'), async (req, res) => {
+  try {
+    const { year, month } = req.body;
+
+    if (!year || !month) {
+      return res.status(400).json({ success: false, message: 'Year and month are required' });
+    }
+
+    const member = await Member.findOne({ memberId: req.params.memberId.toUpperCase() });
+
+    if (!member) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+
+    const purchase = member.monthlyPurchases.find(
+      p => p.year === parseInt(year) && p.month === parseInt(month)
+    );
+
+    if (!purchase) {
+      return res.status(404).json({ success: false, message: 'Monthly purchase record not found.' });
+    }
+
+    if (purchase.rewardPaid) {
+      purchase.rewardPaid = false;
+      purchase.rewardPaidDate = null;
+      purchase.status = 'APPROVED'; // Revert to approved since it was paid
+      member.totalCashRewards = Math.max(0, member.totalCashRewards - purchase.cashReward);
+      await member.save();
+    }
+
+    await logAction(req, 'UNPAY_CASH_REWARDS', 'CASH_REWARDS', { memberId: member.memberId, year, month, cashReward: purchase.cashReward });
+
+    res.json({
+      success: true,
+      data: {
+        memberId: member.memberId,
+        memberName: member.memberName,
+        year: parseInt(year),
+        month: parseInt(month),
+        cashReward: purchase.cashReward,
+        rewardPaid: purchase.rewardPaid,
+        rewardPaidDate: purchase.rewardPaidDate,
+        totalCashRewards: member.totalCashRewards
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

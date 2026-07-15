@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
+    canViewAdvancedInsights: {
+      type: Boolean,
+      default: false
+    },
     canViewScans: {
       type: Boolean,
       default: false
