@@ -26,7 +26,7 @@ async function calculatePointsForScan(scan, config, pointsConfig) {
 }
 
 // Helper function to calculate monthly purchase value and points from scans
-async function calculateMonthlyPurchaseValueAndPoints(memberId, year, month, config, pointsConfig) {
+async function calculateMonthlyPurchaseValueAndPoints(memberId, year, month, config, pointsConfig, productPointsMap = null) {
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
@@ -44,7 +44,12 @@ async function calculateMonthlyPurchaseValueAndPoints(memberId, year, month, con
   for (const scan of scans) {
     let scanPoints = scan.pointsEarned !== undefined ? scan.pointsEarned : (scan.points || 0);
     if (scanPoints === 0 && (scan.price > 0 || scan.qty)) {
-      scanPoints = await calculatePointsForScan(scan, config, pointsConfig);
+      if (productPointsMap) {
+        const productNo = scan.productNo ? scan.productNo.toUpperCase() : null;
+        scanPoints = productNo && productPointsMap[productNo] != null ? productPointsMap[productNo] : 0;
+      } else {
+        scanPoints = await calculatePointsForScan(scan, config, pointsConfig);
+      }
     }
     pointsEarned += scanPoints;
   }
@@ -117,18 +122,28 @@ router.get('/:memberId', protect, async (req, res) => {
       const config = await LoyaltyConfig.getConfig();
       const pointsConfig = config.pointsCalculation || { method: 'price_based', priceDivisor: 1000, applicatorBonus: 0.1 };
       
+      const products = await Product.find({}, 'productNo pointsPerProduct').lean();
+      const productPointsMap = {};
+      products.forEach(p => {
+        if (p.productNo) productPointsMap[p.productNo.toUpperCase()] = p.pointsPerProduct || 0;
+      });
+      
       const { purchaseValue, pointsEarned } = await calculateMonthlyPurchaseValueAndPoints(
         member.memberId, 
         parseInt(year), 
         parseInt(month),
         config,
-        pointsConfig
+        pointsConfig,
+        productPointsMap
       );
       
       member.setMonthlyPurchase(purchaseValue, pointsEarned, parseInt(year), parseInt(month));
       const cashReward = member.calculateCashReward(parseInt(year), parseInt(month), config.cashRewardTiers);
       member.calculateAnnualPointsAndTier(config.annualTiers);
-      await member.save();
+      
+      if (member.isModified()) {
+        await member.save();
+      }
 
       const purchase = member.monthlyPurchases.find(
         p => p.year === parseInt(year) && p.month === parseInt(month)
@@ -203,6 +218,12 @@ router.get('/', protect, hasPermission('canExport'), async (req, res) => {
         pointsMap[m.memberId] = 0;
       }
 
+      const products = await Product.find({}, 'productNo pointsPerProduct').lean();
+      const productPointsMap = {};
+      products.forEach(p => {
+        if (p.productNo) productPointsMap[p.productNo.toUpperCase()] = p.pointsPerProduct || 0;
+      });
+
       for (const scan of scans) {
         const mId = scan.memberId;
         if (purchaseMap[mId] !== undefined) {
@@ -210,21 +231,27 @@ router.get('/', protect, hasPermission('canExport'), async (req, res) => {
           
           let scanPoints = scan.pointsEarned !== undefined ? scan.pointsEarned : (scan.points || 0);
           if (scanPoints === 0 && (scan.price > 0 || scan.qty)) {
-            const p = await Product.findOne({ productNo: scan.productNo ? scan.productNo.toUpperCase() : null });
-            scanPoints = p && p.pointsPerProduct != null ? p.pointsPerProduct : 0;
+            const productNo = scan.productNo ? scan.productNo.toUpperCase() : null;
+            scanPoints = productNo && productPointsMap[productNo] != null ? productPointsMap[productNo] : 0;
           }
           pointsMap[mId] += scanPoints;
         }
       }
 
+      const savePromises = [];
+
       for (const member of members) {
         const pValue = purchaseMap[member.memberId] || 0;
         const pEarned = pointsMap[member.memberId] || 0;
         
+        // Only run mutations if things actually changed or need to be set
         member.setMonthlyPurchase(pValue, pEarned, parseInt(year), parseInt(month));
         const cashReward = member.calculateCashReward(parseInt(year), parseInt(month), config.cashRewardTiers);
         member.calculateAnnualPointsAndTier(config.annualTiers);
-        await member.save();
+        
+        if (member.isModified()) {
+          savePromises.push(member.save());
+        }
 
         const purchase = member.monthlyPurchases.find(
           p => p.year === parseInt(year) && p.month === parseInt(month)
@@ -240,6 +267,12 @@ router.get('/', protect, hasPermission('canExport'), async (req, res) => {
           rewardCalculated: purchase ? purchase.rewardCalculated : false,
           rewardPaid: purchase ? purchase.rewardPaid : false
         });
+      }
+      
+      // Save in chunks to not overwhelm the DB
+      const chunkSize = 50;
+      for (let i = 0; i < savePromises.length; i += chunkSize) {
+        await Promise.all(savePromises.slice(i, i + chunkSize));
       }
     } else {
       for (const member of members) {
@@ -296,18 +329,28 @@ router.post('/calculate/:memberId', protect, hasPermission('canExport'), async (
     const config = await LoyaltyConfig.getConfig();
     const pointsConfig = config.pointsCalculation || { method: 'price_based', priceDivisor: 1000, applicatorBonus: 0.1 };
 
+    const products = await Product.find({}, 'productNo pointsPerProduct').lean();
+    const productPointsMap = {};
+    products.forEach(p => {
+      if (p.productNo) productPointsMap[p.productNo.toUpperCase()] = p.pointsPerProduct || 0;
+    });
+
     const { purchaseValue, pointsEarned } = await calculateMonthlyPurchaseValueAndPoints(
       member.memberId,
       parseInt(year),
       parseInt(month),
       config,
-      pointsConfig
+      pointsConfig,
+      productPointsMap
     );
 
     member.setMonthlyPurchase(purchaseValue, pointsEarned, parseInt(year), parseInt(month));
     const cashReward = member.calculateCashReward(parseInt(year), parseInt(month), config.cashRewardTiers);
     member.calculateAnnualPointsAndTier(config.annualTiers);
-    await member.save();
+    
+    if (member.isModified()) {
+      await member.save();
+    }
 
     const purchase = member.monthlyPurchases.find(
       p => p.year === parseInt(year) && p.month === parseInt(month)
