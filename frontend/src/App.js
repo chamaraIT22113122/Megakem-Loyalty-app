@@ -8437,14 +8437,7 @@ function App() {
                 >
                   Add Product
                 </Button>
-                <Button 
-                  variant='outlined' 
-                  startIcon={<Sync />} 
-                  onClick={handleSyncLoyaltyStatus}
-                  disabled={loading || !hasPermission('canManageProducts')}
-                >
-                  Sync Loyalty Status
-                </Button>
+
               <TextField 
                 size='small' 
                 placeholder='Search products...' 
