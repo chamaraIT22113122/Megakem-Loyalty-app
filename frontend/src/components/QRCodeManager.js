@@ -1086,7 +1086,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             display: block; 
           }
           .batch-info { 
-            font-size: 6.5pt; 
+            font-size: ${printFontSizeBatch}pt; 
             margin: 0.5mm 0;
             line-height: 1.2;
             width: 100%;
@@ -1100,7 +1100,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           }
           .mrp-text {
             font-weight: bold;
-            font-size: 8.5pt;
+            font-size: ${printFontSizeMrp}pt;
             margin-top: 0.5mm;
             text-align: center;
             width: 100%;
@@ -1160,15 +1160,17 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
         html += `
           <div class="label">
+            ${isLoyaltyEnabled ? `
             <div class="qr-container">
-              ${isLoyaltyEnabled ? `<img src="${qr.qrData}" alt="QR">` : ''}
+              <img src="${qr.qrData}" alt="QR">
             </div>
+            ` : ''}
             <div class="batch-info">
               BATCH: <strong>${qr.batchNo}</strong><br>
               ${mfgDateToShow ? `MFG DATE: <strong>${mfgDateToShow}</strong><br>` : ''}
               ${expDateToShow ? `EXP DATE: <strong>${expDateToShow}</strong>` : ''}
             </div>
-            <div class="description-area" style="font-size: 7pt; font-weight: bold; height: 4.5mm; margin-top: 1mm; text-transform: uppercase; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <div class="description-area" style="font-size: ${printFontSizeDesc}pt; font-weight: bold; height: 4.5mm; margin-top: 1mm; text-transform: uppercase; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
               ${qr.description ? qr.description : '&nbsp;'}
             </div>
             <div class="divider-line" style="border-top: 1px solid #000; width: 85%; margin: 1mm auto 0.5mm auto;"></div>
@@ -1861,6 +1863,48 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     />
                   </Grid>
                 )}
+              </Grid>
+
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 2 }} gutterBottom color="primary">
+                Font Sizes (pt)
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={4}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Batch Info"
+                    type="number"
+                    inputProps={{ step: "0.1" }}
+                    value={printFontSizeBatch}
+                    onChange={(e) => setPrintFontSizeBatch(parseFloat(e.target.value) || 6.5)}
+                    disabled={!isMainAdmin}
+                  />
+                </Grid>
+                <Grid item xs={4}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Description"
+                    type="number"
+                    inputProps={{ step: "0.1" }}
+                    value={printFontSizeDesc}
+                    onChange={(e) => setPrintFontSizeDesc(parseFloat(e.target.value) || 7)}
+                    disabled={!isMainAdmin}
+                  />
+                </Grid>
+                <Grid item xs={4}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="MRP"
+                    type="number"
+                    inputProps={{ step: "0.1" }}
+                    value={printFontSizeMrp}
+                    onChange={(e) => setPrintFontSizeMrp(parseFloat(e.target.value) || 8.5)}
+                    disabled={!isMainAdmin}
+                  />
+                </Grid>
               </Grid>
 
               <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 2 }} gutterBottom color="primary">
