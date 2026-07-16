@@ -228,6 +228,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [printGap, setPrintGap] = useState(4); // mm
   const [printLabelPadding, setPrintLabelPadding] = useState(2); // mm
   const [printTarget, setPrintTarget] = useState('loyalty');
+  const [printFontSizeBatch, setPrintFontSizeBatch] = useState(6.5);
+  const [printFontSizeDesc, setPrintFontSizeDesc] = useState(7);
+  const [printFontSizeMrp, setPrintFontSizeMrp] = useState(8.5);
   // Label content is fixed: QR → BATCH → MFG DATE → EXP DATE → BLACK AREA → MRP
 
   const handlePaperSizeChange = (val) => {
@@ -662,6 +665,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     if (cfg.printRows !== undefined) setPrintRows(cfg.printRows);
     if (cfg.printGap !== undefined) setPrintGap(cfg.printGap);
     if (cfg.printLabelPadding !== undefined) setPrintLabelPadding(cfg.printLabelPadding);
+    if (cfg.printFontSizeBatch !== undefined) setPrintFontSizeBatch(cfg.printFontSizeBatch);
+    if (cfg.printFontSizeDesc !== undefined) setPrintFontSizeDesc(cfg.printFontSizeDesc);
+    if (cfg.printFontSizeMrp !== undefined) setPrintFontSizeMrp(cfg.printFontSizeMrp);
   };
 
   const handlePrintTargetChange = async (event, newValue) => {
@@ -706,7 +712,10 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         printColumns,
         printRows,
         printGap,
-        printLabelPadding
+        printLabelPadding,
+        printFontSizeBatch,
+        printFontSizeDesc,
+        printFontSizeMrp
       };
       
       if (printTarget === 'loyalty') {
