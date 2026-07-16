@@ -35,7 +35,17 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
     try {
       setLoading(true);
       const response = await api.get('/qr-codes/reprint-requests');
-      setRequests(response.data.data || []);
+      let combinedRequests = response.data.data || [];
+
+      try {
+        const notifRes = await api.get('/cash-rewards/admin-notifications');
+        const notifications = notifRes.data?.data || [];
+        combinedRequests = [...combinedRequests, ...notifications].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      } catch (notifErr) {
+        console.error('Failed to load admin notifications:', notifErr);
+      }
+
+      setRequests(combinedRequests);
     } catch (error) {
       onShowNotification('Error loading reprint requests: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
@@ -133,6 +143,34 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
                   </TableRow>
                 ) : (
                   requests.map((req) => {
+                    if (req.type === 'payment') {
+                      return (
+                        <TableRow key={req._id} hover sx={{ bgcolor: 'rgba(76, 175, 80, 0.08)' }}>
+                          <TableCell sx={{ fontSize: '0.875rem' }}>
+                            {new Date(req.createdAt).toLocaleString()}
+                          </TableCell>
+                          <TableCell colSpan={4} sx={{ fontSize: '0.875rem' }}>
+                            <strong>System Notification:</strong> {req.message}
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label="PAYMENT" 
+                              size="small" 
+                              color="success" 
+                              sx={{ fontWeight: 'bold' }}
+                            />
+                          </TableCell>
+                          <TableCell align="right" sx={{ pr: 3 }}>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+                              <Typography variant="caption" color="textSecondary">
+                                Recorded
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
                     const statusColor =
                       req.status === 'approved'
                         ? 'success'

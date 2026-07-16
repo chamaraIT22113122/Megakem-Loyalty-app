@@ -50,7 +50,8 @@ import {
   Close,
   Save,
   Lock,
-  Search
+  Search,
+  Settings
 } from '@mui/icons-material';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -226,6 +227,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [printRows, setPrintRows] = useState(7);
   const [printGap, setPrintGap] = useState(4); // mm
   const [printLabelPadding, setPrintLabelPadding] = useState(2); // mm
+  const [printTarget, setPrintTarget] = useState('loyalty');
   // Label content is fixed: QR → BATCH → MFG DATE → EXP DATE → BLACK AREA → MRP
 
   const handlePaperSizeChange = (val) => {
@@ -349,23 +351,25 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             }}
           >
 
-            <Box 
-              sx={{ 
-                width: `${printQRSize * scale}px`, 
-                height: `${printQRSize * scale}px`,
-                backgroundColor: '#eee',
-                border: '1px solid #ccc',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <img 
-                src={item.qrData} 
-                alt="QR Preview" 
-                style={{ width: '100%', height: '100%' }} 
-              />
-            </Box>
+            {printTarget === 'loyalty' && (
+              <Box 
+                sx={{ 
+                  width: `${printQRSize * scale}px`, 
+                  height: `${printQRSize * scale}px`,
+                  backgroundColor: '#eee',
+                  border: '1px solid #ccc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <img 
+                  src={item.qrData} 
+                  alt="QR Preview" 
+                  style={{ width: '100%', height: '100%' }} 
+                />
+              </Box>
+            )}
             <Box sx={{ width: '100%', textAlign: 'center', mt: 0.5 }}>
               <Typography sx={{ fontSize: `${Math.max(3.5, 6 * scale * 0.35)}px`, lineHeight: 1 }}>
                 BATCH: {item.batchNo.substring(0, 18)}
@@ -640,10 +644,52 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     loadQRCodes();
   }, [page, rowsPerPage, filterBatch, filterStatus, searchQuery, isMainAdmin]);
 
+  const applyConfig = (cfg) => {
+    if (cfg.printerModel) setPrinterModel(cfg.printerModel);
+    if (cfg.printSize) setPrintSize(cfg.printSize);
+    if (cfg.layout) setLayout(cfg.layout);
+    if (cfg.dpi) setDpi(cfg.dpi);
+    if (cfg.printLayoutMode) setPrintLayoutMode(cfg.printLayoutMode);
+    if (cfg.printPaperSize) setPrintPaperSize(cfg.printPaperSize);
+    if (cfg.customPaperWidth !== undefined) setCustomPaperWidth(cfg.customPaperWidth);
+    if (cfg.customPaperHeight !== undefined) setCustomPaperHeight(cfg.customPaperHeight);
+    if (cfg.printMarginTop !== undefined) setPrintMarginTop(cfg.printMarginTop);
+    if (cfg.printMarginBottom !== undefined) setPrintMarginBottom(cfg.printMarginBottom);
+    if (cfg.printMarginLeft !== undefined) setPrintMarginLeft(cfg.printMarginLeft);
+    if (cfg.printMarginRight !== undefined) setPrintMarginRight(cfg.printMarginRight);
+    if (cfg.printQRSize !== undefined) setPrintQRSize(cfg.printQRSize);
+    if (cfg.printColumns !== undefined) setPrintColumns(cfg.printColumns);
+    if (cfg.printRows !== undefined) setPrintRows(cfg.printRows);
+    if (cfg.printGap !== undefined) setPrintGap(cfg.printGap);
+    if (cfg.printLabelPadding !== undefined) setPrintLabelPadding(cfg.printLabelPadding);
+  };
+
+  const handlePrintTargetChange = async (event, newValue) => {
+    if (!newValue || newValue === printTarget) return;
+    setPrintTarget(newValue);
+    setLoading(true);
+    try {
+      if (newValue === 'loyalty') {
+        const layoutResponse = await qrCodesAPI.getPrintLayout();
+        if (layoutResponse.data && layoutResponse.data.data) {
+          applyConfig(layoutResponse.data.data);
+        }
+      } else {
+        const saved = localStorage.getItem('printLayoutConfigDisabled');
+        if (saved) {
+          applyConfig(JSON.parse(saved));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
   const savePrintLayout = async () => {
     try {
       setLoading(true);
-      await qrCodesAPI.savePrintLayout({
+      const config = {
         printerModel,
         printSize,
         layout,
@@ -661,7 +707,13 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         printRows,
         printGap,
         printLabelPadding
-      });
+      };
+      
+      if (printTarget === 'loyalty') {
+        await qrCodesAPI.savePrintLayout(config);
+      } else {
+        localStorage.setItem('printLayoutConfigDisabled', JSON.stringify(config));
+      }
       onShowNotification('Print layout options saved successfully', 'success');
     } catch (error) {
       onShowNotification('Error saving print layout: ' + (error.response?.data?.error || error.message), 'error');
@@ -1320,6 +1372,15 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             </Button>
           </>
         )}
+        {isMainAdmin && (
+          <Button
+            variant="outlined"
+            startIcon={<Settings />}
+            onClick={() => setOpenPrintConfigDialog(true)}
+          >
+            Sticker & Print Settings
+          </Button>
+        )}
         <Button
           variant="outlined"
           startIcon={<Refresh />}
@@ -1636,6 +1697,17 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           )}
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
+          <Tabs
+            value={printTarget}
+            onChange={handlePrintTargetChange}
+            indicatorColor="primary"
+            textColor="primary"
+            variant="fullWidth"
+            sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+          >
+            <Tab label="Loyalty Program (With QR Code)" value="loyalty" />
+            <Tab label="Disabled Ones (Without QR Code)" value="nonLoyalty" />
+          </Tabs>
           {!isMainAdmin && (
             <Alert
               severity="info"
@@ -1845,7 +1917,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 Fixed Label Format
               </Typography>
               <Box sx={{ pl: 1 }}>
-                <Typography variant="body2" color="text.secondary">✅ QR Code</Typography>
+                {printTarget === 'loyalty' && <Typography variant="body2" color="text.secondary">✅ QR Code</Typography>}
                 <Typography variant="body2" color="text.secondary">✅ Batch Number</Typography>
                 <Typography variant="body2" color="text.secondary">✅ MFG Date</Typography>
                 <Typography variant="body2" color="text.secondary">✅ Expiry Date</Typography>

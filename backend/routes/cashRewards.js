@@ -4,6 +4,8 @@ const Member = require('../models/Member');
 const Scan = require('../models/Scan');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
 const Product = require('../models/Product');
+const User = require('../models/User');
+const AdminNotification = require('../models/AdminNotification');
 const { protect, authorize, hasPermission } = require('../middleware/auth');
 const { logAction } = require('../middleware/audit');
 
@@ -436,13 +438,31 @@ router.post('/calculate/:memberId', protect, hasPermission('canViewRewards'), as
 // @access  Private/Admin
 router.post('/pay/:memberId', protect, hasPermission('canViewRewards'), async (req, res) => {
   try {
-    const { year, month } = req.body;
+    const { year, month, adminPassword } = req.body;
 
     if (!year || !month) {
       return res.status(400).json({
         success: false,
         message: 'Year and month are required'
       });
+    }
+
+    if (!adminPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin password is required to process payment'
+      });
+    }
+
+    // Verify admin password
+    const adminUser = await User.findById(req.user.id).select('+password');
+    if (!adminUser) {
+      return res.status(404).json({ success: false, message: 'Admin user not found' });
+    }
+
+    const isMatch = await adminUser.comparePassword(adminPassword);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid admin password' });
     }
 
     const member = await Member.findOne({ 
@@ -472,6 +492,16 @@ router.post('/pay/:memberId', protect, hasPermission('canViewRewards'), async (r
       purchase.rewardPaidDate = new Date();
       member.totalCashRewards += purchase.cashReward;
       await member.save();
+
+      // Create AdminNotification
+      await AdminNotification.create({
+        type: 'payment',
+        message: `Payment of Rs ${purchase.cashReward.toLocaleString()} made to member ${member.memberName} (${member.memberId}) for ${month}/${year}.`,
+        status: 'completed',
+        onModel: 'Member',
+        relatedId: member._id,
+        createdBy: req.user.id
+      });
     }
 
     await logAction(req, 'PAY_CASH_REWARDS', 'CASH_REWARDS', { memberId: member.memberId, year, month, cashReward: purchase.cashReward });
@@ -611,6 +641,21 @@ router.post('/unpay/:memberId', protect, hasPermission('canViewRewards'), async 
         totalCashRewards: member.totalCashRewards
       }
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/cash-rewards/admin-notifications
+// @desc    Get admin notifications (like payment notifications)
+// @access  Private/Admin
+router.get('/admin-notifications', protect, hasPermission('canManageCoAdminRequests'), async (req, res) => {
+  try {
+    const notifications = await AdminNotification.find()
+      .populate('createdBy', 'username')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json({ success: true, data: notifications });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

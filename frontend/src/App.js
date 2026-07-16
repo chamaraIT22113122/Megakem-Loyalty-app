@@ -648,7 +648,7 @@ function App() {
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [productDialog, setProductDialog] = useState({ open: false, product: null });
   const [userDialog, setUserDialog] = useState({ open: false, user: null });
-  const [rewardBreakdownDialog, setRewardBreakdownDialog] = useState({ open: false, member: null, breakdown: [] });
+  const [rewardBreakdownDialog, setRewardBreakdownDialog] = useState({ open: false, member: null, breakdown: [], history: [] });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, scanId: null, scanDetails: null });
   const [userDeleteDialog, setUserDeleteDialog] = useState({ open: false, userId: null, userDetails: null });
   const [pointsDialog, setPointsDialog] = useState({ open: false, user: null, points: '', operation: 'set' });
@@ -2471,7 +2471,16 @@ function App() {
     if (!adminAuth) return;
     try {
       const res = await api.get('/qr-codes/reprint-requests');
-      const requests = res.data?.data || [];
+      let requests = res.data?.data || [];
+      
+      try {
+        const notifRes = await api.get('/cash-rewards/admin-notifications');
+        const notifications = notifRes.data?.data || [];
+        requests = [...requests, ...notifications].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      } catch (notifErr) {
+        console.error('Failed to load admin notifications:', notifErr);
+      }
+      
       setCoAdminRequests(requests);
       const approvedCount = requests.filter(r => r.status === 'approved').length;
       setCoAdminApprovedCount(approvedCount);
@@ -7738,46 +7747,22 @@ function App() {
                         <>
                           <Button
                             variant="contained"
-                            color="primary"
+                            color="success"
+                            startIcon={<CheckCircle />}
                             onClick={async () => {
-                              const password = window.prompt(`Approve ${selectedRewards.length} selected rewards?\n\nPlease enter your admin password to approve:`);
+                              const password = window.prompt(`Mark ${selectedRewards.length} selected rewards as paid?\n\nPlease enter your admin password to proceed:`);
                               if (password) {
                                 setLoading(true);
                                 try {
                                   for (const memberId of selectedRewards) {
-                                    await cashRewardsAPI.approveReward(memberId, { year: selectedYear, month: selectedMonth, adminPassword: password });
-                                  }
-                                  const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
-                                  setCashRewards(response.data.data || []);
-                                  setSelectedRewards([]);
-                                  showNotification(`Successfully approved ${selectedRewards.length} rewards!`, 'success');
-                                } catch (error) {
-                                  showNotification('Failed to approve some rewards. Incorrect password?', 'error');
-                                }
-                                setLoading(false);
-                              }
-                            }}
-                          >
-                            Approve
-                          </Button>
-
-                          <Button
-                            variant="contained"
-                            color="success"
-                            startIcon={<CheckCircle />}
-                            onClick={async () => {
-                              if (window.confirm(`Mark ${selectedRewards.length} selected rewards as paid?`)) {
-                                setLoading(true);
-                                try {
-                                  for (const memberId of selectedRewards) {
-                                    await cashRewardsAPI.markAsPaid(memberId, { year: selectedYear, month: selectedMonth });
+                                    await cashRewardsAPI.markAsPaid(memberId, { year: selectedYear, month: selectedMonth, adminPassword: password });
                                   }
                                   const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
                                   setCashRewards(response.data.data || []);
                                   setSelectedRewards([]);
                                   showNotification(`Successfully marked ${selectedRewards.length} rewards as paid!`, 'success');
                                 } catch (error) {
-                                  showNotification('Failed to mark some rewards as paid', 'error');
+                                  showNotification('Failed to mark some rewards as paid. Incorrect password?', 'error');
                                 }
                                 setLoading(false);
                               }
@@ -7939,8 +7924,20 @@ function App() {
                                 setRewardBreakdownDialog({
                                   open: true,
                                   member: reward,
-                                  breakdown: breakdown
+                                  breakdown: breakdown,
+                                  history: []
                                 });
+                                // Fetch full history asynchronously
+                                cashRewardsAPI.getMemberRewards(reward.memberId)
+                                  .then(res => {
+                                    if (res.data && res.data.success) {
+                                      setRewardBreakdownDialog(prev => ({
+                                        ...prev,
+                                        history: res.data.data.monthlyPurchases
+                                      }));
+                                    }
+                                  })
+                                  .catch(err => console.error("Failed to fetch member history", err));
                               }}
                             >
                               <Visibility />
@@ -7955,11 +7952,11 @@ function App() {
                               <PictureAsPdf />
                             </IconButton>
                           </Tooltip>
-                          {isMainAdmin() && (reward.status === 'CALCULATED' || reward.status === 'PENDING_APPROVAL') && (
-                            <Tooltip title="Approve Reward">
+                          {isMainAdmin() && reward.status === 'APPROVED' && (
+                            <Tooltip title="Mark as Paid">
                               <IconButton 
                                 size='small'
-                                color='info'
+                                color='success'
                                 onClick={() => {
                                   setApprovalDialog({
                                     open: true,
@@ -7968,34 +7965,6 @@ function App() {
                                     month: selectedMonth,
                                     password: ''
                                   });
-                                }}
-                              >
-                                <CheckCircle />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {isMainAdmin() && reward.status === 'APPROVED' && (
-                            <Tooltip title="Mark as Paid">
-                              <IconButton 
-                                size='small'
-                                color='success'
-                                onClick={async () => {
-                                  if (window.confirm(`Mark Rs. ${reward.cashReward?.toLocaleString()} as paid for ${reward.memberName}?`)) {
-                                    setLoading(true);
-                                    try {
-                                      await cashRewardsAPI.markAsPaid(reward.memberId, {
-                                        year: selectedYear,
-                                        month: selectedMonth
-                                      });
-                                      // Refresh the list
-                                      const response = await cashRewardsAPI.getAllRewards({ year: selectedYear, month: selectedMonth });
-                                      setCashRewards(response.data.data || []);
-                                      showNotification('Reward marked as paid', 'success');
-                                    } catch (error) {
-                                      showNotification('Failed to mark as paid', 'error');
-                                    }
-                                    setLoading(false);
-                                  }
                                 }}
                               >
                                 <CheckCircle />
@@ -8033,10 +8002,10 @@ function App() {
             )}
 
             <Dialog open={approvalDialog.open} onClose={() => setApprovalDialog({ ...approvalDialog, open: false })}>
-              <DialogTitle>Approve Cash Reward</DialogTitle>
+              <DialogTitle>Process Payment</DialogTitle>
               <DialogContent>
                 <Typography variant="body2" sx={{ mb: 2 }}>
-                  Please enter your admin password to approve this reward.
+                  Please enter your admin password to mark this reward as paid.
                 </Typography>
                 <TextField
                   fullWidth
@@ -8056,14 +8025,14 @@ function App() {
                     if (!approvalDialog.password) return showNotification('Password is required', 'error');
                     setLoading(true);
                     try {
-                      await cashRewardsAPI.approveReward(approvalDialog.memberId, {
+                      await cashRewardsAPI.markAsPaid(approvalDialog.memberId, {
                         year: approvalDialog.year,
                         month: approvalDialog.month,
-                        password: approvalDialog.password
+                        adminPassword: approvalDialog.password
                       });
                       const response = await cashRewardsAPI.getAllRewards({ year: approvalDialog.year, month: approvalDialog.month });
                       setCashRewards(response.data.data || []);
-                      showNotification('Reward approved successfully', 'success');
+                      showNotification('Reward marked as paid successfully', 'success');
                       setApprovalDialog({ ...approvalDialog, open: false });
                     } catch (error) {
                       showNotification(getUserFriendlyError(error), 'error');
@@ -8071,7 +8040,7 @@ function App() {
                     setLoading(false);
                   }}
                 >
-                  Approve
+                  Confirm Payment
                 </Button>
               </DialogActions>
             </Dialog>
@@ -10527,7 +10496,7 @@ function App() {
       {/* Reward Breakdown Dialog */}
       <Dialog 
         open={rewardBreakdownDialog.open} 
-        onClose={() => setRewardBreakdownDialog({ open: false, member: null, breakdown: [] })}
+        onClose={() => setRewardBreakdownDialog({ open: false, member: null, breakdown: [], history: [] })}
         maxWidth='md'
         fullWidth
       >
@@ -10650,12 +10619,53 @@ function App() {
                   )}
                 </Typography>
               </Box>
+
+              {rewardBreakdownDialog.history && rewardBreakdownDialog.history.length > 0 && (
+                <Box sx={{ mt: 4 }}>
+                  <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <HistoryIcon />
+                    Cash Rewards History
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: 'grey.50' }}>
+                          <TableCell><strong>Month / Year</strong></TableCell>
+                          <TableCell align="right"><strong>Total Purchases</strong></TableCell>
+                          <TableCell align="right"><strong>Cash Reward</strong></TableCell>
+                          <TableCell align="center"><strong>Payment Status</strong></TableCell>
+                          <TableCell align="center"><strong>Paid Date</strong></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {rewardBreakdownDialog.history.map((record, index) => (
+                          <TableRow key={index} hover>
+                            <TableCell>{new Date(record.year, record.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}</TableCell>
+                            <TableCell align="right">Rs. {record.totalPurchaseValue?.toLocaleString()}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold' }}>Rs. {record.cashReward?.toLocaleString()}</TableCell>
+                            <TableCell align="center">
+                              <Chip 
+                                size="small" 
+                                label={record.rewardPaid ? 'Paid' : (record.rewardCalculated ? 'Calculated' : 'Pending')} 
+                                color={record.rewardPaid ? 'success' : (record.rewardCalculated ? 'info' : 'warning')} 
+                              />
+                            </TableCell>
+                            <TableCell align="center">
+                              {record.rewardPaid && record.rewardPaidDate ? new Date(record.rewardPaidDate).toLocaleDateString() : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
             </>
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button 
-            onClick={() => setRewardBreakdownDialog({ open: false, member: null, breakdown: [] })}
+            onClick={() => setRewardBreakdownDialog({ open: false, member: null, breakdown: [], history: [] })}
           >
             Close
           </Button>
@@ -12822,7 +12832,28 @@ function App() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {coAdminRequests.filter(r => ['rejected', 'completed'].includes(r.status)).map(req => (
+                        {coAdminRequests.filter(r => ['rejected', 'completed'].includes(r.status)).map(req => {
+                          if (req.type === 'payment') {
+                            return (
+                              <TableRow key={req._id} hover sx={{ bgcolor: 'success.lighter' }}>
+                                <TableCell sx={{ fontSize: '0.85rem' }}>
+                                  {new Date(req.createdAt).toLocaleString()}
+                                </TableCell>
+                                <TableCell colSpan={3} sx={{ fontSize: '0.85rem' }}>
+                                  <strong>System Notification:</strong> {req.message}
+                                </TableCell>
+                                <TableCell>
+                                  <Chip 
+                                    label="PAYMENT" 
+                                    size="small" 
+                                    color="success" 
+                                    sx={{ fontWeight: 'bold' }}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
+                          return (
                           <TableRow key={req._id} hover>
                             <TableCell sx={{ fontSize: '0.85rem' }}>
                               {new Date(req.updatedAt).toLocaleString()}
@@ -12846,7 +12877,7 @@ function App() {
                               />
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )})}
                       </TableBody>
                     </Table>
                   </TableContainer>
