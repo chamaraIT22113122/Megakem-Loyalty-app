@@ -1150,7 +1150,8 @@ router.post('/reprint-requests/consume', protect, qrAdmin, async (req, res) => {
 // @access  Private (Main Admin & Co-Admins with QR access)
 router.get('/settings/print-layout', protect, qrAdmin, async (req, res) => {
   try {
-    const config = await PrintLayoutConfig.getConfig();
+    const target = req.query.target || 'loyalty';
+    const config = await PrintLayoutConfig.getConfig(target);
     res.json({ success: true, data: config });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1162,13 +1163,15 @@ router.get('/settings/print-layout', protect, qrAdmin, async (req, res) => {
 // @access  Private (Main Admin Only)
 router.put('/settings/print-layout', protect, admin, async (req, res) => {
   try {
-    const config = await PrintLayoutConfig.getConfig();
+    const target = req.body.target || 'loyalty';
+    const config = await PrintLayoutConfig.getConfig(target);
     
     const fields = [
       'printerModel', 'printSize', 'layout', 'dpi', 'printLayoutMode',
       'printPaperSize', 'customPaperWidth', 'customPaperHeight',
       'printMarginTop', 'printMarginBottom', 'printMarginLeft', 'printMarginRight',
-      'printQRSize', 'printColumns', 'printRows', 'printGap', 'printLabelPadding'
+      'printQRSize', 'printColumns', 'printRows', 'printGap', 'printLabelPadding',
+      'printFontSizeBatch', 'printFontSizeDesc', 'printFontSizeMrp'
     ];
     
     fields.forEach(field => {

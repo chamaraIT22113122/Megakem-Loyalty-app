@@ -574,7 +574,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
       // Fetch print layout configuration
       try {
-        const layoutResponse = await qrCodesAPI.getPrintLayout();
+        const layoutResponse = await qrCodesAPI.getPrintLayout(printTarget);
         if (layoutResponse.data && layoutResponse.data.data) {
           const cfg = layoutResponse.data.data;
           if (cfg.printerModel) setPrinterModel(cfg.printerModel);
@@ -675,16 +675,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     setPrintTarget(newValue);
     setLoading(true);
     try {
-      if (newValue === 'loyalty') {
-        const layoutResponse = await qrCodesAPI.getPrintLayout();
-        if (layoutResponse.data && layoutResponse.data.data) {
-          applyConfig(layoutResponse.data.data);
-        }
-      } else {
-        const saved = localStorage.getItem('printLayoutConfigDisabled');
-        if (saved) {
-          applyConfig(JSON.parse(saved));
-        }
+      const layoutResponse = await qrCodesAPI.getPrintLayout(newValue);
+      if (layoutResponse.data && layoutResponse.data.data) {
+        applyConfig(layoutResponse.data.data);
       }
     } catch (err) {
       console.error(err);
@@ -718,11 +711,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         printFontSizeMrp
       };
       
-      if (printTarget === 'loyalty') {
-        await qrCodesAPI.savePrintLayout(config);
-      } else {
-        localStorage.setItem('printLayoutConfigDisabled', JSON.stringify(config));
-      }
+      await qrCodesAPI.savePrintLayout({ ...config, target: printTarget });
+
       onShowNotification('Print layout options saved successfully', 'success');
     } catch (error) {
       onShowNotification('Error saving print layout: ' + (error.response?.data?.error || error.message), 'error');

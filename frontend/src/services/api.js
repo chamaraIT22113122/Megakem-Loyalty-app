@@ -162,7 +162,7 @@ export const cashRewardsAPI = {
 export const qrCodesAPI = {
   recordScan: (scanData) => api.post('/qr-codes/record-scan', scanData),
   getScanLogs: (params) => api.get('/qr-codes/scan-logs', { params }),
-  getPrintLayout: () => api.get('/qr-codes/settings/print-layout'),
+  getPrintLayout: (target = 'loyalty') => api.get(`/qr-codes/settings/print-layout?target=${target}`),
   savePrintLayout: (settings) => api.put('/qr-codes/settings/print-layout', settings),
 };
 
