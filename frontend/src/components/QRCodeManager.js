@@ -374,25 +374,25 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               </Box>
             )}
             <Box sx={{ width: '100%', textAlign: 'center', mt: 0.5 }}>
-              <Typography sx={{ fontSize: `${Math.max(3.5, 6 * scale * 0.35)}px`, lineHeight: 1 }}>
+              <Typography sx={{ fontSize: `${Math.max(3.5, printFontSizeBatch * scale * 0.35)}px`, lineHeight: 1 }}>
                 BATCH: {item.batchNo.substring(0, 18)}
               </Typography>
-              <Typography sx={{ fontSize: `${Math.max(3.5, 5 * scale * 0.35)}px`, lineHeight: 1 }}>
+              <Typography sx={{ fontSize: `${Math.max(3.5, (printFontSizeBatch - 1) * scale * 0.35)}px`, lineHeight: 1 }}>
                 MFG DATE: –
               </Typography>
-              <Typography sx={{ fontSize: `${Math.max(3.5, 5 * scale * 0.35)}px`, lineHeight: 1 }}>
+              <Typography sx={{ fontSize: `${Math.max(3.5, (printFontSizeBatch - 1) * scale * 0.35)}px`, lineHeight: 1 }}>
                 EXP DATE: –
               </Typography>
             </Box>
             <Typography 
               sx={{ 
-                fontSize: `${Math.max(3.5, 6 * scale * 0.35)}px`, 
+                fontSize: `${Math.max(3.5, printFontSizeDesc * scale * 0.35)}px`, 
                 lineHeight: 1,
                 fontWeight: 'bold',
                 textAlign: 'center',
                 textTransform: 'uppercase',
                 mt: 0.5,
-                height: `${Math.max(3.5, 6 * scale * 0.35)}px`
+                height: `${Math.max(3.5, printFontSizeDesc * scale * 0.35)}px`
               }}
             >
               {item.description || ' '}
@@ -408,7 +408,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             />
             <Typography 
               sx={{ 
-                fontSize: `${Math.max(4.5, 8 * scale * 0.35)}px`, 
+                fontSize: `${Math.max(4.5, printFontSizeMrp * scale * 0.35)}px`, 
                 fontWeight: 'bold', 
                 textAlign: 'center',
                 lineHeight: 1
