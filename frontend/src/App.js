@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close } from '@mui/icons-material';
+import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -11,6 +11,7 @@ import { generateIDCard } from './utils/generateIDCard';
 import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import SriLankaZoneMap from './components/SriLankaZoneMap';
+import IDCardInteractivePreview from './components/IDCardInteractivePreview';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
@@ -938,7 +939,81 @@ function App() {
   const [applicatorPhotoFile, setApplicatorPhotoFile] = useState(null);
   
   const [hardwareDialog, setHardwareDialog] = useState({ open: false, data: null });
-  const [idCardPreviewDialog, setIdCardPreviewDialog] = useState({ open: false, dataUri: '', filename: '', doc: null });
+  const [idCardPreviewDialog, setIdCardPreviewDialog] = useState({ 
+    open: false, 
+    dataUri: '', 
+    filename: '', 
+    doc: null,
+    member: null,
+    previewMode: 'interactive',
+    config: {
+      memberId: { x: 62, y: 25, fontSize: 12, color: '#1E3264', visible: true },
+      name: { x: 48.5, y: 38.5, fontSize: 7.5, color: '#1E3264', visible: true },
+      zone: { x: 51, y: 43, fontSize: 7.5, color: '#1E3264', visible: true },
+      photo: { x: 5.6, y: 16.7, width: 26, height: 30.5, visible: true }
+    }
+  });
+
+  const idCardDebounceRef = useRef(null);
+
+  const handleIDCardConfigChange = async (field, param, value) => {
+    setIdCardPreviewDialog(prev => {
+      const newConfig = {
+        ...prev.config,
+        [field]: { ...prev.config[field], [param]: value }
+      };
+      
+      if (idCardDebounceRef.current) {
+        clearTimeout(idCardDebounceRef.current);
+      }
+      
+      idCardDebounceRef.current = setTimeout(() => {
+        if (prev.previewMode === 'pdf') {
+          generateIDCard(prev.member, process.env.REACT_APP_API_URL || 'http://localhost:5000', newConfig)
+            .then(result => {
+              setIdCardPreviewDialog(p => ({ ...p, dataUri: result.dataUri, doc: result.doc }));
+            });
+        }
+        if (prev.member && prev.member._id) {
+          membersAPI.update(prev.member._id, { idCardConfig: newConfig }).catch(err => console.error(err));
+        }
+      }, 500);
+
+      return {
+        ...prev,
+        config: newConfig
+      };
+    });
+  };
+
+  const handleSaveDefaultIDCardLayout = async () => {
+    setLoading(true);
+    try {
+      const response = await loyaltyAPI.updateConfig({ idCardDefaultConfig: idCardPreviewDialog.config });
+      setLoyaltyConfig(response.data.data);
+      
+      // Clear the individual config for this user so they use the new default
+      if (idCardPreviewDialog.member && idCardPreviewDialog.member._id) {
+        await membersAPI.update(idCardPreviewDialog.member._id, { idCardConfig: null });
+        
+        // Update local state to reflect that this user no longer has a custom override
+        setIdCardPreviewDialog(prev => ({
+          ...prev,
+          member: {
+            ...prev.member,
+            idCardConfig: null
+          }
+        }));
+      }
+
+      showNotification('Default ID Card layout saved for all users!', 'success');
+    } catch (err) {
+      showNotification('Failed to save default layout', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const [hardwareFormData, setHardwareFormData] = useState({
     name: '',
     memberId: '',
@@ -9069,8 +9144,22 @@ function App() {
                                         onClick={async () => {
                                           setLoading(true);
                                           try {
-                                            const result = await generateIDCard(applicator, process.env.REACT_APP_API_URL || 'http://localhost:5000');
-                                            setIdCardPreviewDialog({ open: true, dataUri: result.dataUri, filename: result.filename, doc: result.doc });
+                                            const config = applicator.idCardConfig || loyaltyConfig?.idCardDefaultConfig || {
+                                              memberId: { x: 62, y: 25, fontSize: 12, color: '#1E3264', visible: true },
+                                              name: { x: 48.5, y: 38.5, fontSize: 7.5, color: '#1E3264', visible: true },
+                                              zone: { x: 51, y: 43, fontSize: 7.5, color: '#1E3264', visible: true },
+                                              photo: { x: 5.6, y: 16.7, width: 26, height: 30.5, visible: true }
+                                            };
+                                            const result = await generateIDCard(applicator, process.env.REACT_APP_API_URL || 'http://localhost:5000', config);
+                                            setIdCardPreviewDialog({ 
+                                              open: true, 
+                                              dataUri: result.dataUri, 
+                                              filename: result.filename, 
+                                              doc: result.doc,
+                                              member: applicator,
+                                              previewMode: 'interactive',
+                                              config: config
+                                            });
                                           } catch (err) {
                                             showNotification('Failed to generate ID Card', 'error');
                                           } finally {
@@ -12975,36 +13064,128 @@ function App() {
       <Dialog 
         open={idCardPreviewDialog.open} 
         onClose={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })} 
-        maxWidth='md' 
+        maxWidth='lg' 
         fullWidth
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           ID Card Preview
-          <IconButton onClick={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })} size='small'>
-            <Close />
-          </IconButton>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              {idCardPreviewDialog.previewMode === 'interactive' ? 'Drag Elements to Position' : 'Final PDF Render'}
+            </Typography>
+            <Button 
+              variant="outlined" 
+              size="small" 
+              onClick={() => {
+                if (idCardPreviewDialog.previewMode === 'interactive') {
+                  generateIDCard(idCardPreviewDialog.member, process.env.REACT_APP_API_URL || 'http://localhost:5000', idCardPreviewDialog.config)
+                    .then(result => {
+                      setIdCardPreviewDialog(p => ({ ...p, previewMode: 'pdf', dataUri: result.dataUri, doc: result.doc }));
+                    });
+                } else {
+                  setIdCardPreviewDialog(p => ({ ...p, previewMode: 'interactive' }));
+                }
+              }}
+            >
+              Switch to {idCardPreviewDialog.previewMode === 'interactive' ? 'PDF' : 'Interactive'}
+            </Button>
+            <IconButton onClick={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })} size='small'>
+              <Close />
+            </IconButton>
+          </Box>
         </DialogTitle>
-        <DialogContent dividers sx={{ height: '60vh', p: 0 }}>
-          {idCardPreviewDialog.dataUri ? (
-            <iframe 
-              src={idCardPreviewDialog.dataUri} 
-              width="100%" 
-              height="100%" 
-              style={{ border: 'none' }} 
-              title="ID Card Preview" 
-            />
-          ) : (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-              <CircularProgress />
-            </Box>
-          )}
+        <DialogContent dividers sx={{ height: '65vh', p: 0, display: 'flex', flexDirection: 'row' }}>
+          <Box sx={{ flex: 1, p: 0, overflow: 'hidden' }}>
+            {idCardPreviewDialog.previewMode === 'interactive' ? (
+              <IDCardInteractivePreview 
+                member={idCardPreviewDialog.member} 
+                config={idCardPreviewDialog.config} 
+                apiUrl={process.env.REACT_APP_API_URL || 'http://localhost:5000'}
+                onChangeConfig={handleIDCardConfigChange}
+              />
+            ) : idCardPreviewDialog.dataUri ? (
+              <iframe 
+                src={idCardPreviewDialog.dataUri} 
+                width="100%" 
+                height="100%" 
+                style={{ border: 'none' }} 
+                title="ID Card Preview" 
+              />
+            ) : (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <CircularProgress />
+              </Box>
+            )}
+          </Box>
+          <Box sx={{ width: '350px', borderLeft: '1px solid #ddd', overflowY: 'auto' }}>
+            <Accordion defaultExpanded>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Profile Photo</Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>
+                <FormControlLabel
+                  control={<Switch size="small" checked={idCardPreviewDialog.config?.photo?.visible !== false} onChange={(e) => handleIDCardConfigChange('photo', 'visible', e.target.checked)} />}
+                  label={<Typography variant="caption">Show on Card</Typography>}
+                />
+                <Typography variant="caption">X Position ({idCardPreviewDialog.config?.photo?.x})</Typography>
+                <Slider size="small" min={0} max={80} step={0.5} value={idCardPreviewDialog.config?.photo?.x || 0} onChange={(e, val) => handleIDCardConfigChange('photo', 'x', val)} />
+                <Typography variant="caption">Y Position ({idCardPreviewDialog.config?.photo?.y})</Typography>
+                <Slider size="small" min={0} max={50} step={0.5} value={idCardPreviewDialog.config?.photo?.y || 0} onChange={(e, val) => handleIDCardConfigChange('photo', 'y', val)} />
+                <Typography variant="caption">Width ({idCardPreviewDialog.config?.photo?.width})</Typography>
+                <Slider size="small" min={10} max={50} step={0.5} value={idCardPreviewDialog.config?.photo?.width || 0} onChange={(e, val) => handleIDCardConfigChange('photo', 'width', val)} />
+                <Typography variant="caption">Height ({idCardPreviewDialog.config?.photo?.height})</Typography>
+                <Slider size="small" min={10} max={50} step={0.5} value={idCardPreviewDialog.config?.photo?.height || 0} onChange={(e, val) => handleIDCardConfigChange('photo', 'height', val)} />
+              </AccordionDetails>
+            </Accordion>
+
+            {['memberId', 'name', 'zone'].map(field => (
+              <Accordion key={field}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', textTransform: 'capitalize' }}>
+                    {field === 'memberId' ? 'Member ID' : field === 'name' ? 'Full Name' : 'Zone No'}
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ pt: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, justifyContent: 'space-between' }}>
+                    <FormControlLabel
+                      control={<Switch size="small" checked={idCardPreviewDialog.config?.[field]?.visible !== false} onChange={(e) => handleIDCardConfigChange(field, 'visible', e.target.checked)} />}
+                      label={<Typography variant="caption">Show on Card</Typography>}
+                    />
+                    <input 
+                      type="color" 
+                      value={idCardPreviewDialog.config?.[field]?.color || '#1E3264'} 
+                      onChange={(e) => handleIDCardConfigChange(field, 'color', e.target.value)} 
+                      style={{ cursor: 'pointer', border: 'none', width: '30px', height: '30px', padding: 0 }}
+                      title="Text Color"
+                    />
+                  </Box>
+                  <Typography variant="caption">X Position ({idCardPreviewDialog.config?.[field]?.x})</Typography>
+                  <Slider size="small" min={10} max={80} step={0.5} value={idCardPreviewDialog.config?.[field]?.x || 0} onChange={(e, val) => handleIDCardConfigChange(field, 'x', val)} />
+                  <Typography variant="caption">Y Position ({idCardPreviewDialog.config?.[field]?.y})</Typography>
+                  <Slider size="small" min={10} max={50} step={0.5} value={idCardPreviewDialog.config?.[field]?.y || 0} onChange={(e, val) => handleIDCardConfigChange(field, 'y', val)} />
+                  <Typography variant="caption">Font Size ({idCardPreviewDialog.config?.[field]?.fontSize})</Typography>
+                  <Slider size="small" min={6} max={24} step={0.5} value={idCardPreviewDialog.config?.[field]?.fontSize || 0} onChange={(e, val) => handleIDCardConfigChange(field, 'fontSize', val)} />
+                  <Typography variant="caption">Wrap Text Width ({idCardPreviewDialog.config?.[field]?.wrapWidth || 0}mm - 0 = Shrink)</Typography>
+                  <Slider size="small" min={0} max={85} step={0.5} value={idCardPreviewDialog.config?.[field]?.wrapWidth || 0} onChange={(e, val) => handleIDCardConfigChange(field, 'wrapWidth', val)} />
+                </AccordionDetails>
+              </Accordion>
+            ))}
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })}>
-            Close
-          </Button>
+        <DialogActions sx={{ justifyContent: 'space-between', px: 3 }}>
           <Button 
-            variant="contained" 
+            variant="outlined" 
+            color="secondary" 
+            onClick={handleSaveDefaultIDCardLayout}
+          >
+            Save as Default Layout
+          </Button>
+          <Box>
+            <Button onClick={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })} sx={{ mr: 1 }}>
+              Close
+            </Button>
+            <Button 
+              variant="contained" 
             color="primary" 
             onClick={() => {
               if (idCardPreviewDialog.doc) {
@@ -13016,6 +13197,7 @@ function App() {
           >
             Download PDF
           </Button>
+          </Box>
         </DialogActions>
       </Dialog>
     </Box></ThemeProvider>

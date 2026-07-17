@@ -732,7 +732,8 @@ router.put('/:id', protect, async (req, res) => {
       'notes',
       'connectedHardware',
       'connectedHardwareId',
-      'photo'
+      'photo',
+      'idCardConfig'
     ];
 
     fieldsToUpdate.forEach(field => {

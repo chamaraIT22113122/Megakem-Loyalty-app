@@ -116,6 +116,10 @@ const memberSchema = new mongoose.Schema({
   photo: {
     type: String
   },
+  idCardConfig: {
+    type: Object,
+    default: null
+  },
   // Monthly purchase tracking for cash rewards
   monthlyPurchases: [{
     year: {

@@ -127,6 +127,11 @@ const loyaltyConfigSchema = new mongoose.Schema({
       type: Date,
       default: null
     }
+  },
+  // Default ID Card Layout Config
+  idCardDefaultConfig: {
+    type: Object,
+    default: null
   }
 }, {
   timestamps: true

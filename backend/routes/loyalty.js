@@ -92,6 +92,11 @@ router.put('/config', protect, [
       config.pointsReset = { ...config.pointsReset, ...req.body.pointsReset };
     }
 
+    if (req.body.idCardDefaultConfig !== undefined) {
+      config.idCardDefaultConfig = req.body.idCardDefaultConfig;
+      config.markModified('idCardDefaultConfig');
+    }
+
     await config.save();
 
     await logAction(req, 'UPDATE_LOYALTY_CONFIG', 'SETTINGS', req.body);
