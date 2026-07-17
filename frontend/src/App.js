@@ -4,7 +4,7 @@ import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, Ca
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI } from './services/api';
 import QRCodeManager from './components/QRCodeManager';
@@ -1003,8 +1003,8 @@ function App() {
           condition: m.condition || 'good',
           notes: m.notes || '',
           photo: m.photo || '',
-          connectedHardware: m.connectedHardware || '',
-          connectedHardwareId: m.connectedHardwareId || ''
+          connectedHardware: m.connectedHardware?.memberName || (typeof m.connectedHardware === 'string' ? m.connectedHardware : ''),
+          connectedHardwareId: m.connectedHardware?._id || m.connectedHardwareId || ''
         }));
         setApplicatorInfo(mapped);
       } catch (error) {
@@ -2080,8 +2080,8 @@ function App() {
       doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
       
       const tableColumn = isHardware 
-        ? ["Photo", "Name", "ID", "Phone", "Equipment", "Brand", "Notes"]
-        : ["Photo", "Name", "ID", "Phone", "NIC", "City", "Notes"];
+        ? ["Photo", "Name", "ID", "Phone", "WhatsApp", "Contact Person", "City", "Zone", "Notes"]
+        : ["Photo", "Name", "ID", "Phone", "WhatsApp", "NIC", "Hardware", "City", "Zone", "Notes"];
         
       const tableRows = [];
       const images = []; // store images separately
@@ -2092,18 +2092,23 @@ function App() {
               '', // placeholder for photo
               item.name || '',
               item.memberId || '',
-              item.phoneNumber || item.whatsappNumber || '',
-              item.equipment || '',
-              item.equipmentBrand || '',
+              item.phoneNumber || '',
+              item.whatsappNumber || '',
+              item.contactPersonName ? `${item.contactPersonName} ${item.contactPersonMobile ? '(' + item.contactPersonMobile + ')' : ''}` : '',
+              item.location || '',
+              item.zone || '',
               item.notes || ''
             ]
           : [
               '', // placeholder for photo
               item.name || '',
               item.memberId || '',
-              item.phoneNumber || item.whatsappNumber || '',
+              item.phoneNumber || '',
+              item.whatsappNumber || '',
               item.nic || '',
+              item.connectedHardware || '',
               item.location || '',
+              item.zone || '',
               item.notes || ''
             ];
             
@@ -2116,7 +2121,7 @@ function App() {
         images.push(photoData);
       });
       
-      doc.autoTable({
+      autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
         startY: 35,
@@ -2197,8 +2202,8 @@ function App() {
         condition: m.condition || 'good',
         notes: m.notes || '',
         photo: m.photo || '',
-        connectedHardware: m.connectedHardware || '',
-        connectedHardwareId: m.connectedHardwareId || ''
+        connectedHardware: m.connectedHardware?.memberName || (typeof m.connectedHardware === 'string' ? m.connectedHardware : ''),
+        connectedHardwareId: m.connectedHardware?._id || m.connectedHardwareId || ''
       }));
       setApplicatorInfo(applicators);
       setApplicatorsTotalCount(res.data?.pagination?.total || applicators.length);
@@ -2258,7 +2263,7 @@ function App() {
     doc.text('Monthly Summary', 14, 95);
     
     // Using autoTable for summary
-    doc.autoTable({
+    autoTable(doc, {
       startY: 100,
       head: [['Description', 'Amount']],
       body: [
@@ -2308,7 +2313,7 @@ function App() {
     doc.setTextColor(0, 51, 102);
     doc.text('Reward Calculation Breakdown', 14, doc.lastAutoTable.finalY + 15);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 20,
       head: [['Tier', 'Rate', 'Amount in Tier', 'Reward']],
       body: breakdown,
@@ -2526,8 +2531,8 @@ function App() {
         condition: m.condition || 'good',
         notes: m.notes || '',
         photo: m.photo || '',
-        connectedHardware: m.connectedHardware || '',
-        connectedHardwareId: m.connectedHardwareId || ''
+        connectedHardware: m.connectedHardware?.memberName || (typeof m.connectedHardware === 'string' ? m.connectedHardware : ''),
+        connectedHardwareId: m.connectedHardware?._id || m.connectedHardwareId || ''
       }));
       setApplicatorInfo(applicators);
       console.log('✅ Members reloaded:', allMembers.length, 'members');
@@ -8591,16 +8596,61 @@ function App() {
                 <Button
                   variant='outlined'
                   startIcon={<FileDownload />}
-                  onClick={() => {
+                  onClick={async () => {
                     if (applicatorInfo.length === 0) {
                       showNotification('No data to export', 'warning');
                       return;
                     }
                     
                     const isHardware = applicatorTypeFilter === 'Hardware';
-                    const dataToExport = applicatorInfo.filter(a => isHardware ? a.equipment === 'Hardware' : a.equipment !== 'Hardware');
-                    const title = isHardware ? 'Hardware Information Report' : 'Applicator Information Report';
-                    generatePDFReport(dataToExport, title, isHardware);
+                    const title = isHardware ? 'Hardware Information Report' : (applicatorTypeFilter === 'all' ? 'All Members Report' : 'Applicator Information Report');
+                    
+                    try {
+                      showNotification('Preparing export, please wait...', 'info');
+                      let roleParam = '';
+                      if (applicatorTypeFilter === 'Hardware') roleParam = 'customer';
+                      else if (applicatorTypeFilter === 'Applicators') roleParam = 'applicator';
+                      
+                      const res = await membersAPI.getAll({
+                        limit: 10000,
+                        search: applicatorSearchQuery,
+                        ...(roleParam && { role: roleParam })
+                      });
+                      
+                      const allData = res.data?.data || [];
+                      
+                      const dataToExport = allData.map(m => ({
+                        _id: m._id,
+                        name: m.memberName,
+                        memberId: m.memberId,
+                        phoneNumber: m.phone || '',
+                        whatsappNumber: m.whatsappNumber || '',
+                        nic: m.nic || '',
+                        birthday: m.birthday ? new Date(m.birthday).toISOString().split('T')[0] : '',
+                        location: m.location || '',
+                        hardwareAddress: m.hardwareAddress || '',
+                        contactPersonName: m.contactPersonName || '',
+                        contactPersonMobile: m.contactPersonMobile || '',
+                        zone: m.zone || '',
+                        equipment: m.equipment || '',
+                        equipmentBrand: m.equipmentBrand || '',
+                        purchaseDate: m.purchaseDate ? new Date(m.purchaseDate).toISOString().split('T')[0] : '',
+                        condition: m.condition || 'good',
+                        notes: m.notes || '',
+                        photo: m.photo || '',
+                        connectedHardware: m.connectedHardware?.memberName || (typeof m.connectedHardware === 'string' ? m.connectedHardware : ''),
+                        connectedHardwareId: m.connectedHardware?._id || m.connectedHardwareId || ''
+                      }));
+                      
+                      const finalExportData = applicatorTypeFilter === 'all' 
+                        ? dataToExport 
+                        : dataToExport.filter(a => isHardware ? a.equipment === 'Hardware' : a.equipment !== 'Hardware');
+
+                      generatePDFReport(finalExportData, title, isHardware);
+                    } catch (error) {
+                      console.error('Export error:', error);
+                      showNotification('Failed to fetch data for export', 'error');
+                    }
                   }}
                   disabled={applicatorInfo.length === 0}
                 >

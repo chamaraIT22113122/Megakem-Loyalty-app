@@ -4,6 +4,7 @@ const XLSX = require('xlsx');
 const Scan = require('../models/Scan');
 const User = require('../models/User');
 const { protect, admin, hasPermission } = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/rbac');
 
 // @route   GET /api/analytics/dashboard
 // @desc    Get comprehensive dashboard analytics
@@ -285,7 +286,7 @@ router.get('/calendar-data', protect, hasPermission('canViewDashboard'), async (
 // @route   GET /api/analytics/export
 // @desc    Export analytics data as CSV or Excel
 // @access  Private/Admin
-router.get('/export', protect, hasPermission('canExport'), async (req, res) => {
+router.get('/export', protect, requireAdmin, async (req, res) => {
   try {
     const { type = 'scans', startDate, endDate, format = 'csv' } = req.query;
     
@@ -466,6 +467,78 @@ router.get('/churn-detection', protect, hasPermission('canViewDashboard'), async
     .limit(50);
 
     res.json({ success: true, data: atRiskMembers });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/analytics/price-estimation
+// @desc    Calculate grand total using historical vs current product prices
+// @access  Private/Admin
+router.get('/price-estimation', protect, hasPermission('canViewDashboard'), async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    const dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.timestamp = {};
+      if (startDate) dateFilter.timestamp.$gte = new Date(startDate);
+      if (endDate) dateFilter.timestamp.$lte = new Date(endDate);
+    }
+
+    const priceEstimation = await Scan.aggregate([
+      { $match: dateFilter },
+      { 
+        $lookup: {
+          from: 'products',
+          let: { productNo: { $toUpper: '$productNo' }, scanQty: { $toUpper: '$qty' } },
+          pipeline: [
+            { 
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: [{ $toUpper: '$productNo' }, '$$productNo'] },
+                    { $eq: [{ $toUpper: '$category' }, '$$scanQty'] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: 'matchedProduct'
+        }
+      },
+      {
+        $unwind: {
+          path: '$matchedProduct',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          historicalTotal: { $sum: { $ifNull: ['$price', 0] } },
+          currentTotal: { 
+            $sum: { 
+              $cond: { 
+                if: { $ne: [{ $type: '$matchedProduct.price' }, 'missing'] }, 
+                then: '$matchedProduct.price', 
+                else: { $ifNull: ['$price', 0] } 
+              } 
+            } 
+          }
+        }
+      }
+    ]);
+
+    const result = priceEstimation.length > 0 ? priceEstimation[0] : { historicalTotal: 0, currentTotal: 0 };
+
+    res.json({ 
+      success: true, 
+      data: {
+        historicalTotal: result.historicalTotal,
+        currentTotal: result.currentTotal
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

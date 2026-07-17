@@ -179,6 +179,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   // Dialog states
   const [openGenerateDialog, setOpenGenerateDialog] = useState(false);
   const [openBulkDialog, setOpenBulkDialog] = useState(false);
+  const [confirmBulkDialogOpen, setConfirmBulkDialogOpen] = useState(false);
   const [openPreviewDialog, setOpenPreviewDialog] = useState(false);
   const [openBulkDeleteDialog, setOpenBulkDeleteDialog] = useState(false);
   const [openEditBatchDialog, setOpenEditBatchDialog] = useState(false);
@@ -759,6 +760,20 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     }
   };
 
+  const handleGenerateClick = () => {
+    if (!selectedProduct || quantity < 1 || !batchNo) {
+      onShowNotification('Please fill all required fields', 'error');
+      return;
+    }
+
+    if (!manufactureDate || !expiryDate || !description) {
+      setConfirmBulkDialogOpen(true);
+      return;
+    }
+
+    generateBulkQRCodes();
+  };
+
   const generateBulkQRCodes = async () => {
     if (!selectedProduct || quantity < 1 || !batchNo) {
       onShowNotification('Please fill all required fields', 'error');
@@ -984,8 +999,28 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         qrsToPrint = qrCodes.filter(qr => qrIdsOrObjects.includes(qr._id));
       }
       
+      // Determine if we need loyalty or non-loyalty config based on the first QR code
+      let target = 'loyalty';
+      if (qrsToPrint.length > 0) {
+        const firstQR = qrsToPrint[0];
+        const product = products.find(p => p.productNo && firstQR.productNo && p.productNo.toUpperCase() === firstQR.productNo.toUpperCase());
+        if (product && product.isLoyaltyEnabled === false) {
+          target = 'nonLoyalty';
+        }
+      }
+      
+      let configOverrides = {};
+      try {
+        const res = await qrCodesAPI.getPrintLayout(target);
+        if (res.data && res.data.data) {
+          configOverrides = res.data.data;
+        }
+      } catch (err) {
+        console.error('Error fetching layout for print:', err);
+      }
+
       const printWindow = window.open('', '_blank');
-      const html = generatePrintHTML(qrsToPrint);
+      const html = generatePrintHTML(qrsToPrint, configOverrides);
       
       printWindow.document.write(html);
       printWindow.document.close();
@@ -1012,12 +1047,29 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     }
   };
 
-  const generatePrintHTML = (qrs) => {
-    const paperW = printPaperSize === 'custom' ? customPaperWidth : (printPaperSize === 'a4' ? 210 : (printPaperSize === 'letter' ? 215.9 : (printPaperSize === 'medium' ? 101.6 : 76.2)));
-    const paperH = printPaperSize === 'custom' ? customPaperHeight : (printPaperSize === 'a4' ? 297 : (printPaperSize === 'letter' ? 279.4 : (printPaperSize === 'medium' ? 152.4 : 76.2)));
+  const generatePrintHTML = (qrs, configOverrides = {}) => {
+    const pPaperSize = configOverrides.printPaperSize || printPaperSize;
+    const cPaperWidth = configOverrides.customPaperWidth !== undefined ? configOverrides.customPaperWidth : customPaperWidth;
+    const cPaperHeight = configOverrides.customPaperHeight !== undefined ? configOverrides.customPaperHeight : customPaperHeight;
+    const pLayoutMode = configOverrides.printLayoutMode || printLayoutMode;
+    const pColumns = configOverrides.printColumns !== undefined ? configOverrides.printColumns : printColumns;
+    const pRows = configOverrides.printRows !== undefined ? configOverrides.printRows : printRows;
+    const pMarginTop = configOverrides.printMarginTop !== undefined ? configOverrides.printMarginTop : printMarginTop;
+    const pMarginBottom = configOverrides.printMarginBottom !== undefined ? configOverrides.printMarginBottom : printMarginBottom;
+    const pMarginLeft = configOverrides.printMarginLeft !== undefined ? configOverrides.printMarginLeft : printMarginLeft;
+    const pMarginRight = configOverrides.printMarginRight !== undefined ? configOverrides.printMarginRight : printMarginRight;
+    const pGap = configOverrides.printGap !== undefined ? configOverrides.printGap : printGap;
+    const pLabelPadding = configOverrides.printLabelPadding !== undefined ? configOverrides.printLabelPadding : printLabelPadding;
+    const pQRSize = configOverrides.printQRSize !== undefined ? configOverrides.printQRSize : printQRSize;
+    const pFontSizeBatch = configOverrides.printFontSizeBatch !== undefined ? configOverrides.printFontSizeBatch : printFontSizeBatch;
+    const pFontSizeDesc = configOverrides.printFontSizeDesc !== undefined ? configOverrides.printFontSizeDesc : printFontSizeDesc;
+    const pFontSizeMrp = configOverrides.printFontSizeMrp !== undefined ? configOverrides.printFontSizeMrp : printFontSizeMrp;
+
+    const paperW = pPaperSize === 'custom' ? cPaperWidth : (pPaperSize === 'a4' ? 210 : (pPaperSize === 'letter' ? 215.9 : (pPaperSize === 'medium' ? 101.6 : 76.2)));
+    const paperH = pPaperSize === 'custom' ? cPaperHeight : (pPaperSize === 'a4' ? 297 : (pPaperSize === 'letter' ? 279.4 : (pPaperSize === 'medium' ? 152.4 : 76.2)));
     
-    const cols = printLayoutMode === 'roll' ? 1 : printColumns;
-    const rows = printLayoutMode === 'roll' ? 1 : printRows;
+    const cols = pLayoutMode === 'roll' ? 1 : pColumns;
+    const rows = pLayoutMode === 'roll' ? 1 : pRows;
     const itemsPerPage = cols * rows;
 
     let html = `
@@ -1041,18 +1093,18 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             box-sizing: border-box;
             width: ${paperW}mm;
             height: ${paperH}mm;
-            padding: ${printMarginTop}mm ${printMarginRight}mm ${printMarginBottom}mm ${printMarginLeft}mm;
+            padding: ${pMarginTop}mm ${pMarginRight}mm ${pMarginBottom}mm ${pMarginLeft}mm;
             page-break-after: always;
             display: grid;
             grid-template-columns: repeat(${cols}, 1fr);
             grid-template-rows: repeat(${rows}, 1fr);
-            gap: ${printGap}mm;
+            gap: ${pGap}mm;
             overflow: hidden;
           }
           .label {
             box-sizing: border-box;
             border: 1px dashed #ccc;
-            padding: ${printLabelPadding}mm;
+            padding: ${pLabelPadding}mm;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -1072,8 +1124,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             width: 100%;
           }
           .qr-container { 
-            width: ${printQRSize}mm; 
-            height: ${printQRSize}mm;
+            width: ${pQRSize}mm; 
+            height: ${pQRSize}mm;
             margin: 1mm 0;
             display: flex;
             align-items: center;
@@ -1085,7 +1137,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             display: block; 
           }
           .batch-info { 
-            font-size: ${printFontSizeBatch}pt; 
+            font-size: ${pFontSizeBatch}pt; 
             margin: 0.5mm 0;
             line-height: 1.2;
             width: 100%;
@@ -1099,7 +1151,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           }
           .mrp-text {
             font-weight: bold;
-            font-size: ${printFontSizeMrp}pt;
+            font-size: ${pFontSizeMrp}pt;
             margin-top: 0.5mm;
             text-align: center;
             width: 100%;
@@ -1169,7 +1221,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               ${mfgDateToShow ? `MFG DATE: <strong>${mfgDateToShow}</strong><br>` : ''}
               ${expDateToShow ? `EXP DATE: <strong>${expDateToShow}</strong>` : ''}
             </div>
-            <div class="description-area" style="font-size: ${printFontSizeDesc}pt; font-weight: bold; height: 4.5mm; margin-top: 1mm; text-transform: uppercase; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <div class="description-area" style="font-size: ${pFontSizeDesc}pt; font-weight: bold; height: 4.5mm; margin-top: 1mm; text-transform: uppercase; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
               ${qr.description ? qr.description : '&nbsp;'}
             </div>
             <div class="divider-line" style="border-top: 1px solid #000; width: 85%; margin: 1mm auto 0.5mm auto;"></div>
@@ -1182,7 +1234,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         const filledSlots = pageQRs.length;
         const emptySlots = itemsPerPage - filledSlots;
         for (let s = 0; s < emptySlots; s++) {
-          html += `<div class="label" style="border: none; opacity: 0;"><div style="width: ${printQRSize}mm; height: ${printQRSize}mm;"></div></div>`;
+          html += `<div class="label" style="border: none; opacity: 0;"><div style="width: ${pQRSize}mm; height: ${pQRSize}mm;"></div></div>`;
         }
       }
 
@@ -1565,17 +1617,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
 
           <Grid container spacing={2}>
-            <Grid item xs={4}>
-              <TextField
-                fullWidth
-                label="Prefix"
-                value={packageNoPrefix}
-                onChange={(e) => setPackageNoPrefix(e.target.value)}
-                margin="normal"
-                placeholder="e.g. PKG-"
-              />
-            </Grid>
-            <Grid item xs={4}>
+            <Grid item xs={6}>
               <TextField
                 fullWidth
                 label="Start No"
@@ -1586,7 +1628,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 required
               />
             </Grid>
-            <Grid item xs={4}>
+            <Grid item xs={6}>
               <TextField
                 fullWidth
                 label="End No"
@@ -1627,13 +1669,32 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             </Select>
           </FormControl>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenBulkDialog(false)}>Cancel</Button>
-          <Button onClick={generateBulkQRCodes} variant="contained" disabled={loading}>
-            {loading ? <CircularProgress size={24} /> : (isMainAdmin ? 'Generate Bulk' : 'Print Bulk')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+                  <DialogActions>
+            <Button onClick={() => setOpenBulkDialog(false)}>Cancel</Button>
+            <Button onClick={handleGenerateClick} variant="contained" disabled={loading}>
+              {loading ? <CircularProgress size={24} /> : (isMainAdmin ? 'Generate Bulk' : 'Print Bulk')}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Confirmation Dialog for Incomplete Fields */}
+        <Dialog open={confirmBulkDialogOpen} onClose={() => setConfirmBulkDialogOpen(false)}>
+          <DialogTitle>Incomplete Details</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Not all optional fields (like Manufacture Date, Expiry Date, or Description) are filled. Do you want to proceed anyway?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirmBulkDialogOpen(false)}>Cancel</Button>
+            <Button onClick={() => {
+              setConfirmBulkDialogOpen(false);
+              generateBulkQRCodes();
+            }} variant="contained" color="primary">
+              Proceed
+            </Button>
+          </DialogActions>
+        </Dialog>
 
       {/* Reprint Request Dialog */}
       <Dialog open={openReprintDialog} onClose={() => setOpenReprintDialog(false)} maxWidth="xs" fullWidth>

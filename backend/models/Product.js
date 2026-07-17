@@ -56,6 +56,15 @@ const productSchema = new mongoose.Schema({
     manufactureDate: Date,
     expiryDate: Date,
     quantity: Number
+  }],
+  priceHistory: [{
+    price: Number,
+    packSizePricing: [{
+      packSize: String,
+      price: Number
+    }],
+    changedAt: { type: Date, default: Date.now },
+    changedBy: String
   }]
 }, {
   timestamps: true

@@ -72,6 +72,16 @@ const scanSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  latitude: {
+    type: Number
+  },
+  longitude: {
+    type: Number
+  },
+  fraudFlag: {
+    type: Boolean,
+    default: false
+  },
   timestamp: {
     type: Date,
     default: Date.now

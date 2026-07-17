@@ -35,6 +35,19 @@ const { optionalAuth, protect, authorize, hasPermission } = require('../middlewa
 const QRCodeModel = require('../models/QRCode');
 const ScanLog = require('../models/ScanLog');
 
+// Helper for distance calculation (Haversine in miles)
+function getDistanceFromLatLonInMiles(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  const R = 3958.8; // Radius of earth in miles
+  const dLat = (lat2 - lat1) * (Math.PI/180);
+  const dLon = (lon2 - lon1) * (Math.PI/180);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 // HMAC verification helper (mirrors qrCode.js) — Upgrade 1
 const QR_HMAC_SECRET = process.env.QR_HMAC_SECRET || 'megakem-qr-default-secret-change-in-production';
 function verifyQRSig(productNo, batchNo, packageNo, sig) {
@@ -223,11 +236,10 @@ router.post('/', optionalAuth, async (req, res) => {
         signature: sigStatus,
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
-        notes: `Batch already scanned by a ${role}`
       }).catch(() => {});
       return res.status(400).json({
         success: false,
-        message: `This batch number (${batchNo}) has already been scanned by a ${role}`,
+        message: `This bag/batch was already scanned by you on ${new Date(duplicateScan.timestamp).toLocaleDateString()}.`,
         duplicate: true
       });
     }
@@ -235,6 +247,22 @@ router.post('/', optionalAuth, async (req, res) => {
     // Try to get product price and points if not provided
     let productPrice = req.body.price;
     let productPoints = 0;
+    
+    // Geospatial fraud check
+    let fraudFlag = false;
+    if (req.body.latitude && req.body.longitude) {
+      const lastScanOfBatch = await Scan.findOne({ batchNo }).sort({ timestamp: -1 });
+      if (lastScanOfBatch && lastScanOfBatch.latitude && lastScanOfBatch.longitude) {
+        const distance = getDistanceFromLatLonInMiles(
+          req.body.latitude, req.body.longitude, 
+          lastScanOfBatch.latitude, lastScanOfBatch.longitude
+        );
+        const timeDiffHours = (new Date() - lastScanOfBatch.timestamp) / (1000 * 60 * 60);
+        if (distance > 50 && timeDiffHours < 24) {
+          fraudFlag = true;
+        }
+      }
+    }
     
     if (productNo) {
       // First try to find exact match with product code and pack size (category)
@@ -281,6 +309,9 @@ router.post('/', optionalAuth, async (req, res) => {
       price: productPrice || 0,
       points: 0,
       location: location || '',
+      latitude: req.body.latitude,
+      longitude: req.body.longitude,
+      fraudFlag: fraudFlag,
       connectedHardware: req.body.connectedHardware || '',
       connectedHardwareId: req.body.connectedHardwareId || '',
       expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : undefined

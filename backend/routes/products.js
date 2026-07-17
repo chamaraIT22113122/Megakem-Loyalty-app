@@ -135,17 +135,49 @@ router.post('/', protect, hasPermission('canManageProducts'), async (req, res) =
 // @access  Private (Admin only)
 router.put('/:id', protect, hasPermission('canManageProducts'), async (req, res) => {
   try {
+    const oldProduct = await Product.findById(req.params.id);
+    if (!oldProduct) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const newPrice = req.body.price !== undefined ? Number(req.body.price) : undefined;
+    const oldPrice = oldProduct.price || 0;
+
+    // RBAC: Only admins can alter prices
+    if (newPrice !== undefined && newPrice !== oldPrice) {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Only administrators can alter prices.'
+        });
+      }
+    }
+
     const product = await Product.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true, runValidators: true }
     );
 
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
+    // If price or packSizePricing changed, record history in the array
+    const newPackSizePricing = req.body.packSizePricing;
+    const oldPackSizePricing = oldProduct.packSizePricing || [];
+    let packSizeChanged = false;
+    if (newPackSizePricing) {
+        packSizeChanged = JSON.stringify(oldPackSizePricing) !== JSON.stringify(newPackSizePricing);
+    }
+
+    if ((newPrice !== undefined && newPrice !== oldPrice) || packSizeChanged) {
+      product.priceHistory.push({
+        price: oldPrice,
+        packSizePricing: oldPackSizePricing,
+        changedAt: new Date(),
+        changedBy: req.user ? req.user.id : null
       });
+      await product.save();
     }
 
     // Audit Log
