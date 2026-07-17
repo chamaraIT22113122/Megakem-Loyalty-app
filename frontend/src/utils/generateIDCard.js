@@ -1,4 +1,7 @@
 import jsPDF from 'jspdf';
+import frontTemplate from '../assets/WTC ID CARD front side Template.png';
+import backTemplate from '../assets/WTC ID CARD F-Backside.png';
+import QRCode from 'qrcode';
 
 export const generateIDCard = async (member, apiUrl) => {
   // CR80 ID Card standard size: 85.6 mm x 53.98 mm
@@ -21,8 +24,22 @@ export const generateIDCard = async (member, apiUrl) => {
 
   try {
     // 1. Draw Front of Card
-    const frontImg = await loadImage('/images/id_front.png');
-    doc.addImage(frontImg, 'PNG', 0, 0, 85.6, 53.98);
+    try {
+      const frontImg = await loadImage(frontTemplate);
+      doc.addImage(frontImg, 'PNG', 0, 0, 85.6, 53.98);
+    } catch (err) {
+      console.warn("Could not load front template image. Drawing fallback background.", err);
+      // Fallback background
+      doc.setFillColor(240, 248, 255);
+      doc.rect(0, 0, 85.6, 53.98, 'F');
+      
+      // Basic header
+      doc.setFillColor(0, 51, 102);
+      doc.rect(0, 0, 85.6, 12, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.text("MEMBER ID CARD", 42.8, 8, { align: 'center' });
+    }
 
     // 2. Add Profile Photo
     if (member.photo) {
@@ -64,16 +81,24 @@ export const generateIDCard = async (member, apiUrl) => {
     doc.text((member.zone || '').toString(), 49, 42.5);
 
     // 4. Add Back of Card (Second Page)
+    doc.addPage();
     try {
-      const backImg = await loadImage('/images/id_back.png');
-      doc.addPage();
+      const backImg = await loadImage(backTemplate);
       doc.addImage(backImg, 'PNG', 0, 0, 85.6, 53.98);
     } catch (err) {
-      console.warn("Could not load back image (id_back.png). Make sure it's placed in public/images/", err);
+      console.warn("Could not load back image. Drawing fallback back side.", err);
+      doc.setFillColor(240, 248, 255);
+      doc.rect(0, 0, 85.6, 53.98, 'F');
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.text("If found, please return to Megakem Loyalty.", 42.8, 27, { align: 'center' });
     }
 
-    // 5. Download the PDF
-    doc.save(`${member.memberId || 'Member'}_ID_Card.pdf`);
+    // 5. Return the document instead of saving immediately
+    return {
+      doc: doc,
+      filename: `${member.memberId || 'Member'}_ID_Card.pdf`
+    };
     
   } catch (error) {
     console.error("Error generating ID card:", error);

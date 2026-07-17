@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -938,6 +938,7 @@ function App() {
   const [applicatorPhotoFile, setApplicatorPhotoFile] = useState(null);
   
   const [hardwareDialog, setHardwareDialog] = useState({ open: false, data: null });
+  const [idCardPreviewDialog, setIdCardPreviewDialog] = useState({ open: false, dataUri: '', filename: '', doc: null });
   const [hardwareFormData, setHardwareFormData] = useState({
     name: '',
     memberId: '',
@@ -9068,8 +9069,8 @@ function App() {
                                         onClick={async () => {
                                           setLoading(true);
                                           try {
-                                            await generateIDCard(applicator, process.env.REACT_APP_API_URL || 'http://localhost:5000');
-                                            showNotification('ID Card downloaded', 'success');
+                                            const result = await generateIDCard(applicator, process.env.REACT_APP_API_URL || 'http://localhost:5000');
+                                            setIdCardPreviewDialog({ open: true, dataUri: result.dataUri, filename: result.filename, doc: result.doc });
                                           } catch (err) {
                                             showNotification('Failed to generate ID Card', 'error');
                                           } finally {
@@ -12966,6 +12967,54 @@ function App() {
         <DialogActions sx={{ px: 3, pb: 2, borderTop: '1px solid', borderColor: 'divider' }}>
           <Button onClick={() => setCoAdminRequestsDialogOpen(false)} variant='contained' color='primary'>
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ID Card Preview Dialog */}
+      <Dialog 
+        open={idCardPreviewDialog.open} 
+        onClose={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })} 
+        maxWidth='md' 
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          ID Card Preview
+          <IconButton onClick={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })} size='small'>
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ height: '60vh', p: 0 }}>
+          {idCardPreviewDialog.dataUri ? (
+            <iframe 
+              src={idCardPreviewDialog.dataUri} 
+              width="100%" 
+              height="100%" 
+              style={{ border: 'none' }} 
+              title="ID Card Preview" 
+            />
+          ) : (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+              <CircularProgress />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })}>
+            Close
+          </Button>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => {
+              if (idCardPreviewDialog.doc) {
+                idCardPreviewDialog.doc.save(idCardPreviewDialog.filename);
+                setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null });
+                showNotification('ID Card downloaded', 'success');
+              }
+            }}
+          >
+            Download PDF
           </Button>
         </DialogActions>
       </Dialog>
