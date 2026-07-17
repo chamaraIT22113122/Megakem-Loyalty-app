@@ -2175,15 +2175,19 @@ function App() {
     if (!adminAuth) return;
     try {
       setLoading(true);
+      let roleParam = '';
+      if (applicatorTypeFilter === 'Hardware') roleParam = 'customer';
+      else if (applicatorTypeFilter === 'Applicator') roleParam = 'applicator';
+
       const res = await membersAPI.getAll({
         page: applicatorsPage + 1,
         limit: applicatorsRowsPerPage,
-        search: applicatorSearchQuery
+        search: applicatorSearchQuery,
+        ...(roleParam && { role: roleParam })
       });
       const allMembers = res.data?.data || [];
-      setMembers(allMembers);
       
-      const applicators = allMembers.filter(m => m.role === 'applicator' || m.role === 'customer').map(m => ({
+      const applicators = allMembers.map(m => ({
         _id: m._id,
         name: m.memberName,
         memberId: m.memberId,
@@ -2229,7 +2233,7 @@ function App() {
       fetchPaginatedMembers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applicatorsPage, applicatorsRowsPerPage, applicatorSearchQuery, adminAuth]);
+  }, [applicatorsPage, applicatorsRowsPerPage, applicatorSearchQuery, applicatorTypeFilter, adminAuth]);
 
   const generatePDFStatement = (reward) => {
     const doc = new jsPDF();
@@ -8813,6 +8817,7 @@ function App() {
                   if (newValue !== null) {
                     setApplicatorTypeFilter(newValue);
                     setSelectedApplicators([]); // Reset selection on filter change
+                    setApplicatorsPage(0); // Reset page to 0
                   }
                 }}
                 size="small"
