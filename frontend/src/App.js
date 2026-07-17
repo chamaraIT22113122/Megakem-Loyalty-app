@@ -1,12 +1,13 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI } from './services/api';
+import { generateIDCard } from './utils/generateIDCard';
 import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import SriLankaZoneMap from './components/SriLankaZoneMap';
@@ -9059,6 +9060,27 @@ function App() {
                                       <PictureAsPdf />
                                     </IconButton>
                                   </Tooltip>
+                                  {applicatorTypeFilter !== 'Hardware' && (
+                                    <Tooltip title='Download ID Card'>
+                                      <IconButton
+                                        size='small'
+                                        color='secondary'
+                                        onClick={async () => {
+                                          setLoading(true);
+                                          try {
+                                            await generateIDCard(applicator, process.env.REACT_APP_API_URL || 'http://localhost:5000');
+                                            showNotification('ID Card downloaded', 'success');
+                                          } catch (err) {
+                                            showNotification('Failed to generate ID Card', 'error');
+                                          } finally {
+                                            setLoading(false);
+                                          }
+                                        }}
+                                      >
+                                        <CardMembership />
+                                      </IconButton>
+                                    </Tooltip>
+                                  )}
                                   <Tooltip title='Edit'>
                                     <IconButton 
                                       size='small' 
