@@ -9,6 +9,7 @@
     "@mui/icons-material": "^5.16.7",
     "@mui/material": "^5.16.7",
     "@svg-maps/sri-lanka": "^2.0.0",
+    "@vladmandic/face-api": "^1.7.15",
     "axios": "^1.7.9",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.8",

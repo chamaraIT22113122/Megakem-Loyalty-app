@@ -1,9 +1,10 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
+import * as faceapi from '@vladmandic/face-api';
 import autoTable from 'jspdf-autotable';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI } from './services/api';
@@ -937,6 +938,131 @@ function App() {
     photo: ''
   });
   const [applicatorPhotoFile, setApplicatorPhotoFile] = useState(null);
+  
+  // Camera state for live preview
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [facingMode, setFacingMode] = useState('user');
+  const [autoEnhance, setAutoEnhance] = useState(false);
+  const [isFaceAligned, setIsFaceAligned] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const faceDetectionInterval = useRef(null);
+
+  const startFaceDetection = () => {
+    if (faceDetectionInterval.current) clearInterval(faceDetectionInterval.current);
+    faceDetectionInterval.current = setInterval(async () => {
+      if (videoRef.current && videoRef.current.readyState === 4) {
+        try {
+          const detections = await faceapi.detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions());
+          if (detections && detections.length > 0) {
+            const face = detections[0].box;
+            const video = videoRef.current;
+            const centerX = face.x + (face.width / 2);
+            const centerY = face.y + (face.height / 2);
+            
+            // Check if center of face is roughly in the middle of the frame
+            const isCenteredX = centerX > video.videoWidth * 0.3 && centerX < video.videoWidth * 0.7;
+            const isCenteredY = centerY > video.videoHeight * 0.2 && centerY < video.videoHeight * 0.8;
+            const isGoodSize = face.width > video.videoWidth * 0.15;
+            
+            setIsFaceAligned(isCenteredX && isCenteredY && isGoodSize);
+          } else {
+            setIsFaceAligned(false);
+          }
+        } catch (e) {}
+      }
+    }, 500);
+  };
+
+  const startCamera = async () => {
+    setIsCameraOpen(true);
+    setIsFaceAligned(false);
+    try {
+      // Load face-api models if not loaded yet
+      if (!faceapi.nets.tinyFaceDetector.isLoaded) {
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: facingMode } 
+      });
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          startFaceDetection();
+        }
+      }, 100);
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      setIsCameraOpen(false);
+      let errorMessage = "Could not access camera. Please check permissions.";
+      if (err.name === 'AbortError' || err.message.includes('Timeout')) {
+        errorMessage = "Camera access timed out. This often happens if another app (like Zoom/Teams) is currently using the camera.";
+      }
+      showNotification(errorMessage, "error");
+    }
+  };
+
+  const stopCamera = () => {
+    if (faceDetectionInterval.current) {
+      clearInterval(faceDetectionInterval.current);
+      faceDetectionInterval.current = null;
+    }
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsFaceAligned(false);
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      // Target aspect ratio based on ID card (26mm width x 30.5mm height)
+      const targetW = 260;
+      const targetH = 305;
+      const targetRatio = targetW / targetH;
+      
+      const videoRatio = video.videoWidth / video.videoHeight;
+      let cropWidth, cropHeight, startX, startY;
+      
+      if (videoRatio > targetRatio) {
+        // Video is wider than needed, crop sides
+        cropHeight = video.videoHeight;
+        cropWidth = video.videoHeight * targetRatio;
+        startX = (video.videoWidth - cropWidth) / 2;
+        startY = 0;
+      } else {
+        // Video is taller than needed, crop top/bottom
+        cropWidth = video.videoWidth;
+        cropHeight = video.videoWidth / targetRatio;
+        startX = 0;
+        startY = (video.videoHeight - cropHeight) / 2;
+      }
+      
+      // 3x multiplier for high-resolution print capture
+      canvas.width = targetW * 3;
+      canvas.height = targetH * 3;
+      const ctx = canvas.getContext('2d');
+      if (autoEnhance) {
+        ctx.filter = 'brightness(1.15) contrast(1.1)';
+      }
+      // Draw the cropped center of the video to fill the high-res canvas
+      ctx.drawImage(video, startX, startY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+          setApplicatorPhotoFile(file);
+          stopCamera();
+        }
+      }, 'image/jpeg');
+    }
+  };
   
   const [hardwareDialog, setHardwareDialog] = useState({ open: false, data: null });
   const [idCardPreviewDialog, setIdCardPreviewDialog] = useState({ 
@@ -12374,28 +12500,151 @@ function App() {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
-              <Avatar
-                src={applicatorPhotoFile ? URL.createObjectURL(applicatorPhotoFile) : (applicatorFormData.photo ? (applicatorFormData.photo.startsWith('data:image') || applicatorFormData.photo.startsWith('http') ? applicatorFormData.photo : `http://localhost:5000${applicatorFormData.photo}`) : '')}
-                sx={{ width: 100, height: 100, mb: 1 }}
-              />
-              <Button
-                variant="outlined"
-                component="label"
-                startIcon={<Add />}
-              >
-                Upload Photo
-                <input
-                  type="file"
-                  hidden
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setApplicatorPhotoFile(e.target.files[0]);
-                    }
-                  }}
-                />
-              </Button>
+              {isCameraOpen ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
+                    <Button 
+                      size="small" 
+                      variant="outlined" 
+                      startIcon={<Cameraswitch />} 
+                      onClick={() => {
+                        setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+                        stopCamera();
+                        setTimeout(startCamera, 100);
+                      }}
+                    >
+                      Flip Camera
+                    </Button>
+                    <Button 
+                      size="small" 
+                      variant={autoEnhance ? "contained" : "outlined"} 
+                      color={autoEnhance ? "primary" : "inherit"}
+                      startIcon={<AutoFixHigh />} 
+                      onClick={() => setAutoEnhance(!autoEnhance)}
+                    >
+                      Auto-Enhance
+                    </Button>
+                  </Box>
+                  <Box sx={{ 
+                    position: 'relative', 
+                    width: '260px', 
+                    height: '305px', 
+                    overflow: 'hidden', 
+                    borderRadius: '8px', 
+                    border: isFaceAligned ? '4px solid #4CAF50' : '2px solid #ccc',
+                    boxShadow: isFaceAligned ? '0 0 15px rgba(76, 175, 80, 0.5)' : 'none',
+                    transition: 'all 0.3s ease',
+                    bgcolor: '#000',
+                    mx: 'auto'
+                  }}>
+                    <video 
+                      ref={videoRef} 
+                      autoPlay 
+                      playsInline
+                      muted 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                    {/* Face Guide Oval */}
+                    <Box sx={{ 
+                      position: 'absolute', 
+                      top: '45%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: '140px', 
+                      height: '180px', 
+                      border: '2px dashed rgba(255, 255, 255, 0.7)', 
+                      borderRadius: '50%',
+                      pointerEvents: 'none'
+                    }} />
+                    {/* Center Crosshairs */}
+                    <Box sx={{
+                      position: 'absolute',
+                      top: '45%',
+                      left: '50%',
+                      width: '20px',
+                      height: '20px',
+                      transform: 'translate(-50%, -50%)',
+                      pointerEvents: 'none',
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        top: '50%',
+                        left: 0,
+                        width: '100%',
+                        height: '2px',
+                        bgcolor: 'rgba(255, 255, 255, 0.8)',
+                        transform: 'translateY(-50%)'
+                      },
+                      '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        left: '50%',
+                        top: 0,
+                        width: '2px',
+                        height: '100%',
+                        bgcolor: 'rgba(255, 255, 255, 0.8)',
+                        transform: 'translateX(-50%)'
+                      }
+                    }} />
+                    <Typography sx={{ 
+                      color: isFaceAligned ? '#4CAF50' : 'white', 
+                      position: 'absolute', 
+                      bottom: '15px', 
+                      width: '100%', 
+                      textAlign: 'center', 
+                      fontSize: '0.9rem', 
+                      fontWeight: 'bold', 
+                      textShadow: '1px 1px 4px black', 
+                      pointerEvents: 'none',
+                      transition: 'color 0.3s'
+                    }}>
+                      {isFaceAligned ? 'Face Aligned! Ready to Capture' : 'Center face in frame'}
+                    </Typography>
+                  </Box>
+                  <canvas ref={canvasRef} style={{ display: 'none' }} />
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button variant="contained" color={isFaceAligned ? "success" : "primary"} onClick={capturePhoto}>
+                      Capture
+                    </Button>
+                    <Button variant="outlined" color="error" onClick={stopCamera}>
+                      Cancel
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
+                <>
+                  <Avatar
+                    src={applicatorPhotoFile ? URL.createObjectURL(applicatorPhotoFile) : (applicatorFormData.photo ? (applicatorFormData.photo.startsWith('data:image') || applicatorFormData.photo.startsWith('http') ? applicatorFormData.photo : `http://localhost:5000${applicatorFormData.photo}`) : '')}
+                    sx={{ width: 100, height: 100, mb: 1 }}
+                  />
+                  <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 2 }}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      startIcon={<Add />}
+                    >
+                      Upload Photo
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setApplicatorPhotoFile(e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={applicatorPhotoFile || applicatorFormData.photo ? <Replay /> : <Add />}
+                      onClick={startCamera}
+                    >
+                      {applicatorPhotoFile || applicatorFormData.photo ? 'Retake Photo' : 'Take Photo'}
+                    </Button>
+                  </Box>
+                </>
+              )}
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
