@@ -31,6 +31,16 @@ const io = new Server(server, {
   }
 });
 
+io.on('connection', (socket) => {
+  // Client explicitly requests to join the admin room after authenticating
+  socket.on('join_admin_room', (data) => {
+    if (data && data.email === 'admin@megakem.com') {
+      socket.join('main_admins');
+      console.log('Admin joined main_admins room');
+    }
+  });
+});
+
 app.use((req, res, next) => {
   req.io = io;
   next();
@@ -199,6 +209,7 @@ app.use('/api/redemptions', require('./routes/redemptions'));
 app.use('/api/audit-logs', require('./routes/auditLogs'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/push', require('./routes/push'));
+app.use('/api/backup', require('./routes/backup'));
 
 // Health check
 app.get('/api/health', (req, res) => {

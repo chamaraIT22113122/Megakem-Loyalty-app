@@ -1,13 +1,13 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay } from '@mui/icons-material';
+import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider, Collapse, Drawer } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay, KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import * as faceapi from '@vladmandic/face-api';
 import autoTable from 'jspdf-autotable';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
-import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI } from './services/api';
+import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI, backupAPI } from './services/api';
 import { generateIDCard } from './utils/generateIDCard';
 import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
@@ -185,6 +185,128 @@ const loadScript = (src) => new Promise((resolve, reject) => {
   script.src = src; script.onload = resolve; script.onerror = reject;
   document.head.appendChild(script);
 });
+
+// ─── Expandable Product Row Component ────────────────────────────────────────────
+const ProductRow = ({ p, setProductDialog, setProductPointsDialog, handleDeleteProduct, hasPermission }) => {
+  const [open, setOpen] = useState(false);
+
+  // Calculate points display
+  let pointsDisplay = 'Not Set';
+  if (p.pointsPerProduct !== null && p.pointsPerProduct !== undefined) {
+    pointsDisplay = `${p.pointsPerProduct} pts (Fixed)`;
+  } else if (p.pointsPerPackSize && p.pointsPerPackSize.length > 0) {
+    pointsDisplay = 'Variable (Pack Sizes)';
+  }
+
+  const hasPackSizes = p.packSizePricing && p.packSizePricing.length > 0;
+  
+  // Check if there is an active promotion
+  const now = new Date();
+  const isActivePromo = p.promotion && p.promotion.isActive && 
+    (!p.promotion.startDate || new Date(p.promotion.startDate) <= now) &&
+    (!p.promotion.endDate || new Date(p.promotion.endDate) >= now);
+
+  return (
+    <React.Fragment>
+      <TableRow sx={{ '& > *': { borderBottom: 'unset' }, bgcolor: isActivePromo ? 'rgba(255, 215, 0, 0.05)' : 'inherit' }}>
+        <TableCell>
+          <IconButton
+            aria-label="expand row"
+            size="small"
+            onClick={() => setOpen(!open)}
+            disabled={!hasPackSizes && !isActivePromo}
+            sx={{ visibility: hasPackSizes || isActivePromo ? 'visible' : 'hidden' }}
+          >
+            {open ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+          </IconButton>
+        </TableCell>
+        <TableCell>
+          {p.name}
+          {isActivePromo && (
+            <Chip 
+              label={`Promo: ${p.promotion.multiplier}x Points`} 
+              size="small" 
+              color="warning" 
+              sx={{ ml: 1, fontSize: '0.7rem', height: '20px' }} 
+            />
+          )}
+        </TableCell>
+        <TableCell>{p.productNo}</TableCell>
+        <TableCell>{p.category}</TableCell>
+        <TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell>
+        <TableCell>
+          <Chip 
+            label={pointsDisplay} 
+            size='small' 
+            color={pointsDisplay === 'Not Set' ? 'default' : 'success'}
+            icon={<EmojiEvents sx={{ fontSize: '0.9rem !important' }} />}
+          />
+        </TableCell>
+        <TableCell>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Edit Product'><Edit /></IconButton>
+            <IconButton size='small' color='primary' onClick={() => setProductPointsDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Configure Points'><EmojiEvents /></IconButton>
+            <IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts') || !hasPermission('canDelete')} title='Delete Product'><Delete /></IconButton>
+          </Box>
+        </TableCell>
+      </TableRow>
+      
+      {(hasPackSizes || isActivePromo) && (
+        <TableRow>
+          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+            <Collapse in={open} timeout="auto" unmountOnExit>
+              <Box sx={{ margin: 1, p: 2, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2 }}>
+                
+                {isActivePromo && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" color="warning.dark" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Star fontSize="small" /> Active Promotion
+                    </Typography>
+                    <Typography variant="body2" sx={{ ml: 3 }}>
+                      Multiplier: <b>{p.promotion.multiplier}x</b>
+                      {p.promotion.startDate && ` | From: ${new Date(p.promotion.startDate).toLocaleDateString()}`}
+                      {p.promotion.endDate && ` | Until: ${new Date(p.promotion.endDate).toLocaleDateString()}`}
+                    </Typography>
+                  </Box>
+                )}
+
+                {hasPackSizes && (
+                  <>
+                    <Typography variant="subtitle2" gutterBottom component="div">
+                      Pack Sizes & Pricing
+                    </Typography>
+                    <Table size="small" aria-label="pack-sizes">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Pack Size</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Price (Rs.)</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Points</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {p.packSizePricing.map((psp, i) => {
+                          const pts = p.pointsPerPackSize?.find(ps => ps.packSize === psp.packSize)?.points;
+                          return (
+                            <TableRow key={i}>
+                              <TableCell>{psp.packSize}</TableCell>
+                              <TableCell>{psp.price?.toLocaleString() || 'N/A'}</TableCell>
+                              <TableCell>{pts !== undefined ? pts : 'Default'}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </>
+                )}
+                
+              </Box>
+            </Collapse>
+          </TableCell>
+        </TableRow>
+      )}
+    </React.Fragment>
+  );
+};
 
 // ─── Sri Lanka Zone Map Component ────────────────────────────────────────────
 const ZoneSLMap = ({ members }) => {
@@ -582,6 +704,82 @@ function App() {
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [coAdminApprovedCount, setCoAdminApprovedCount] = useState(0);
   const [coAdminRequestsDialogOpen, setCoAdminRequestsDialogOpen] = useState(false);
+  
+  const [auditLogDetailsDialog, setAuditLogDetailsDialog] = useState({ open: false, log: null });
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMember, setDrawerMember] = useState(null);
+
+  // Utility to generate a human-readable summary of the audit log action
+  const getAuditLogSummary = (log) => {
+    if (!log || !log.details) return 'No details available.';
+    const d = log.details;
+    
+    // For UPDATE_MEMBER action, generate specific details
+    if (log.action === 'UPDATE_MEMBER') {
+      const name = d.memberName || d.name || d.memberId || 'Unknown Member';
+      
+      if (d.oldState && d.newState) {
+        const changes = [];
+        const skipKeys = ['_id', '__v', 'createdAt', 'updatedAt'];
+        
+        // Find differences
+        Object.keys(d.newState).forEach(key => {
+          if (skipKeys.includes(key)) return;
+          
+          const oldVal = d.oldState[key];
+          const newVal = d.newState[key];
+          
+          if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+            changes.push(`${key} (${oldVal || 'none'} → ${newVal || 'none'})`);
+          }
+        });
+        
+        if (changes.length > 0) {
+          return `Updated member: ${name} [Changes: ${changes.join(', ')}]`;
+        }
+      }
+      return `Updated member: ${name}`;
+    }
+    
+    // Fallbacks for other actions matching the existing switch statement
+    switch(log.action) {
+      case 'BULK_DELETE_QR_CODES': return `Deleted ${d.deletedCount} QR codes for batch '${d.batchNo}'`;
+      case 'DELETE_QR_CODES': return `Deleted ${d.deletedCount} individual QR codes`;
+      case 'CREATE_USER': return `Created user: ${d.username} (${d.email}) with role '${d.role}'`;
+      case 'CREATE_MEMBER': return `Created member: ${d.name} (${d.phone})`;
+      case 'DELETE_MEMBER': return `Deleted member: ${d.name || d.memberId}`;
+      case 'BULK_DELETE_MEMBERS': return `Deleted ${d.deletedCount} members`;
+      case 'CREATE_PRODUCT': return `Created product: ${d.name} (Points: ${d.points})`;
+      case 'UPDATE_PRODUCT': return `Updated product: ${d.name || d.productId}`;
+      case 'DELETE_PRODUCT': return `Deleted product: ${d.name || d.productId}`;
+      case 'CREATE_REWARD': return `Created reward: ${d.name} (Cost: ${d.pointsCost} points)`;
+      case 'UPDATE_REWARD': return `Updated reward: ${d.name || d.rewardId}`;
+      case 'DELETE_REWARD': return `Deleted reward: ${d.name || d.rewardId}`;
+      case 'UPDATE_LOYALTY_CONFIG': return `Updated loyalty settings: ${Object.keys(d).join(', ')}`;
+      case 'UPDATE_PRODUCT_POINTS': return `Updated points for multiple products`;
+      case 'UPDATE_REDEMPTION_STATUS': return `Changed redemption status to '${d.status}'`;
+      case 'REGISTER_USER': return `Registered new user: ${d.username} (${d.email})`;
+      case 'ADMIN_LOGIN': return `Login successful`;
+      case 'CHANGE_PASSWORD': return `Changed password`;
+      case 'SYNC_MEMBERS': return `Synced members (Added: ${d.added}, Updated: ${d.updated})`;
+      case 'FIX_ROLES': return `Fixed roles for ${d.membersFixed} members and ${d.scansFixed} scans`;
+      case 'UPDATE_MEMBER_POINTS': return `Updated points for member ${d.memberId} (Points: ${d.points})`;
+      case 'UPDATE_USER': return `Updated user: ${d.updatedUserEmail} to role '${d.role}'`;
+      case 'RESET_USER_PASSWORD': return `Reset password for user: ${d.targetUserEmail}`;
+      case 'DELETE_USER': return `Deleted user: ${d.deletedUserEmail}`;
+      case 'CALCULATE_CASH_REWARDS': return `Calculated cash rewards for member ${d.memberId} (${d.year}-${d.month}) - Purchase: Rs. ${d.purchaseValue}, Reward: Rs. ${d.cashReward}`;
+      case 'PAY_CASH_REWARDS': return `Paid Rs. ${d.cashReward} cash rewards to member ${d.memberId} for ${d.year}-${d.month}`;
+      case 'GENERATE_QR_CODES': return `Generated ${d.count} QR codes for batch '${d.batchNo}'${d.productName ? ` (Product: ${d.productName})` : ''}`;
+      case 'BULK_GENERATE_QR_CODES': return `Generated ${d.count} QR codes in bulk for batch '${d.batchNo}'${d.productName ? ` (Product: ${d.productName})` : ''}`;
+      case 'UPDATE_QR_BATCH': return `Updated QR batch '${d.batchNo}'`;
+      case 'PRINT_QR_CODES': return `Queued ${d.count} QR codes for printing to ${d.printerModel}`;
+      case 'CREATE_REPRINT_REQUEST': return `Requested reprint of ${d.count} QR codes for batch '${d.batchNo}' (Reason: ${d.reason})`;
+      case 'REVIEW_REPRINT_REQUEST': return `Reviewed reprint request (Status: ${d.status})`;
+      case 'DELETE_REPRINT_REQUEST': return `Deleted reprint request`;
+      default: return 'System Action Performed';
+    }
+  };
+
   const [coAdminRequests, setCoAdminRequests] = useState([]);
   const [coAdminTabVal, setCoAdminTabVal] = useState(0);
   const [userLoginEmail, setUserLoginEmail] = useState('');
@@ -3605,22 +3803,18 @@ function App() {
         return;
       }
 
-      // Create backup
-      const backupData = {
-        version: '1.0',
-        timestamp: new Date().toISOString(),
-        data: {
-          scans: scanHistory,
-          products: products,
-          users: users.map(u => ({ ...u, password: undefined })) // Exclude passwords
-        }
-      };
+      // Fetch comprehensive backup from backend
+      const backupRes = await backupAPI.exportData();
+      if (!backupRes.data.success) {
+        throw new Error('Failed to fetch backup data from server');
+      }
       
+      const backupData = backupRes.data.data;
       const jsonContent = JSON.stringify(backupData, null, 2);
       const blob = new Blob([jsonContent], { type: 'application/json' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `megakem-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `megakem-full-backup-${new Date().toISOString().split('T')[0]}.json`;
       link.click();
       
       showNotification('Backup created successfully!', 'success', 3000);
@@ -3713,49 +3907,17 @@ function App() {
         return;
       }
 
-      // Restore scans to backend
-      let restoredItems = 0;
-      if (backupData.data.scans && Array.isArray(backupData.data.scans) && backupData.data.scans.length > 0) {
-        try {
-          // Send scans to backend using batch create
-          const scansToRestore = backupData.data.scans.map(scan => ({
-            memberName: scan.memberName,
-            memberId: scan.memberId,
-            phone: scan.phone || '',
-            role: scan.role,
-            productName: scan.productName,
-            productNo: scan.productNo,
-            batchNo: scan.batchNo,
-            bagNo: scan.bagNo,
-            qty: scan.qty,
-            price: scan.price,
-            location: scan.location,
-            timestamp: scan.timestamp
-          }));
-          
-          await scansAPI.createBatch(scansToRestore);
-          restoredItems = scansToRestore.length;
-          
-          // Reload scans from backend to get updated data
-          const scansRes = await scansAPI.getLive();
-          setScanHistory(scansRes.data.data);
-          
-          // Reload members to keep Members tab in sync
-          await reloadMembers();
-        } catch (error) {
-          console.error('Error restoring scans:', error);
-          showNotification('Failed to restore scans to database', 'error', 5000);
-          setLoading(false);
-          return;
-        }
+      // Restore entire database via backend API
+      const restoreRes = await backupAPI.importData(backupData);
+      
+      if (!restoreRes.data.success) {
+        throw new Error('Failed to restore backup to server');
       }
       
-      // Update frontend state for products (if backend endpoints exist)
-      if (backupData.data.products && Array.isArray(backupData.data.products)) {
-        setProducts(backupData.data.products);
-      }
-        
-      showNotification(`Backup restored successfully! (${restoredItems} scans from ${new Date(backupData.timestamp).toLocaleString()})`, 'success', 3000);
+      // Reload the page to ensure all frontend state syncs with the newly restored database
+      window.location.reload();
+      
+      showNotification(`Backup restored successfully from ${new Date(backupData.timestamp).toLocaleString()}`, 'success', 3000);
       addToActivityLog('Backup Restored', `Data restored from ${new Date(backupData.timestamp).toLocaleDateString()}`, 'warning');
       setRestorePasswordDialog({ open: false, password: '', file: null, backupData: null });
     } catch (error) {
@@ -8443,7 +8605,8 @@ function App() {
                         <TableCell>Module</TableCell>
                         <TableCell>Action</TableCell>
                         <TableCell>Performed By</TableCell>
-                        <TableCell>Details</TableCell>
+                        <TableCell>Summary</TableCell>
+                        <TableCell align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -8455,63 +8618,22 @@ function App() {
                           <TableCell>{log.performedBy ? `${log.performedBy.username} (${log.performedBy.email})` : 'System/Unknown'}</TableCell>
                           <TableCell>
                             <Box sx={{ maxHeight: 150, overflow: 'auto', fontSize: '0.85rem' }}>
-                              {(() => {
-                                try {
-                                  const d = log.details;
-                                  if (!d || Object.keys(d).length === 0) return '-';
-                                  
-                                  switch(log.action) {
-                                    case 'BULK_DELETE_QR_CODES': return `Deleted ${d.deletedCount} QR codes for batch '${d.batchNo}'`;
-                                    case 'DELETE_QR_CODES': return `Deleted ${d.deletedCount} individual QR codes`;
-                                    case 'CREATE_USER': return `Created user: ${d.username} (${d.email}) with role '${d.role}'`;
-                                    case 'CREATE_MEMBER': return `Created member: ${d.name} (${d.phone})`;
-                                    case 'UPDATE_MEMBER': return `Updated member: ${d.name || d.phone || d.memberId}`;
-                                    case 'DELETE_MEMBER': return `Deleted member: ${d.name || d.memberId}`;
-                                    case 'BULK_DELETE_MEMBERS': return `Deleted ${d.deletedCount} members`;
-                                    case 'CREATE_PRODUCT': return `Created product: ${d.name} (Points: ${d.points})`;
-                                    case 'UPDATE_PRODUCT': return `Updated product: ${d.name || d.productId}`;
-                                    case 'DELETE_PRODUCT': return `Deleted product: ${d.name || d.productId}`;
-                                    case 'CREATE_REWARD': return `Created reward: ${d.name} (Cost: ${d.pointsCost} points)`;
-                                    case 'UPDATE_REWARD': return `Updated reward: ${d.name || d.rewardId}`;
-                                    case 'DELETE_REWARD': return `Deleted reward: ${d.name || d.rewardId}`;
-                                    case 'UPDATE_LOYALTY_CONFIG': return `Updated loyalty settings: ${Object.keys(d).join(', ')}`;
-                                    case 'UPDATE_PRODUCT_POINTS': return `Updated points for multiple products`;
-                                    case 'UPDATE_REDEMPTION_STATUS': return `Changed redemption status to '${d.status}'`;
-                                    case 'REGISTER_USER': return `Registered new user: ${d.username} (${d.email})`;
-                                    case 'ADMIN_LOGIN': return `Login successful`;
-                                    case 'CHANGE_PASSWORD': return `Changed password`;
-                                    case 'SYNC_MEMBERS': return `Synced members (Added: ${d.added}, Updated: ${d.updated})`;
-                                    case 'FIX_ROLES': return `Fixed roles for ${d.membersFixed} members and ${d.scansFixed} scans`;
-                                    case 'UPDATE_MEMBER_POINTS': return `Updated points for member ${d.memberId} (Points: ${d.points})`;
-                                    case 'UPDATE_USER': return `Updated user: ${d.updatedUserEmail} to role '${d.role}'`;
-                                    case 'RESET_USER_PASSWORD': return `Reset password for user: ${d.targetUserEmail}`;
-                                    case 'DELETE_USER': return `Deleted user: ${d.deletedUserEmail}`;
-                                    case 'CALCULATE_CASH_REWARDS': return `Calculated cash rewards for member ${d.memberId} (${d.year}-${d.month}) - Purchase: Rs. ${d.purchaseValue}, Reward: Rs. ${d.cashReward}`;
-                                    case 'PAY_CASH_REWARDS': return `Paid Rs. ${d.cashReward} cash rewards to member ${d.memberId} for ${d.year}-${d.month}`;
-                                    case 'GENERATE_QR_CODES': return `Generated ${d.count} QR codes for batch '${d.batchNo}'`;
-                                    case 'BULK_GENERATE_QR_CODES': return `Generated ${d.count} QR codes in bulk for batch '${d.batchNo}'`;
-                                    case 'UPDATE_QR_BATCH': return `Updated QR batch '${d.batchNo}'`;
-                                    case 'PRINT_QR_CODES': return `Queued ${d.count} QR codes for printing to ${d.printerModel}`;
-                                    case 'CREATE_REPRINT_REQUEST': return `Requested reprint of ${d.count} QR codes for batch '${d.batchNo}' (Reason: ${d.reason})`;
-                                    case 'REVIEW_REPRINT_REQUEST': return `Reviewed reprint request (Status: ${d.status})`;
-                                    case 'DELETE_REPRINT_REQUEST': return `Deleted reprint request`;
-                                    default:
-                                      return (
-                                        <Box sx={{ p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
-                                          <pre style={{ margin: 0, fontSize: '0.75rem' }}>{JSON.stringify(d, null, 2)}</pre>
-                                        </Box>
-                                      );
-                                  }
-                                } catch (e) {
-                                  return JSON.stringify(log.details);
-                                }
-                              })()}
+                              {getAuditLogSummary(log)}
                             </Box>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Button 
+                              size="small" 
+                              variant="outlined" 
+                              onClick={() => setAuditLogDetailsDialog({ open: true, log })}
+                            >
+                              View
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
                       {auditLogs.length === 0 && (
-                        <TableRow><TableCell colSpan={5} align="center">No logs found matching your filters</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} align="center">No logs found matching your filters</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -8712,7 +8834,7 @@ function App() {
               )}
             </Box>
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-              <Table><TableHead><TableRow><TableCell>Product Name</TableCell><TableCell>Product Code</TableCell><TableCell>Pack Size</TableCell><TableCell>Price (LKR)</TableCell><TableCell>Loyalty Points</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
+              <Table><TableHead><TableRow><TableCell sx={{ width: 40 }} /><TableCell>Product Name</TableCell><TableCell>Product Code</TableCell><TableCell>Pack Size</TableCell><TableCell>Price (LKR)</TableCell><TableCell>Loyalty Points</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
                 <TableBody>
                   {(() => {
                     const filteredProducts = products.filter(p => 
@@ -8725,7 +8847,7 @@ function App() {
                     if (filteredProducts.length === 0) {
                       return (
                         <TableRow>
-                          <TableCell colSpan={6} align="center">
+                          <TableCell colSpan={7} align="center">
                             <Box sx={{ py: 4 }}>
                               <Typography variant='body1' color='text.secondary'>
                                 {products.length === 0 ? 'No products found. Click "Add Product" to create one.' : 'No products match your search.'}
@@ -8739,38 +8861,16 @@ function App() {
                       );
                     }
                     
-                    return filteredProducts.map(p => {
-                      // Calculate points display
-                      let pointsDisplay = 'Not Set';
-                      
-                      if (p.pointsPerProduct !== null && p.pointsPerProduct !== undefined) {
-                        pointsDisplay = `${p.pointsPerProduct} pts (Fixed)`;
-                      }
-                      
-                      return (
-                        <TableRow key={p._id}>
-                          <TableCell>{p.name}</TableCell>
-                          <TableCell>{p.productNo}</TableCell>
-                          <TableCell>{p.category}</TableCell>
-                          <TableCell>Rs. {p.price?.toLocaleString() || '0.00'}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={pointsDisplay} 
-                              size='small' 
-                              color={pointsDisplay === 'Not Set' ? 'default' : 'success'}
-                              icon={<EmojiEvents sx={{ fontSize: '0.9rem !important' }} />}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', gap: 0.5 }}>
-                              <IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Edit Product'><Edit /></IconButton>
-                              <IconButton size='small' color='primary' onClick={() => setProductPointsDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Configure Points'><EmojiEvents /></IconButton>
-                              <IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts') || !hasPermission('canDelete')} title='Delete Product'><Delete /></IconButton>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    });
+                    return filteredProducts.map(p => (
+                      <ProductRow 
+                        key={p._id} 
+                        p={p} 
+                        setProductDialog={setProductDialog} 
+                        setProductPointsDialog={setProductPointsDialog} 
+                        handleDeleteProduct={handleDeleteProduct} 
+                        hasPermission={hasPermission} 
+                      />
+                    ));
                   })()}
                 </TableBody>
               </Table>
@@ -9160,8 +9260,11 @@ function App() {
                               {applicatorTypeFilter === 'Hardware' ? (
                                 <>
                                   <TableCell>
-                                    <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
+                                    <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
                                       {applicator.name}
+                                      {applicator.lastScanDate && (new Date() - new Date(applicator.lastScanDate)) / (1000 * 60 * 60 * 24) > 45 && (
+                                        <Chip label="At Risk" size="small" color="error" sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} />
+                                      )}
                                     </Typography>
                                   </TableCell>
                                   <TableCell>
@@ -9202,8 +9305,11 @@ function App() {
                             </Avatar>
                                   </TableCell>
                                   <TableCell>
-                                    <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
+                                    <Typography variant='body2' fontWeight={600} sx={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
                                       {applicator.name}
+                                      {applicator.lastScanDate && (new Date() - new Date(applicator.lastScanDate)) / (1000 * 60 * 60 * 24) > 45 && (
+                                        <Chip label="At Risk" size="small" color="error" sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} />
+                                      )}
                                     </Typography>
                                   </TableCell>
                                   <TableCell>
@@ -9233,6 +9339,18 @@ function App() {
                               )}
                               <TableCell>
                                 <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <Tooltip title="Quick View">
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => {
+                                        setDrawerMember(applicator);
+                                        setDrawerOpen(true);
+                                      }}
+                                    >
+                                      <Visibility />
+                                    </IconButton>
+                                  </Tooltip>
                                   <Tooltip title='View Profile'>
                                     <IconButton
                                       size='small'
@@ -9748,6 +9866,35 @@ function App() {
                 label="Loyalty Program / QR Code Enabled"
                 sx={{ mt: 2 }}
               />
+
+
+              {/* Price History Section */}
+              {productDialog.product?.priceHistory && productDialog.product.priceHistory.length > 0 && (
+                <Box sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <Typography variant='subtitle2' sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <HistoryIcon color="action" fontSize="small" /> Price History
+                  </Typography>
+                  <List dense disablePadding>
+                    {productDialog.product.priceHistory.slice().reverse().map((hist, idx) => (
+                      <ListItem key={idx} divider={idx !== productDialog.product.priceHistory.length - 1} sx={{ px: 0 }}>
+                        <ListItemText 
+                          primary={
+                            <Typography variant="body2">
+                              Historical Price: <b>Rs. {hist.price?.toLocaleString()}</b>
+                            </Typography>
+                          }
+                          secondary={
+                            <React.Fragment>
+                              <Typography variant="caption" display="block">By {hist.changedBy?.username || 'Unknown'}</Typography>
+                              <Typography variant="caption" color="textSecondary">{new Date(hist.changedAt).toLocaleString()}</Typography>
+                            </React.Fragment>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
 
               {/* Promotional Campaign Section */}
               <Box sx={{ mt: 3, p: 2, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
@@ -13449,6 +13596,89 @@ function App() {
           </Box>
         </DialogActions>
       </Dialog>
+
+      {/* Audit Log Details Dialog */}
+      <Dialog 
+        open={auditLogDetailsDialog.open} 
+        onClose={() => setAuditLogDetailsDialog({ open: false, log: null })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Security color="primary" />
+            <Typography variant="h6">Audit Log Details</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {auditLogDetailsDialog.log && (
+            <Box>
+              <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 1 }}>Action Summary (What Happened)</Typography>
+              <Paper sx={{ p: 2, bgcolor: '#e3f2fd', borderLeft: '4px solid #2196f3', mb: 3 }}>
+                <Typography variant="body1" fontWeight="500">
+                  {getAuditLogSummary(auditLogDetailsDialog.log)}
+                </Typography>
+              </Paper>
+              
+              <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 1 }}>Advanced Details (Raw Data)</Typography>
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default' }}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.85rem' }}>
+                  {JSON.stringify(auditLogDetailsDialog.log.details, null, 2)}
+                </pre>
+              </Paper>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAuditLogDetailsDialog({ open: false, log: null })} variant="contained">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Quick-View Drawer */}
+      <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: { xs: '100vw', sm: 400 }, p: 3 }}>
+          {drawerMember && (
+            <>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">{drawerMember.name}</Typography>
+                <IconButton onClick={() => setDrawerOpen(false)}><Close /></IconButton>
+              </Box>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Member ID: {drawerMember.memberId}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Role: {drawerMember.role}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Points: {drawerMember.points}
+              </Typography>
+              {drawerMember.lastScanDate && (new Date() - new Date(drawerMember.lastScanDate)) / (1000 * 60 * 60 * 24) > 45 && (
+                <Chip label="At Risk (No recent scans)" color="error" size="small" sx={{ mb: 2 }} />
+              )}
+              
+              <Typography variant="subtitle1" sx={{ mt: 3, mb: 1, fontWeight: 'bold' }}>Monthly Points Trend</Typography>
+              <Box sx={{ width: '100%', height: 200 }}>
+                {drawerMember.monthlyPurchases && drawerMember.monthlyPurchases.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={drawerMember.monthlyPurchases}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" tick={{fontSize: 12}} />
+                      <YAxis tick={{fontSize: 12}} />
+                      <RechartsTooltip />
+                      <Line type="monotone" dataKey="pointsEarned" stroke="#0196d8" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">No purchase history available.</Typography>
+                )}
+              </Box>
+            </>
+          )}
+        </Box>
+      </Drawer>
+
     </Box></ThemeProvider>
   );
 }

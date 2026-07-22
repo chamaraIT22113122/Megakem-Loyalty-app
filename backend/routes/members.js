@@ -591,8 +591,12 @@ router.post('/', protect, [
       });
     }
 
-    let member = await Member.findOne({ memberId: memberId.toUpperCase().trim() });
+    const member = await Member.findOne({
+      $or: [{ nic }, { phone }, { whatsappNumber }]
+    });
+
     if (member) {
+      const oldState = member.toObject();
       if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator' && member.role !== 'customer') {
         return res.status(403).json({
           success: false,
@@ -619,12 +623,14 @@ router.post('/', protect, [
       member.updateTier(config.tierThresholds);
       await member.save();
 
+      const newState = member.toObject();
       await logAction(req, 'UPDATE_MEMBER', 'MEMBERS', {
         memberId: member._id,
         memberCode: member.memberId,
+        memberName: member.memberName,
         role: member.role,
         isMigrationUpdate: true
-      });
+      }, oldState, newState);
 
       return res.json({
         success: true,
@@ -706,6 +712,8 @@ router.put('/:id', protect, async (req, res) => {
         message: 'Member not found'
       });
     }
+    
+    const oldState = member.toObject();
 
     if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && member.role !== 'applicator' && member.role !== 'customer') {
       return res.status(403).json({
@@ -770,10 +778,12 @@ router.put('/:id', protect, async (req, res) => {
     await member.save();
 
     // Audit Log
+    const newState = member.toObject();
     await logAction(req, 'UPDATE_MEMBER', 'MEMBERS', {
       memberId: member._id,
-      memberCode: member.memberId
-    });
+      memberCode: member.memberId,
+      memberName: member.memberName
+    }, oldState, newState);
 
     res.json({
       success: true,

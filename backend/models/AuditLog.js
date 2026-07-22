@@ -15,6 +15,31 @@ const auditLogSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed,
     required: true
   },
+  oldState: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
+  newState: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
+  severity: {
+    type: String,
+    enum: ['LOW', 'MEDIUM', 'HIGH'],
+    default: 'LOW'
+  },
+  isAnomaly: {
+    type: Boolean,
+    default: false
+  },
+  hash: {
+    type: String,
+    index: true
+  },
+  previousHash: {
+    type: String,
+    index: true
+  },
   performedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -26,6 +51,10 @@ const auditLogSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
     index: true
+  },
+  requestData: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
   }
 }, {
   timestamps: true

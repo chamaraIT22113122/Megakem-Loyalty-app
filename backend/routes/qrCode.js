@@ -358,7 +358,7 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       qrCodes: inserted.map(q => ({ _id: q._id, qrId: q.qrId, qrLink: q.qrLink, batchNo: q.batchNo, packageNo: q.packageNo }))
     });
     
-    await logAction(req, 'BULK_GENERATE_QR_CODES', 'QR_CODES', { batchNo, count: inserted.length });
+    await logAction(req, 'BULK_GENERATE_QR_CODES', 'QR_CODES', { batchNo, count: inserted.length, productName: product.name, productNo: product.productNo });
   } catch (error) {
     console.error('Bulk QR generation error:', error);
     res.status(500).json({ error: error.message });
@@ -799,7 +799,7 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
       qrCodes: savedCodes
     });
     
-    await logAction(req, 'BULK_GENERATE_QR_CODES', 'QR_CODES', { batchNo, count: savedCodes.length });
+    await logAction(req, 'BULK_GENERATE_QR_CODES', 'QR_CODES', { batchNo, count: savedCodes.length, productName: product.name, productNo: product.productNo });
   } catch (error) {
     console.error('Bulk QR generation error:', error);
     res.status(500).json({ error: error.message });

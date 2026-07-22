@@ -192,9 +192,14 @@ export const redemptionsAPI = {
   updateStatus: (id, data) => api.put(`/redemptions/${id}/status`, data),
 };
 
-// Audit Logs API
 export const auditLogsAPI = {
   getAll: (params) => api.get('/audit-logs', { params }),
+  revert: (id) => api.post(`/audit-logs/${id}/revert`),
+};
+
+export const backupAPI = {
+  exportData: () => api.get('/backup/export'),
+  importData: (backupData) => api.post('/backup/import', { backupData })
 };
 
 export default api;

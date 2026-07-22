@@ -1003,4 +1003,60 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
+// @route   POST /api/auth/users/bulk-update
+// @desc    Update multiple users at once
+// @access  Private/Main Admin
+router.post('/users/bulk-update', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' || req.user.email !== 'admin@megakem.com') {
+      return res.status(403).json({ success: false, message: 'Only the main admin can perform bulk updates' });
+    }
+
+    const { userIds, updates } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide user IDs' });
+    }
+
+    // Do not allow updating the main admin through bulk actions
+    const mainAdmin = await User.findOne({ email: 'admin@megakem.com' });
+    const filteredIds = userIds.filter(id => id.toString() !== mainAdmin._id.toString());
+
+    await User.updateMany({ _id: { $in: filteredIds } }, { $set: updates });
+    await logAction(req, 'BULK_UPDATE_USERS', 'USERS', { updatedCount: filteredIds.length, updates });
+
+    res.json({ success: true, count: filteredIds.length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/auth/users/bulk-delete
+// @desc    Delete multiple users at once
+// @access  Private/Main Admin
+router.post('/users/bulk-delete', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' || req.user.email !== 'admin@megakem.com') {
+      return res.status(403).json({ success: false, message: 'Only the main admin can perform bulk deletes' });
+    }
+
+    const { userIds } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide user IDs' });
+    }
+
+    // Do not allow deleting the main admin
+    const mainAdmin = await User.findOne({ email: 'admin@megakem.com' });
+    const filteredIds = userIds.filter(id => id.toString() !== mainAdmin._id.toString());
+
+    await User.deleteMany({ _id: { $in: filteredIds } });
+    await logAction(req, 'BULK_DELETE_USERS', 'USERS', { deletedCount: filteredIds.length });
+
+    res.json({ success: true, count: filteredIds.length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

@@ -835,6 +835,129 @@ async function updateMemberFromScan(scan) {
   }
 }
 
+// @route   POST /api/scans/bulk-invalidate
+// @desc    Bulk invalidate scans (mark as fraud and subtract points)
+// @access  Private (Admin only)
+router.post('/bulk-invalidate', protect, hasPermission('canUpdate'), async (req, res) => {
+  try {
+    const { scanIds } = req.body;
+    if (!Array.isArray(scanIds) || scanIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Scan IDs array is required' });
+    }
+
+    const scans = await Scan.find({ _id: { $in: scanIds }, fraudFlag: false });
+    let count = 0;
+    
+    for (const scan of scans) {
+      scan.fraudFlag = true;
+      await scan.save();
+
+      const member = await Member.findOne({ memberId: scan.memberId.toUpperCase() });
+      if (member) {
+        member.points = Math.max(0, member.points - (scan.pointsEarned || scan.points || 0));
+        member.totalScans = Math.max(0, member.totalScans - 1);
+        
+        // Also update monthly and annual points logic
+        const scanDate = scan.timestamp || new Date();
+        const year = scanDate.getFullYear();
+        const month = scanDate.getMonth() + 1;
+        const scanPrice = scan.price || 0;
+        
+        // Negative points adjustment for monthly purchases
+        if (member.monthlyPurchases) {
+           const purchaseIndex = member.monthlyPurchases.findIndex(p => p.year === year && p.month === month);
+           if (purchaseIndex !== -1) {
+              const currentP = member.monthlyPurchases[purchaseIndex];
+              member.monthlyPurchases[purchaseIndex].pointsEarned = Math.max(0, (currentP.pointsEarned || 0) - (scan.pointsEarned || scan.points || 0));
+              member.monthlyPurchases[purchaseIndex].totalPurchaseValue = Math.max(0, (currentP.totalPurchaseValue || 0) - scanPrice);
+           }
+        }
+        
+        const config = await LoyaltyConfig.getConfig();
+        if (typeof member.updateTier === 'function') {
+           member.updateTier(config.tierThresholds);
+        }
+        if (typeof member.calculateAnnualPointsAndTier === 'function') {
+           member.calculateAnnualPointsAndTier(config.annualTiers);
+        }
+        
+        await member.save();
+      }
+      count++;
+    }
+
+    res.json({
+      success: true,
+      message: `${count} scans invalidated successfully`,
+      count
+    });
+  } catch (error) {
+    console.error('Bulk Invalidate Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+// @route   POST /api/scans/bulk-recalculate
+// @desc    Bulk recalculate scan points based on current loyalty rules
+// @access  Private (Admin only)
+router.post('/bulk-recalculate', protect, hasPermission('canUpdate'), async (req, res) => {
+  try {
+    const { scanIds } = req.body;
+    if (!Array.isArray(scanIds) || scanIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Scan IDs array is required' });
+    }
+
+    const scans = await Scan.find({ _id: { $in: scanIds }, fraudFlag: false });
+    let updatedCount = 0;
+    
+    for (const scan of scans) {
+       const calculatedPoints = await calculatePointsForScan(scan);
+       if (calculatedPoints !== scan.pointsEarned) {
+          const diff = calculatedPoints - (scan.pointsEarned || 0);
+          scan.points = calculatedPoints;
+          scan.pointsEarned = calculatedPoints;
+          await scan.save();
+
+          const member = await Member.findOne({ memberId: scan.memberId.toUpperCase() });
+          if (member) {
+             member.points = Math.max(0, member.points + diff);
+             
+             const scanDate = scan.timestamp || new Date();
+             const year = scanDate.getFullYear();
+             const month = scanDate.getMonth() + 1;
+             
+             if (member.monthlyPurchases) {
+                 const purchaseIndex = member.monthlyPurchases.findIndex(p => p.year === year && p.month === month);
+                 if (purchaseIndex !== -1) {
+                    const currentP = member.monthlyPurchases[purchaseIndex];
+                    member.monthlyPurchases[purchaseIndex].pointsEarned = Math.max(0, (currentP.pointsEarned || 0) + diff);
+                 }
+             }
+
+             const config = await LoyaltyConfig.getConfig();
+             if (typeof member.updateTier === 'function') {
+                member.updateTier(config.tierThresholds);
+             }
+             if (typeof member.calculateAnnualPointsAndTier === 'function') {
+                member.calculateAnnualPointsAndTier(config.annualTiers);
+             }
+             await member.save();
+          }
+          updatedCount++;
+       }
+    }
+
+    res.json({
+      success: true,
+      message: `${updatedCount} scans recalculated successfully`,
+      count: updatedCount
+    });
+  } catch (error) {
+    console.error('Bulk Recalculate Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
 // @route   POST /api/scans/sync-members
 // @desc    Sync members from all existing scans (one-time operation)
 // @access  Private/Admin
