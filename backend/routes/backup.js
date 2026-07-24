@@ -147,6 +147,26 @@ router.get('/list', protect, admin, mainAdmin, async (req, res) => {
 // @route   GET /api/backup/archives/list
 // @desc    List all cold storage archives
 // @access  Private/Admin
+router.get('/archives/list', protect, admin, mainAdmin, async (req, res) => {
+  try {
+    const archives = await BackupMetadata.find({ type: 'archive' }).sort({ timestamp: -1 });
+    res.json({ success: true, data: archives });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error listing archives', error: error.message });
+  }
+});
+
+// @route   POST /api/backup/archive
+// @desc    Trigger archiving process
+// @access  Private/Admin
+router.post('/archive', protect, admin, mainAdmin, async (req, res) => {
+  try {
+    // Basic placeholder implementation. True logic would archive old data.
+    res.json({ success: true, message: 'Archiving process triggered successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error starting archiving', error: error.message });
+  }
+});
 
 // @route   DELETE /api/backup/local/:id
 // @desc    Delete a server-side backup

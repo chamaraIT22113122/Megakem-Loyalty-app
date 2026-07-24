@@ -19,9 +19,21 @@ const uploadToGoogleDrive = async (filePath, fileName) => {
       return null;
     }
 
-    const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    let FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    
+    // Also try to get it from the database configuration if enabled
+    try {
+      const LoyaltyConfig = require('../models/LoyaltyConfig');
+      const config = await LoyaltyConfig.getConfig();
+      if (config && config.cloudSync && config.cloudSync.gcpEnabled && config.cloudSync.googleDriveFolderId) {
+        FOLDER_ID = config.cloudSync.googleDriveFolderId;
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not fetch LoyaltyConfig for Google Drive ID:', e.message);
+    }
+
     if (!FOLDER_ID) {
-      console.warn('⚠️ Google Drive Sync Skipped: GOOGLE_DRIVE_FOLDER_ID not set in .env.');
+      console.warn('⚠️ Google Drive Sync Skipped: GOOGLE_DRIVE_FOLDER_ID not set in .env and not configured in DB.');
       return null;
     }
 

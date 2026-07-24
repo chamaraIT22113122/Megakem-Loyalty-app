@@ -105,6 +105,10 @@ router.put('/config', protect, [
       config.autoBackup = { ...config.autoBackup, ...req.body.autoBackup };
     }
 
+    if (req.body.cloudSync) {
+      config.cloudSync = { ...config.cloudSync, ...req.body.cloudSync };
+    }
+
     await config.save();
 
     if (req.body.autoBackup) {
