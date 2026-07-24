@@ -91,6 +91,10 @@ router.post('/sync-loyalty-status', protect, hasPermission('canManageProducts'),
       updatedCount 
     });
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'products' });
+    }
+
     res.status(200).json({
       success: true,
       message: `Successfully updated loyalty status for ${updatedCount} products.`,
@@ -117,6 +121,10 @@ router.post('/', protect, hasPermission('canManageProducts'), async (req, res) =
       productName: product.name,
       productNo: product.productNo 
     });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'products' });
+    }
 
     res.status(201).json({
       success: true,
@@ -186,6 +194,10 @@ router.put('/:id', protect, hasPermission('canManageProducts'), async (req, res)
       updates: req.body 
     });
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'products' });
+    }
+
     res.json({
       success: true,
       data: product
@@ -222,6 +234,10 @@ router.delete('/:id', protect, hasPermission('canManageProducts'), hasPermission
 
     // Audit Log
     await logAction(req, 'DELETE_PRODUCT', 'PRODUCTS', productData);
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'products' });
+    }
 
     res.json({
       success: true,

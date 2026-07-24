@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { io } from 'socket.io-client';
 import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
@@ -576,6 +577,29 @@ function App() {
   useEffect(() => {
     localStorage.setItem('adminTab', adminTab);
   }, [adminTab]);
+
+  useEffect(() => {
+    let socket;
+    if (adminAuth) {
+      socket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
+        transports: ['websocket', 'polling']
+      });
+      socket.on('data_updated', (data) => {
+        console.log('Socket update received for:', data?.entity);
+        if (data && ['products', 'qr_codes', 'reprint_requests', 'users', 'scans'].includes(data.entity)) {
+          // Re-fetch the required data
+          loadAdminData();
+          if (data.entity === 'reprint_requests') {
+             loadPendingRequestsCount();
+             loadCoAdminRequests();
+          }
+        }
+      });
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [adminAuth]);
   const [dashboardStartDate, setDashboardStartDate] = useState('');
   const [dashboardEndDate, setDashboardEndDate] = useState('');
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);

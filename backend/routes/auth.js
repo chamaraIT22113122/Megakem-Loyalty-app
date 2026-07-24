@@ -82,6 +82,10 @@ router.post('/register', [
       email: user.email 
     });
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'users' });
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -758,6 +762,10 @@ router.put('/users/:id', protect, async (req, res) => {
 
     await logAction(req, 'UPDATE_USER', 'USERS', { updatedUserEmail: updatedUser.email, role: updatedUser.role });
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'users' });
+    }
+
     res.json({
       success: true,
       data: {
@@ -815,6 +823,10 @@ router.put('/users/:id/reset-password', protect, async (req, res) => {
     await user.save();
 
     await logAction(req, 'RESET_USER_PASSWORD', 'USERS', { targetUserEmail: user.email });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'users' });
+    }
 
     res.json({
       success: true,
@@ -880,6 +892,10 @@ router.put('/users/:id/points', protect, [
     user.updateTier();
     await user.save();
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'users' });
+    }
+
     res.json({
       success: true,
       data: {
@@ -931,6 +947,10 @@ router.delete('/users/:id', protect, async (req, res) => {
     await User.findByIdAndDelete(req.params.id);
 
     await logAction(req, 'DELETE_USER', 'USERS', { deletedUserEmail: user.email });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'users' });
+    }
 
     res.json({
       success: true,
@@ -1025,6 +1045,10 @@ router.post('/users/bulk-update', protect, async (req, res) => {
     await User.updateMany({ _id: { $in: filteredIds } }, { $set: updates });
     await logAction(req, 'BULK_UPDATE_USERS', 'USERS', { updatedCount: filteredIds.length, updates });
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'users' });
+    }
+
     res.json({ success: true, count: filteredIds.length });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1052,6 +1076,10 @@ router.post('/users/bulk-delete', protect, async (req, res) => {
 
     await User.deleteMany({ _id: { $in: filteredIds } });
     await logAction(req, 'BULK_DELETE_USERS', 'USERS', { deletedCount: filteredIds.length });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'users' });
+    }
 
     res.json({ success: true, count: filteredIds.length });
   } catch (error) {

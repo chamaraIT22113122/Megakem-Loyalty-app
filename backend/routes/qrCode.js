@@ -221,6 +221,12 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
       // Format batch to: [ProductNo] [BatchNo] [DateCode] [PackageNo]
       const formattedBatch = getFormattedBatch(product.productNo, batchNo, finalMfgDate, packageNo);
 
+      // Check if a QR code for this specific package already exists
+      const existingQR = await QRCodeModel.findOne({ product: productId, batchNo: formattedBatch });
+      if (existingQR) {
+        return res.status(400).json({ error: `A QR code for package ${packageNo || 'STD'} in batch ${batchNo} already exists.` });
+      }
+
       // Create unique QR ID - replace spaces with underscores for ID uniqueness
       const qrId = `${product.productNo}-${formattedBatch.replace(/\s+/g, '_')}-${packageNo || 'STD'}-${Date.now()}`;
       
@@ -267,6 +273,10 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
     });
     
     await logAction(req, 'GENERATE_QR_CODES', 'QR_CODES', { batchNo, count: generatedQRs.length });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'qr_codes' });
+    }
   } catch (error) {
     console.error('QR generation error:', error);
     res.status(500).json({ error: error.message });
@@ -324,6 +334,13 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
     for (let i = 0; i < qty; i++) {
       const packageNo = String(startIndex + i).padStart(4, '0');
       const formattedBatch = getFormattedBatch(product.productNo, batchNo, finalMfgDate, packageNo);
+
+      // Check if a QR code for this specific package already exists
+      const existingQR = await QRCodeModel.findOne({ product: productId, batchNo: formattedBatch });
+      if (existingQR) {
+        return res.status(400).json({ error: `A QR code for package ${packageNo} in batch ${batchNo} already exists. Please start from a different package number or check existing QR codes.` });
+      }
+
       const qrId = `${product.productNo}-${formattedBatch.replace(/\s+/g, '_')}-${packageNo}-${Date.now()}-${i}`;
       
       const sig = signQRLink(product.productNo, formattedBatch, packageNo);
@@ -359,6 +376,10 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
     });
     
     await logAction(req, 'BULK_GENERATE_QR_CODES', 'QR_CODES', { batchNo, count: inserted.length, productName: product.name, productNo: product.productNo });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'qr_codes' });
+    }
   } catch (error) {
     console.error('Bulk QR generation error:', error);
     res.status(500).json({ error: error.message });
@@ -386,6 +407,10 @@ router.put('/batches/:batchNo', protect, qrAdmin, async (req, res) => {
     );
 
     await logAction(req, 'UPDATE_QR_BATCH', 'QR_CODES', { batchNo, updateData });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'qr_codes' });
+    }
 
     res.json({ message: 'Batch updated successfully', updated: result.modifiedCount });
   } catch (error) {
@@ -614,6 +639,10 @@ router.put('/mark-printed', protect, qrAdmin, async (req, res) => {
       }
     );
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'qr_codes' });
+    }
+
     res.json({
       message: `Marked ${updated.modifiedCount} QR codes as printed`,
       updated: updated.modifiedCount
@@ -635,6 +664,10 @@ router.delete('/', protect, qrAdmin, hasPermission('canDelete'), async (req, res
       const escapedBatchNo = batchNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const deleted = await QRCodeModel.deleteMany({ batchNo: { $regex: new RegExp(`^${escapedBatchNo}`, 'i') } });
       await logAction(req, 'BULK_DELETE_QR_CODES', 'QR_CODES', { batchNo, deletedCount: deleted.deletedCount });
+      
+      if (req.io) {
+        req.io.emit('data_updated', { entity: 'qr_codes' });
+      }
       return res.json({
         message: `Deleted ${deleted.deletedCount} QR codes for batch ${batchNo}`,
         deleted: deleted.deletedCount
@@ -648,6 +681,10 @@ router.delete('/', protect, qrAdmin, hasPermission('canDelete'), async (req, res
     const deleted = await QRCodeModel.deleteMany({ _id: { $in: qrIds } });
 
     await logAction(req, 'DELETE_QR_CODES', 'QR_CODES', { count: qrIds.length, deletedCount: deleted.deletedCount });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'qr_codes' });
+    }
 
     res.json({
       message: `Deleted ${deleted.deletedCount} QR codes`,
@@ -1026,6 +1063,10 @@ router.post('/reprint-requests', protect, qrAdmin, async (req, res) => {
     
     await logAction(req, 'CREATE_REPRINT_REQUEST', 'QR_CODES', { count: idsToCreate.length });
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'reprint_requests' });
+    }
+
     res.json({
       success: true,
       message: `Successfully created ${idsToCreate.length} reprint requests`,
@@ -1077,6 +1118,10 @@ router.put('/reprint-requests/:id/approve', protect, hasPermission('canManageCoA
 
     await logAction(req, 'REVIEW_REPRINT_REQUEST', 'QR_CODES', { requestId: updatedRequest._id, status });
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'reprint_requests' });
+    }
+
     res.json({
       success: true,
       data: updatedRequest
@@ -1098,6 +1143,11 @@ router.put('/reprint-requests/:id/reject', protect, hasPermission('canManageCoAd
 
     request.status = 'rejected';
     await request.save();
+    
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'reprint_requests' });
+    }
+    
     res.json({ success: true, data: request });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1116,6 +1166,10 @@ router.delete('/reprint-requests/:id', protect, hasPermission('canManageCoAdminR
     await request.deleteOne();
 
     await logAction(req, 'DELETE_REPRINT_REQUEST', 'QR_CODES', { requestId: req.params.id });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'reprint_requests' });
+    }
 
     res.json({
       success: true,
@@ -1138,6 +1192,10 @@ router.post('/reprint-requests/consume', protect, qrAdmin, async (req, res) => {
       { qrCode: { $in: qrIds }, status: 'approved' },
       { status: 'completed' }
     );
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'reprint_requests' });
+    }
 
     res.json({ success: true });
   } catch (error) {

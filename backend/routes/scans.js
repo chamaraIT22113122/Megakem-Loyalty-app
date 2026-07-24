@@ -352,6 +352,8 @@ router.post('/', optionalAuth, async (req, res) => {
     // Emit real-time WebSocket event
     if (req.io) {
       req.io.emit('new_scan', scan);
+      req.io.emit('data_updated', { entity: 'scans' });
+      req.io.emit('data_updated', { entity: 'users' });
     }
 
     if (req.user) {
@@ -509,6 +511,11 @@ router.post('/batch', optionalAuth, async (req, res) => {
       }
     }
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'scans' });
+      req.io.emit('data_updated', { entity: 'users' });
+    }
+
     res.status(201).json({
       success: true,
       count: createdScans.length,
@@ -571,6 +578,11 @@ router.delete('/:id', protect, hasPermission('canDelete'), async (req, res) => {
         member.updateTier(config.tierThresholds);
       }
       await member.save();
+    }
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'scans' });
+      req.io.emit('data_updated', { entity: 'users' });
     }
 
     res.json({

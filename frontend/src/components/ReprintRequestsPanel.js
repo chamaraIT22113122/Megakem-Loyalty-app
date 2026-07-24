@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import {
   Box,
   Button,
@@ -55,6 +56,22 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
 
   useEffect(() => {
     loadRequests();
+    let socket;
+    try {
+      socket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
+        transports: ['websocket', 'polling']
+      });
+      socket.on('data_updated', (data) => {
+        if (data && data.entity === 'reprint_requests') {
+          loadRequests();
+        }
+      });
+    } catch (err) {
+      console.warn('Socket init failed:', err);
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
   }, []);
 
   const handleApprove = async (id) => {

@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps, no-loop-func */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { io } from 'socket.io-client';
 import {
   Box,
   Button,
@@ -555,6 +556,23 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   // Fetch data on mount
   useEffect(() => {
     loadData();
+    let socket;
+    try {
+      socket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
+        transports: ['websocket', 'polling']
+      });
+      socket.on('data_updated', (data) => {
+        if (data && ['qr_codes', 'reprint_requests', 'products'].includes(data.entity)) {
+          loadData();
+          loadQRCodes();
+        }
+      });
+    } catch (err) {
+      console.warn('Socket initialization failed:', err);
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
   }, []);
 
   const loadData = async () => {
