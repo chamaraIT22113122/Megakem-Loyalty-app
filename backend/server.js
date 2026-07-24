@@ -10,7 +10,7 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
 const User = require('./models/User');
 const Product = require('./models/Product');
-const { performBackup } = require('./scripts/autoBackup');
+const { initScheduler } = require('./utils/scheduler');
 const { restoreBackup } = require('./scripts/restoreBackup');
 const { checkAndResetPoints } = require('./scripts/pointsReset');
 const seedPoints = require('./scripts/seedPoints');
@@ -141,11 +141,8 @@ const initializeApp = async () => {
   }
 };
 
-// Schedule daily backup at midnight (0 0 * * *)
-cron.schedule('0 0 * * *', () => {
-  performBackup();
-  checkAndResetPoints();
-});
+// Initialize automated backups and scheduled tasks
+initScheduler();
 
 // Middleware
 const allowedOrigins = [

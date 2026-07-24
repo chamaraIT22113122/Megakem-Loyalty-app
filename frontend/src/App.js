@@ -13,6 +13,7 @@ import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import SriLankaZoneMap from './components/SriLankaZoneMap';
 import IDCardInteractivePreview from './components/IDCardInteractivePreview';
+import DataManagement from './components/DataManagement';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
@@ -9690,7 +9691,15 @@ function App() {
               </Box>
             </Box></CardContent></Card></Grid>
             
-            {isMainAdmin() && <Grid item xs={12}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>💾 Data Management</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>Backup and restore your application data</Typography><Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}><Button variant='contained' startIcon={<GetApp />} onClick={handleBackupData} disabled={loading} sx={{ minWidth: 150 }}>Create Backup</Button><Button variant='outlined' component='label' startIcon={<Refresh />} disabled={loading} sx={{ minWidth: 150 }}>Restore Backup<input type='file' accept='.json' hidden onChange={handleRestoreData} /></Button></Box><Typography variant='caption' color='text.secondary' sx={{ mt: 2, display: 'block' }}>Backup includes all scans, products, and user data (excluding passwords)</Typography></CardContent></Card></Grid>}
+            {isMainAdmin() && (
+              <Grid item xs={12}>
+                <DataManagement 
+                  showNotification={showNotification} 
+                  addToActivityLog={addToActivityLog} 
+                  isMainAdmin={isMainAdmin()} 
+                />
+              </Grid>
+            )}
           </Grid>}
 
           <Dialog open={backupPasswordDialog.open} onClose={() => setBackupPasswordDialog({ open: false, password: '' })} maxWidth='xs' fullWidth>

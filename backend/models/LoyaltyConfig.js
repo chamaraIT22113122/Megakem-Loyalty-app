@@ -132,6 +132,57 @@ const loyaltyConfigSchema = new mongoose.Schema({
   idCardDefaultConfig: {
     type: Object,
     default: null
+  },
+  // Auto Backup Configuration
+  autoBackup: {
+    enabled: {
+      type: Boolean,
+      default: true
+    },
+    frequency: {
+      type: String,
+      enum: ['daily', 'weekly', 'monthly'],
+      default: 'daily'
+    },
+    retentionDays: {
+      type: Number,
+      default: 30,
+      min: 1
+    }
+  },
+  // Advanced Archiving (Cold Storage)
+  archiving: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    thresholdMonths: {
+      type: Number,
+      default: 12,
+      min: 1
+    }
+  },
+  // Advanced Compression settings
+  compression: {
+    enabled: {
+      type: Boolean,
+      default: true
+    }
+  },
+  // Advanced Cloud Sync settings (Mock/Stub)
+  cloudSync: {
+    awsEnabled: {
+      type: Boolean,
+      default: false
+    },
+    gcpEnabled: {
+      type: Boolean,
+      default: false
+    },
+    googleDriveFolderId: {
+      type: String,
+      default: ''
+    }
   }
 }, {
   timestamps: true

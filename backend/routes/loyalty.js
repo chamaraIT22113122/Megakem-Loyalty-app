@@ -5,6 +5,7 @@ const LoyaltyConfig = require('../models/LoyaltyConfig');
 const Product = require('../models/Product');
 const { protect } = require('../middleware/auth');
 const { logAction } = require('../middleware/audit');
+const { updateBackupSchedule } = require('../utils/scheduler');
 
 // @route   GET /api/loyalty/config
 // @desc    Get loyalty configuration
@@ -47,7 +48,10 @@ router.put('/config', protect, [
   body('pointsCalculation.priceDivisor').optional().isFloat({ min: 1 }),
   body('pointsCalculation.applicatorBonus').optional().isFloat({ min: 0, max: 1 }),
   body('pointsReset.intervalMonths').optional().isInt({ min: 0 }),
-  body('pointsReset.resetDay').optional().isInt({ min: 1, max: 28 })
+  body('pointsReset.resetDay').optional().isInt({ min: 1, max: 28 }),
+  body('autoBackup.enabled').optional().isBoolean(),
+  body('autoBackup.frequency').optional().isIn(['daily', 'weekly', 'monthly']),
+  body('autoBackup.retentionDays').optional().isInt({ min: 1 })
 ], async (req, res) => {
   try {
     if (req.user.role !== 'admin' && !(req.user.role === 'co-admin' && req.user.permissions?.canManageProducts === true)) {
@@ -96,8 +100,17 @@ router.put('/config', protect, [
       config.idCardDefaultConfig = req.body.idCardDefaultConfig;
       config.markModified('idCardDefaultConfig');
     }
+    
+    if (req.body.autoBackup) {
+      config.autoBackup = { ...config.autoBackup, ...req.body.autoBackup };
+    }
 
     await config.save();
+
+    if (req.body.autoBackup) {
+      // Reload cron job if auto backup settings were modified
+      updateBackupSchedule();
+    }
 
     await logAction(req, 'UPDATE_LOYALTY_CONFIG', 'SETTINGS', req.body);
 

@@ -198,8 +198,16 @@ export const auditLogsAPI = {
 };
 
 export const backupAPI = {
-  exportData: () => api.get('/backup/export'),
-  importData: (backupData) => api.post('/backup/import', { backupData })
+  exportData: (collections) => api.get('/backup/export', { params: collections ? { collections: collections.join(',') } : {} }),
+  createLocalBackup: (collections, compression = true) => api.post('/backup/create-local', { collections, compression }),
+  listBackups: () => api.get('/backup/list'),
+  deleteBackup: (id) => api.delete(`/backup/local/${id}`),
+  downloadBackup: (id) => api.get(`/backup/download/${id}`, { responseType: 'blob' }),
+  importData: (backupData, encryptedString = null, merge = false, selectedCollections = null) => api.post('/backup/import', { backupData, encryptedString, merge, selectedCollections }),
+  restoreFromServer: (id, merge = false, selectedCollections = null) => api.post(`/backup/restore-from-server/${id}`, { merge, selectedCollections }),
+  getStats: () => api.get('/backup/stats'),
+  listArchives: () => api.get('/backup/archives/list'),
+  triggerArchive: (thresholdMonths) => api.post('/backup/archive', { thresholdMonths })
 };
 
 export default api;

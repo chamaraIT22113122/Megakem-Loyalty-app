@@ -33,6 +33,49 @@ if (!fs.existsSync(BACKUP_DIR)) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
+const { google } = require('googleapis');
+
+/**
+ * Upload to Google Drive using a Service Account
+ */
+async function uploadToGoogleDrive(filePath, fileName, folderId) {
+  try {
+    const keyPath = path.join(__dirname, '../config/google-service-account.json');
+    if (!fs.existsSync(keyPath)) {
+      console.log('⚠️  Google Drive upload skipped: Missing google-service-account.json in config folder.');
+      return;
+    }
+
+    const auth = new google.auth.GoogleAuth({
+      keyFile: keyPath,
+      scopes: ['https://www.googleapis.com/auth/drive.file'],
+    });
+
+    const drive = google.drive({ version: 'v3', auth });
+
+    const fileMetadata = {
+      name: fileName,
+      parents: [folderId] // ID of the folder where to upload
+    };
+
+    const media = {
+      mimeType: 'application/octet-stream',
+      body: fs.createReadStream(filePath)
+    };
+
+    console.log(`☁️ Uploading ${fileName} to Google Drive...`);
+    const file = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: 'id'
+    });
+    
+    console.log(`✅ Successfully uploaded backup to Google Drive with File ID: ${file.data.id}`);
+  } catch (error) {
+    console.error('❌ Failed to upload backup to Google Drive:', error.message);
+  }
+}
+
 /**
  * Perform a full database backup to JSON (Encrypted)
  */
@@ -43,6 +86,11 @@ const performBackup = async () => {
   try {
     connection = await mongoose.connect(process.env.MONGODB_URI);
     const db = mongoose.connection.db;
+    
+    // Load config from the database
+    const LoyaltyConfig = require('../models/LoyaltyConfig');
+    const config = await LoyaltyConfig.getConfig();
+    
     const collections = await db.listCollections().toArray();
     const backupData = {
       timestamp: new Date().toISOString(),
@@ -70,8 +118,10 @@ const performBackup = async () => {
     // Cleanup old backups (keep last 7 days)
     cleanupOldBackups();
 
-    // NOTE: In a real production environment, you would upload this file to S3/Cloud Storage here.
-    // Example: await uploadToS3(filePath, fileName);
+    // Upload to Google Drive if enabled
+    if (config.cloudSync && config.cloudSync.gcpEnabled && config.cloudSync.googleDriveFolderId) {
+      await uploadToGoogleDrive(filePath, fileName, config.cloudSync.googleDriveFolderId);
+    }
 
   } catch (error) {
     console.error('❌ Backup failed:', error.message);

@@ -148,66 +148,68 @@ router.get('/daily-report', protect, hasPermission('canViewDashboard'), async (r
     const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
     const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
 
-    // Get all scans for the day
+    // Get all scans for the day (to return as a list if needed)
     const dailyScans = await Scan.find({
       timestamp: { $gte: startOfDay, $lte: endOfDay }
     }).sort({ timestamp: -1 });
 
-    // Calculate statistics
-    const totalScans = dailyScans.length;
-    const uniqueMembers = new Set(dailyScans.map(s => s.memberId)).size;
-    const uniqueProducts = new Set(dailyScans.map(s => s.productNo)).size;
-
-    // Scans by role
-    const roleBreakdown = dailyScans.reduce((acc, scan) => {
-      acc[scan.role] = (acc[scan.role] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Top products for the day
-    const productStats = dailyScans.reduce((acc, scan) => {
-      const key = scan.productNo;
-      if (!acc[key]) {
-        acc[key] = {
-          productNo: scan.productNo,
-          productName: scan.productName,
-          count: 0
-        };
+    // Calculate statistics using MongoDB Aggregation Pipeline for max performance
+    const [reportStats] = await Scan.aggregate([
+      { $match: { timestamp: { $gte: startOfDay, $lte: endOfDay } } },
+      {
+        $facet: {
+          basicStats: [
+            { $group: {
+                _id: null,
+                totalScans: { $sum: 1 },
+                uniqueMembers: { $addToSet: '$memberId' },
+                uniqueProducts: { $addToSet: '$productNo' }
+            }}
+          ],
+          roleBreakdown: [
+            { $group: { _id: '$role', count: { $sum: 1 } } }
+          ],
+          topProducts: [
+            { $group: { _id: { no: '$productNo', name: '$productName' }, count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 10 }
+          ],
+          hourlyDistribution: [
+            { $group: { _id: { $hour: '$timestamp' }, count: { $sum: 1 } } }
+          ],
+          topMembers: [
+            { $group: { _id: { id: '$memberId', name: '$memberName', role: '$role', location: '$location' }, count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 5 }
+          ]
+        }
       }
-      acc[key].count++;
-      return acc;
-    }, {});
+    ]);
 
-    const topProducts = Object.values(productStats)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+    const basic = reportStats.basicStats[0] || { totalScans: 0, uniqueMembers: [], uniqueProducts: [] };
+    const totalScans = basic.totalScans;
+    const uniqueMembers = basic.uniqueMembers.length;
+    const uniqueProducts = basic.uniqueProducts.length;
 
-    // Hourly distribution
-    const hourlyDistribution = dailyScans.reduce((acc, scan) => {
-      const hour = new Date(scan.timestamp).getHours();
-      acc[hour] = (acc[hour] || 0) + 1;
-      return acc;
-    }, {});
+    const roleBreakdown = {};
+    reportStats.roleBreakdown.forEach(r => { if(r._id) roleBreakdown[r._id] = r.count; });
 
-    // Top members/locations
-    const memberStats = dailyScans.reduce((acc, scan) => {
-      const key = scan.memberId;
-      if (!acc[key]) {
-        acc[key] = {
-          memberId: scan.memberId,
-          memberName: scan.memberName,
-          role: scan.role,
-          location: scan.location,
-          count: 0
-        };
-      }
-      acc[key].count++;
-      return acc;
-    }, {});
+    const topProducts = reportStats.topProducts.map(p => ({
+      productNo: p._id.no,
+      productName: p._id.name,
+      count: p.count
+    }));
 
-    const topMembers = Object.values(memberStats)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    const hourlyDistribution = {};
+    reportStats.hourlyDistribution.forEach(h => { hourlyDistribution[h._id] = h.count; });
+
+    const topMembers = reportStats.topMembers.map(m => ({
+      memberId: m._id.id,
+      memberName: m._id.name,
+      role: m._id.role,
+      location: m._id.location,
+      count: m.count
+    }));
 
     res.json({
       success: true,
@@ -244,39 +246,28 @@ router.get('/calendar-data', protect, hasPermission('canViewDashboard'), async (
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-    // Get all scans for the month
-    const monthScans = await Scan.find({
-      timestamp: { $gte: startDate, $lte: endDate }
-    });
-
-    // Group by day
-    const dailySummary = monthScans.reduce((acc, scan) => {
-      const day = new Date(scan.timestamp).getDate();
-      if (!acc[day]) {
-        acc[day] = {
-          date: day,
-          scans: 0,
-          uniqueMembers: new Set(),
-          uniqueProducts: new Set()
-        };
-      }
-      acc[day].scans++;
-      acc[day].uniqueMembers.add(scan.memberId);
-      acc[day].uniqueProducts.add(scan.productNo);
-      return acc;
-    }, {});
-
-    // Convert sets to counts
-    const formattedData = Object.entries(dailySummary).map(([day, data]) => ({
-      date: parseInt(day),
-      scans: data.scans,
-      uniqueMembers: data.uniqueMembers.size,
-      uniqueProducts: data.uniqueProducts.size
-    }));
+    // Use Aggregation Pipeline to process calendar stats natively in MongoDB
+    const monthSummary = await Scan.aggregate([
+      { $match: { timestamp: { $gte: startDate, $lte: endDate } } },
+      { $group: {
+          _id: { $dayOfMonth: '$timestamp' },
+          scans: { $sum: 1 },
+          uniqueMembers: { $addToSet: '$memberId' },
+          uniqueProducts: { $addToSet: '$productNo' }
+      }},
+      { $project: {
+          date: '$_id',
+          scans: 1,
+          uniqueMembers: { $size: '$uniqueMembers' },
+          uniqueProducts: { $size: '$uniqueProducts' },
+          _id: 0
+      }},
+      { $sort: { date: 1 } }
+    ]);
 
     res.json({
       success: true,
-      data: formattedData
+      data: monthSummary
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
