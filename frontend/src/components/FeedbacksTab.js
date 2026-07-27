@@ -389,10 +389,15 @@ const FeedbacksTab = () => {
           
           {selectedGallery.images.length > 0 && (
             <img 
-              src={selectedGallery.images[selectedGallery.index]?.startsWith('http') 
-                ? selectedGallery.images[selectedGallery.index] 
-                : `${API_BASE_URL.replace(/\/api$/, '')}${selectedGallery.images[selectedGallery.index]?.startsWith('/') ? '' : '/'}${selectedGallery.images[selectedGallery.index]}`
-              } 
+              src={(() => {
+                const src = selectedGallery.images[selectedGallery.index];
+                if (!src) return '';
+                const isExternal = src.startsWith('http');
+                const originalImgUrl = isExternal ? src : `${API_BASE_URL.replace(/\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
+                return isExternal && !src.includes(API_BASE_URL)
+                  ? `${API_BASE_URL}/upload/proxy?url=${encodeURIComponent(originalImgUrl)}`
+                  : originalImgUrl;
+              })()} 
               alt="Feedback" 
               style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 4 }} 
             />
