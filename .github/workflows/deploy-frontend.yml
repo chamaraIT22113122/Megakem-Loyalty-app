@@ -32,9 +32,11 @@ jobs:
       run: npm install --legacy-peer-deps
 
     - name: Set Environment Variables & Build
+      env:
+        CI: 'false'
       run: |
         echo "REACT_APP_API_URL=https://megakem-loyalty-app.onrender.com/api" > .env
-        CI=false npm run build
+        npm run build
 
     - name: Create .htaccess for React Router
       run: |
