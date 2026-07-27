@@ -11,15 +11,15 @@ require('dotenv').config();
  */
 const uploadToGoogleDrive = async (filePath, fileName) => {
   try {
-    const KEY_PATH = path.join(__dirname, '../google-credentials.json');
+    const KEY_PATH = path.join(__dirname, '../config/google-service-account.json');
     
     // Check if credentials file exists
     if (!fs.existsSync(KEY_PATH)) {
-      console.warn('⚠️ Google Drive Sync Skipped: google-credentials.json not found.');
+      console.warn('⚠️ Google Drive Sync Skipped: google-service-account.json not found.');
       return null;
     }
 
-    let FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    let FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID_BACKUPS || process.env.GOOGLE_DRIVE_FOLDER_ID;
     
     // Also try to get it from the database configuration if enabled
     try {
@@ -33,14 +33,14 @@ const uploadToGoogleDrive = async (filePath, fileName) => {
     }
 
     if (!FOLDER_ID) {
-      console.warn('⚠️ Google Drive Sync Skipped: GOOGLE_DRIVE_FOLDER_ID not set in .env and not configured in DB.');
+      console.warn('⚠️ Google Drive Sync Skipped: GOOGLE_DRIVE_FOLDER_ID_BACKUPS not set in .env and not configured in DB.');
       return null;
     }
 
     // Authenticate
     const auth = new google.auth.GoogleAuth({
       keyFile: KEY_PATH,
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
+      scopes: ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive'],
     });
 
     const drive = google.drive({ version: 'v3', auth });
@@ -73,6 +73,77 @@ const uploadToGoogleDrive = async (filePath, fileName) => {
   }
 };
 
+/**
+ * Uploads an image to Google Drive, makes it public, and returns the shareable link.
+ * @param {string} filePath - Absolute path to the local file to upload.
+ * @param {string} fileName - Name of the file as it should appear in Google Drive.
+ * @param {string} mimeType - MIME type of the file.
+ * @returns {Promise<Object|null>} - Returns { id, webViewLink, webContentLink } or null if fails.
+ */
+const uploadImageToGoogleDrive = async (filePath, fileName, mimeType = 'image/jpeg') => {
+  try {
+    const KEY_PATH = path.join(__dirname, '../config/google-service-account.json');
+    
+    if (!fs.existsSync(KEY_PATH)) {
+      console.warn('⚠️ Google Drive Upload Skipped: google-service-account.json not found.');
+      return null;
+    }
+
+    let FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID_FEEDBACK_IMAGES || process.env.GOOGLE_DRIVE_FOLDER_ID;
+    if (!FOLDER_ID) {
+      console.warn('⚠️ Google Drive Upload Skipped: GOOGLE_DRIVE_FOLDER_ID_FEEDBACK_IMAGES not set.');
+      return null;
+    }
+
+    const auth = new google.auth.GoogleAuth({
+      keyFile: KEY_PATH,
+      scopes: ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive'],
+    });
+
+    const drive = google.drive({ version: 'v3', auth });
+
+    const fileMetadata = {
+      name: fileName,
+      parents: [FOLDER_ID]
+    };
+
+    const media = {
+      mimeType: mimeType,
+      body: fs.createReadStream(filePath)
+    };
+
+    console.log(`☁️ Uploading image ${fileName} to Google Drive...`);
+    const file = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: 'id, name, webViewLink, webContentLink'
+    });
+
+    // Make the file publicly accessible
+    await drive.permissions.create({
+      fileId: file.data.id,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
+
+    // Fetch the file again to get the updated links after changing permissions
+    const result = await drive.files.get({
+      fileId: file.data.id,
+      fields: 'id, name, webViewLink, webContentLink'
+    });
+
+    console.log(`✅ Successfully uploaded and shared ${fileName} (URL: ${result.data.webViewLink})`);
+    return result.data;
+
+  } catch (error) {
+    console.error('❌ Failed to upload image to Google Drive:', error.message);
+    return null;
+  }
+};
+
 module.exports = {
-  uploadToGoogleDrive
+  uploadToGoogleDrive,
+  uploadImageToGoogleDrive
 };

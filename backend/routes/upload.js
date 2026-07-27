@@ -41,21 +41,42 @@ const upload = multer({
 // @route   POST /api/upload
 // @desc    Upload an image
 // @access  Private (You can add protect middleware if needed)
-router.post('/', upload.single('image'), (req, res) => {
+router.post('/', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Please upload a file' });
     }
     
-    // Return the path that will be used to access the image statically
-    // e.g. /uploads/photo-12345.jpg
-    const imageUrl = `/uploads/${req.file.filename}`;
+    // Import Google Drive upload utility
+    const { uploadImageToGoogleDrive } = require('../utils/googleDriveUpload');
+    
+    // Upload the file to Google Drive
+    const driveResult = await uploadImageToGoogleDrive(
+      req.file.path, 
+      req.file.filename,
+      req.file.mimetype
+    );
+    
+    let imageUrl = `/uploads/${req.file.filename}`; // Fallback to local URL
+    let isDriveUrl = false;
+    
+    if (driveResult && driveResult.id) {
+      // Use the direct viewing URL format for Google Drive images
+      imageUrl = `https://drive.google.com/uc?export=view&id=${driveResult.id}`;
+      isDriveUrl = true;
+      
+      // Optional: Delete the local file after successful upload to Drive
+      // fs.unlink(req.file.path, (err) => {
+      //   if (err) console.error('Error deleting local file after Drive upload:', err);
+      // });
+    }
     
     res.status(200).json({
       success: true,
       data: {
         url: imageUrl,
-        filename: req.file.filename
+        filename: req.file.filename,
+        isDriveUrl
       }
     });
   } catch (error) {
