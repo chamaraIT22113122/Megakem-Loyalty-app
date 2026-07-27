@@ -8,7 +8,7 @@ import {
 import { Delete, Image as ImageIcon, ArrowBackIos, ArrowForwardIos, Save, Email, PictureAsPdf } from '@mui/icons-material';
 import { feedbackAPI, API_BASE_URL } from '../services/api';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import pdfTemplateUrl from '../assets/Megakem_Rewards_feedback_Template.pdf';
+// Removed import of pdfTemplateUrl from assets
 
 const FeedbacksTab = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -93,8 +93,12 @@ const FeedbacksTab = () => {
     try {
       setSnackbar({ open: true, msg: 'Generating PDF...', type: 'info' });
       
-      // Load template
-      const templateBytes = await fetch(pdfTemplateUrl).then(res => res.arrayBuffer());
+      // Load template from public folder
+      const pdfTemplateUrl = process.env.PUBLIC_URL + '/Megakem_Rewards_feedback_Template.pdf';
+      const templateBytes = await fetch(pdfTemplateUrl).then(res => {
+        if (!res.ok) throw new Error(`Template fetch failed with status: ${res.status}`);
+        return res.arrayBuffer();
+      });
       const pdfDoc = await PDFDocument.load(templateBytes);
       
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
