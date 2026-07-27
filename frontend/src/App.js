@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars, no-loop-func */
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider, Collapse, Drawer } from '@mui/material';
+import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, Menu, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider, Collapse, Drawer } from '@mui/material';
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay, KeyboardArrowDown, KeyboardArrowUp, Feedback as FeedbackIcon } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -741,6 +741,7 @@ function App() {
   const [pendingFeedbacksCount, setPendingFeedbacksCount] = useState(0);
   const [coAdminApprovedCount, setCoAdminApprovedCount] = useState(0);
   const [coAdminRequestsDialogOpen, setCoAdminRequestsDialogOpen] = useState(false);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
   
   const [auditLogDetailsDialog, setAuditLogDetailsDialog] = useState({ open: false, log: null });
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
@@ -4112,13 +4113,7 @@ function App() {
           <Tooltip title={isMainAdmin() ? "Pending Co-Admin Requests" : "My Requests & Notifications"}>
             <IconButton 
               color='inherit' 
-              onClick={() => {
-                if (isMainAdmin()) {
-                  setAdminTab('reprint-requests');
-                } else {
-                  setCoAdminRequestsDialogOpen(true);
-                }
-              }} 
+              onClick={(e) => setNotificationAnchorEl(e.currentTarget)}
               sx={{ 
                 mr: 2, 
                 bgcolor: 'rgba(255,255,255,0.1)', 
@@ -4129,6 +4124,52 @@ function App() {
                 <Notifications />
               </Badge>
             </IconButton>
+            <Menu
+              anchorEl={notificationAnchorEl}
+              open={Boolean(notificationAnchorEl)}
+              onClose={() => setNotificationAnchorEl(null)}
+              PaperProps={{
+                elevation: 0,
+                sx: {
+                  overflow: 'visible',
+                  filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                  mt: 1.5,
+                  minWidth: 200
+                },
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              {(isMainAdmin() || hasPermission('canManageCoAdminRequests')) && (
+                <MenuItem onClick={() => {
+                  setNotificationAnchorEl(null);
+                  if (isMainAdmin()) {
+                    setAdminTab('reprint-requests');
+                  } else {
+                    setCoAdminRequestsDialogOpen(true);
+                  }
+                }}>
+                  <Badge badgeContent={pendingRequestsCount || coAdminApprovedCount} color="error" sx={{ mr: 2 }}>
+                    <PictureAsPdf fontSize="small" />
+                  </Badge>
+                  Reprint Requests
+                </MenuItem>
+              )}
+              {hasPermission('canViewFeedbacks') && (
+                <MenuItem onClick={() => {
+                  setNotificationAnchorEl(null);
+                  setAdminTab('feedbacks');
+                }}>
+                  <Badge badgeContent={pendingFeedbacksCount} color="error" sx={{ mr: 2 }}>
+                    <FeedbackIcon fontSize="small" />
+                  </Badge>
+                  Feedbacks
+                </MenuItem>
+              )}
+              {(!hasPermission('canViewFeedbacks') && !isMainAdmin() && !hasPermission('canManageCoAdminRequests')) && (
+                 <MenuItem disabled>No new notifications</MenuItem>
+              )}
+            </Menu>
           </Tooltip>
         )}
         {adminAuth && view === 'admin' && (

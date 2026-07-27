@@ -47,7 +47,9 @@ export const generateIDCard = async (member, apiUrl, config = null) => {
   const loadImage = (src) => {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = 'Anonymous';
+      if (src && src.startsWith('http')) {
+        img.crossOrigin = 'Anonymous';
+      }
       img.onload = () => resolve(img);
       img.onerror = (e) => reject(e);
       img.src = src;
@@ -153,7 +155,7 @@ export const generateIDCard = async (member, apiUrl, config = null) => {
     // 5. Return the document instead of saving immediately
     return {
       doc: doc,
-      dataUri: doc.output('bloburl'),
+      dataUri: doc.output('datauristring'),
       filename: `${member.memberId || 'Member'}_ID_Card.pdf`
     };
     
