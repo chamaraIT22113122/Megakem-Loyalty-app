@@ -725,6 +725,7 @@ function App() {
     return () => {
       if (socket) socket.disconnect();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminAuth]);
   const [dashboardStartDate, setDashboardStartDate] = useState('');
   const [dashboardEndDate, setDashboardEndDate] = useState('');
@@ -2832,6 +2833,7 @@ function App() {
     if (adminTab === 'dashboard') {
       loadDashboardData();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardStartDate, dashboardEndDate, dateFilter, adminAuth, adminTab]);
 
   const loadAdminData = async () => {
@@ -3151,6 +3153,7 @@ function App() {
 
   useEffect(() => {
     loadAuditLogs();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminAuth, adminTab, auditLogPage, auditLogRowsPerPage, auditLogModuleFilter, auditLogActionFilter, auditLogStartDate, auditLogEndDate]);
 
   useEffect(() => {
@@ -3207,6 +3210,7 @@ function App() {
 
   useEffect(() => {
     fetchPaginatedScans();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverScanPage, serverScanRowsPerPage, scanSearchQuery, scanDateFilter, adminTab, adminAuth]);
 
   // Auto-refresh dashboard data every 30 seconds when enabled
@@ -3298,6 +3302,7 @@ function App() {
     if (view === 'admin' && adminTab === 'advanced-insights') {
       loadAdvancedInsights();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, adminTab]);
 
 

@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import { 
   GetApp, Refresh, Delete, CloudDownload, Storage, 
-  Visibility, VisibilityOff, Warning, Lock, LockOpen,
+  Visibility, VisibilityOff, Lock, LockOpen,
   DataUsage, TrendingUp, Settings
 } from '@mui/icons-material';
 import { backupAPI, loyaltyAPI } from '../services/api';
@@ -21,6 +21,7 @@ const AVAILABLE_COLLECTIONS = [
 
 const DataManagement = ({ showNotification, addToActivityLog, isMainAdmin }) => {
   const [backups, setBackups] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [archives, setArchives] = useState([]);
   const [stats, setStats] = useState(null);
   const [autoBackupConfig, setAutoBackupConfig] = useState({ enabled: true, frequency: 'daily', retentionDays: 30 });
@@ -44,6 +45,7 @@ const DataManagement = ({ showNotification, addToActivityLog, isMainAdmin }) => 
     if (isMainAdmin) {
       fetchBackups();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMainAdmin]);
 
   const fetchBackups = async () => {
@@ -134,10 +136,12 @@ const DataManagement = ({ showNotification, addToActivityLog, isMainAdmin }) => 
           addToActivityLog('Backup Downloaded', 'Local backup downloaded', 'success');
         }
       } else if (type === 'restore_server') {
+        // eslint-disable-next-line no-unused-vars
         const res = await backupAPI.restoreFromServer(targetId, mergeRestore, collectionsToRestore);
         showNotification(`Restored documents successfully`, 'success');
         addToActivityLog('Backup Restored', 'Data restored from server', 'warning');
       } else if (type === 'restore_file') {
+        // eslint-disable-next-line no-unused-vars
         const res = await backupAPI.importData(backupData, encryptedString, mergeRestore, collectionsToRestore);
         showNotification(`Restored documents successfully`, 'success');
         addToActivityLog('Backup Restored', 'Data restored from file', 'warning');

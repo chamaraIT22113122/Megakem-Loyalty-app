@@ -1,7 +1,6 @@
 import jsPDF from 'jspdf';
 import frontTemplate from '../assets/WTC ID CARD front side Template.png';
 import backTemplate from '../assets/WTC ID CARD F-Backside.png';
-import QRCode from 'qrcode';
 
 let cachedFrontImg = null;
 let cachedBackImg = null;
