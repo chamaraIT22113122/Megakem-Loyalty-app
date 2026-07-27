@@ -23,6 +23,11 @@ const feedbackSchema = new mongoose.Schema({
     type: String,
     required: false
   },
+  complaintNumber: {
+    type: String,
+    unique: true,
+    sparse: true // sparse allows existing documents without this field to not conflict on unique index
+  },
   message: {
     type: String,
     required: true

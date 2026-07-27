@@ -5,8 +5,10 @@ import {
   CircularProgress, Snackbar, Alert, Dialog, DialogTitle,
   DialogContent, DialogActions, Button, Tooltip, Avatar, Chip, TextField, InputAdornment
 } from '@mui/material';
-import { Delete, Visibility, Image as ImageIcon, ArrowBackIos, ArrowForwardIos, Save, Email } from '@mui/icons-material';
+import { Delete, Visibility, Image as ImageIcon, ArrowBackIos, ArrowForwardIos, Save, Email, PictureAsPdf } from '@mui/icons-material';
 import { feedbackAPI, API_BASE_URL } from '../services/api';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const FeedbacksTab = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -86,6 +88,95 @@ const FeedbacksTab = () => {
     setSelectedGallery(prev => ({ ...prev, index: (prev.index - 1 + prev.images.length) % prev.images.length }));
   };
 
+  const handleDownloadPDF = async (feedback) => {
+    try {
+      const doc = new jsPDF();
+      
+      // Load logo
+      const logo = new Image();
+      logo.src = '/logo512.png';
+      
+      const generateDocument = (hasLogo) => {
+        let currentY = 10;
+        
+        if (hasLogo) {
+          doc.addImage(logo, 'PNG', 14, 10, 30, 30);
+          
+          doc.setFontSize(20);
+          doc.setTextColor(40);
+          doc.text('Megakem Loyalty App', 50, 22);
+          
+          doc.setFontSize(14);
+          doc.setTextColor(100);
+          doc.text('Complaint / Feedback Report', 50, 32);
+          
+          currentY = 45;
+        } else {
+          doc.setFontSize(20);
+          doc.setTextColor(40);
+          doc.text('Megakem Loyalty App', 14, 22);
+          
+          doc.setFontSize(14);
+          doc.setTextColor(100);
+          doc.text('Complaint / Feedback Report', 14, 32);
+          
+          currentY = 40;
+        }
+        
+        // Line separator
+        doc.setDrawColor(200);
+        doc.line(14, currentY, 196, currentY);
+        
+        // Details
+        const detailsData = [
+          ['Complaint No:', feedback.complaintNumber || 'N/A'],
+          ['Date:', new Date(feedback.createdAt).toLocaleString()],
+          ['User Type:', feedback.userType === 'customer' ? 'Customer' : 'Applicator'],
+          ['Batch Number:', feedback.batchNumber || 'N/A']
+        ];
+        
+        if (feedback.userType === 'customer') {
+          detailsData.push(['Customer Name:', feedback.name || 'N/A']);
+          detailsData.push(['Customer Phone:', feedback.phone || 'N/A']);
+        } else {
+          detailsData.push(['Applicator ID:', feedback.applicatorId || 'N/A']);
+        }
+        
+        doc.autoTable({
+          startY: currentY + 5,
+          body: detailsData,
+          theme: 'plain',
+          styles: { fontSize: 11, cellPadding: 2 },
+          columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } }
+        });
+        
+        // Message Section
+        const finalY = doc.lastAutoTable.finalY || currentY + 5;
+        doc.setFontSize(12);
+        doc.setTextColor(40);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Message / Details:', 14, finalY + 15);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        
+        const splitMessage = doc.splitTextToSize(feedback.message || 'No message provided', 180);
+        doc.text(splitMessage, 14, finalY + 22);
+        
+        // Save PDF
+        const filename = `Complaint_${feedback.complaintNumber || 'Report'}.pdf`;
+        doc.save(filename);
+      };
+
+      logo.onload = () => generateDocument(true);
+      logo.onerror = () => generateDocument(false);
+      
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      setSnackbar({ open: true, msg: 'Failed to generate PDF', type: 'error' });
+    }
+  };
+
   if (loading) return <Box p={4} display="flex" justifyContent="center"><CircularProgress /></Box>;
   if (error) return <Box p={4}><Typography color="error">{error}</Typography></Box>;
 
@@ -130,6 +221,7 @@ const FeedbacksTab = () => {
         <Table>
           <TableHead sx={{ bgcolor: 'grey.100' }}>
             <TableRow>
+              <TableCell>Complaint No</TableCell>
               <TableCell>Date</TableCell>
               <TableCell>User Type</TableCell>
               <TableCell>User Details</TableCell>
@@ -142,11 +234,16 @@ const FeedbacksTab = () => {
           <TableBody>
             {feedbacks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">No feedbacks found.</TableCell>
+                <TableCell colSpan={8} align="center">No feedbacks found.</TableCell>
               </TableRow>
             ) : (
               feedbacks.map((fb) => (
                 <TableRow key={fb._id} hover>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight={600} color="primary">
+                      {fb.complaintNumber || 'N/A'}
+                    </Typography>
+                  </TableCell>
                   <TableCell>{new Date(fb.createdAt).toLocaleString()}</TableCell>
                   <TableCell>
                     <Chip 
@@ -195,6 +292,11 @@ const FeedbacksTab = () => {
                     ))}
                   </TableCell>
                   <TableCell align="center">
+                    <Tooltip title="Download PDF">
+                      <IconButton color="primary" onClick={() => handleDownloadPDF(fb)}>
+                        <PictureAsPdf />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Delete">
                       <IconButton color="error" onClick={() => handleDelete(fb._id)}>
                         <Delete />

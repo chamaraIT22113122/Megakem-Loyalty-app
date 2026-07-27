@@ -185,6 +185,14 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Generate a unique complaint number: FB-YYMMDD-XXXX
+    const now = new Date();
+    const dateString = now.getFullYear().toString().slice(2) + 
+                       String(now.getMonth() + 1).padStart(2, '0') + 
+                       String(now.getDate()).padStart(2, '0');
+    const randomDigits = Math.floor(1000 + Math.random() * 9000);
+    const complaintNumber = `FB-${dateString}-${randomDigits}`;
+
     const feedback = new Feedback({
       userType: userType || 'applicator',
       name,
@@ -192,6 +200,7 @@ router.post('/', async (req, res) => {
       applicatorId,
       role,
       batchNumber,
+      complaintNumber,
       message,
       imageUrls
     });
