@@ -93,8 +93,8 @@ const FeedbacksTab = () => {
     try {
       setSnackbar({ open: true, msg: 'Generating PDF...', type: 'info' });
       
-      // Load template from public folder
-      const pdfTemplateUrl = process.env.PUBLIC_URL + '/Megakem_Rewards_feedback_Template.pdf';
+      // Load template from public folder (v2 for cache busting)
+      const pdfTemplateUrl = process.env.PUBLIC_URL + '/Megakem_Rewards_feedback_Template_v2.pdf';
       const templateBytes = await fetch(pdfTemplateUrl).then(res => {
         if (!res.ok) throw new Error(`Template fetch failed with status: ${res.status}`);
         return res.arrayBuffer();
