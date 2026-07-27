@@ -3,6 +3,40 @@ const router = express.Router();
 const Feedback = require('../models/Feedback');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+// Helper to create a nodemailer transporter bound to IPv4
+const createIPv4Transporter = () => {
+  return new Promise((resolve, reject) => {
+    const smtpHost = (process.env.SMTP_HOST || 'smtp-mail.outlook.com').replace(/['"]/g, '').trim();
+    const smtpPort = parseInt((process.env.SMTP_PORT || '587').toString().replace(/['"]/g, '').trim(), 10);
+    const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.replace(/['"]/g, '').trim() : '';
+    const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/['"]/g, '').trim() : '';
+
+    dns.lookup(smtpHost, { family: 4 }, (err, address) => {
+      if (err) {
+        return reject(err);
+      }
+      const transporter = nodemailer.createTransport({
+        host: address,
+        port: smtpPort,
+        secure: false, // true for 465, false for other ports
+        auth: {
+          user: smtpUser, 
+          pass: smtpPass, 
+        },
+        tls: {
+          ciphers: 'SSLv3',
+          servername: smtpHost
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 10000
+      });
+      resolve({ transporter, smtpUser });
+    });
+  });
+};
 
 // Helper function to send email
 const sendFeedbackEmail = async (feedback, redirectEmail, baseUrl = '') => {
@@ -14,27 +48,7 @@ const sendFeedbackEmail = async (feedback, redirectEmail, baseUrl = '') => {
   }
 
   try {
-    const smtpHost = (process.env.SMTP_HOST || 'smtp-mail.outlook.com').replace(/['"]/g, '').trim();
-    const smtpPort = parseInt((process.env.SMTP_PORT || '587').toString().replace(/['"]/g, '').trim(), 10);
-    const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.replace(/['"]/g, '').trim() : '';
-    const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/['"]/g, '').trim() : '';
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: smtpUser, 
-        pass: smtpPass, 
-      },
-      tls: {
-        ciphers: 'SSLv3'
-      },
-      family: 4, // Force IPv4
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000
-    });
+    const { transporter, smtpUser } = await createIPv4Transporter();
 
     // Determine user info
     let userInfo = '';
@@ -97,27 +111,7 @@ const sendFeedbackEmail = async (feedback, redirectEmail, baseUrl = '') => {
 // @access  Public
 router.get('/test-smtp', async (req, res) => {
   try {
-    const smtpHost = (process.env.SMTP_HOST || 'smtp-mail.outlook.com').replace(/['"]/g, '').trim();
-    const smtpPort = parseInt((process.env.SMTP_PORT || '587').toString().replace(/['"]/g, '').trim(), 10);
-    const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.replace(/['"]/g, '').trim() : '';
-    const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/['"]/g, '').trim() : '';
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: false,
-      auth: {
-        user: smtpUser, 
-        pass: smtpPass, 
-      },
-      tls: {
-        ciphers: 'SSLv3'
-      },
-      family: 4, // Force IPv4
-      connectionTimeout: 10000, // 10 seconds timeout
-      greetingTimeout: 10000,
-      socketTimeout: 10000
-    });
+    const { transporter, smtpUser } = await createIPv4Transporter();
 
     const info = await transporter.sendMail({
       from: `"Megakem Feedback" <${smtpUser || 'no-reply@megakem.com'}>`,
