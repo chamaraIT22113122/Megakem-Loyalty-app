@@ -1145,6 +1145,8 @@ function App() {
     canManageQRCodes: true,
     canManageCoAdminRequests: true,
     canManageApplicators: true,
+    canViewAuditLogs: true,
+    canViewFeedbacks: true,
     canDelete: true,
     canExport: true
   });
@@ -3251,6 +3253,8 @@ function App() {
         if (adminTab === 'qr-codes' && !hasPermission('canManageQRCodes')) return false;
         if (adminTab === 'reprint-requests' && !hasPermission('canManageCoAdminRequests')) return false;
         if (adminTab === 'applicator' && !hasPermission('canManageApplicators')) return false;
+        if (adminTab === 'audit-logs' && !hasPermission('canViewAuditLogs')) return false;
+        if (adminTab === 'feedbacks' && !hasPermission('canViewFeedbacks')) return false;
         return true;
       };
 
@@ -3264,6 +3268,8 @@ function App() {
         else if (hasPermission('canManageProducts')) setAdminTab('products');
         else if (hasPermission('canManageQRCodes')) setAdminTab('qr-codes');
         else if (hasPermission('canManageApplicators')) setAdminTab('applicator');
+        else if (hasPermission('canViewAuditLogs')) setAdminTab('audit-logs');
+        else if (hasPermission('canViewFeedbacks')) setAdminTab('feedbacks');
         else setAdminTab('profile');
       }
     }
@@ -3607,7 +3613,9 @@ function App() {
           canManageProducts: permissions?.canManageProducts === true,
           canManageQRCodes: permissions?.canManageQRCodes === true,
           canManageCoAdminRequests: permissions?.canManageCoAdminRequests === true,
-          canManageApplicators: permissions?.canManageApplicators === true
+          canManageApplicators: permissions?.canManageApplicators === true,
+          canViewAuditLogs: permissions?.canViewAuditLogs === true,
+          canViewFeedbacks: permissions?.canViewFeedbacks === true
         }
       };
 
@@ -4117,7 +4125,7 @@ function App() {
                 '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
               }}
             >
-              <Badge badgeContent={isMainAdmin() ? (pendingRequestsCount + pendingFeedbacksCount) : coAdminApprovedCount} color="error">
+              <Badge badgeContent={isMainAdmin() ? (pendingRequestsCount + pendingFeedbacksCount) : (coAdminApprovedCount + (hasPermission('canViewFeedbacks') ? pendingFeedbacksCount : 0))} color="error">
                 <Notifications />
               </Badge>
             </IconButton>
@@ -5512,7 +5520,6 @@ function App() {
               {/* {hasPermission('canManageProducts') && <Tab icon={<Star />} label='Rewards Catalog' value='catalog' />} HIDDEN FOR NOW */}
               {hasPermission('canViewLeaderboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
               {hasPermission('canViewAdvancedInsights') && <Tab icon={<Insights />} label='Advanced Insights' value='advanced-insights' />}
-              {isMainAdmin() && <Tab icon={<Security />} label='Audit Logs' value='audit-logs' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
               {hasPermission('canManageCoAdminRequests') && (
@@ -5527,7 +5534,8 @@ function App() {
                 />
               )}
               {hasPermission('canManageApplicators') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
-              <Tab icon={<FeedbackIcon />} label='Feedbacks' value='feedbacks' />
+              {hasPermission('canViewAuditLogs') && <Tab icon={<Security />} label='Audit Logs' value='audit-logs' />}
+              {hasPermission('canViewFeedbacks') && <Tab icon={<FeedbackIcon />} label='Feedbacks' value='feedbacks' />}
               <Tab icon={<Settings />} label='Profile' value='profile' />
             </Tabs>
           </Paper>
@@ -7798,7 +7806,9 @@ function App() {
                       canManageProducts: false,
                       canManageQRCodes: false,
                       canManageCoAdminRequests: false,
-                      canManageApplicators: false
+                      canManageApplicators: false,
+                      canViewAuditLogs: false,
+                      canViewFeedbacks: false
                     } 
                   } 
                 })}
@@ -7868,6 +7878,8 @@ function App() {
                           {u.permissions?.canManageQRCodes === true && <Chip label='QR' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageCoAdminRequests === true && <Chip label='Requests' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageApplicators === true && <Chip label='Applicators' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canViewAuditLogs === true && <Chip label='Audit Logs' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canViewFeedbacks === true && <Chip label='Feedbacks' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canExport === true && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                         </>
@@ -7905,7 +7917,9 @@ function App() {
                               canManageProducts: u.permissions?.canManageProducts === true,
                               canManageQRCodes: u.permissions?.canManageQRCodes === true,
                               canManageCoAdminRequests: u.permissions?.canManageCoAdminRequests === true,
-                              canManageApplicators: u.permissions?.canManageApplicators === true
+                              canManageApplicators: u.permissions?.canManageApplicators === true,
+                              canViewAuditLogs: u.permissions?.canViewAuditLogs === true,
+                              canViewFeedbacks: u.permissions?.canViewFeedbacks === true
                             }
                           } 
                         })} 
@@ -8603,7 +8617,7 @@ function App() {
           )}
 
           {/* Audit Logs Tab */}
-          {adminTab === 'audit-logs' && isMainAdmin() && (
+          {adminTab === 'audit-logs' && hasPermission('canViewAuditLogs') && (
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h5"><Security sx={{ mr: 1, verticalAlign: 'middle' }}/> System Audit Logs</Typography>
@@ -9585,7 +9599,7 @@ function App() {
           </Box>}
 
           {/* Feedbacks Tab */}
-          {adminTab === 'feedbacks' && <Box>
+          {adminTab === 'feedbacks' && hasPermission('canViewFeedbacks') && <Box>
             <FeedbacksTab />
           </Box>}
 
@@ -10367,7 +10381,51 @@ function App() {
                   />
                 </Box>
 
-                {/* 11. Delete Records */}
+                {/* Audit Logs */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can View Audit Logs</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Audit Logs tab</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canViewAuditLogs === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canViewAuditLogs: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='info' 
+                  />
+                </Box>
+
+                {/* Feedbacks */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can View Feedbacks</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Feedbacks tab</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canViewFeedbacks === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canViewFeedbacks: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='info' 
+                  />
+                </Box>
+
+                {/* Delete Records */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
                     <Typography variant='body2' fontWeight={600}>Can Delete Records</Typography>

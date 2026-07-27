@@ -98,7 +98,11 @@ router.get('/proxy', async (req, res) => {
     }
     
     // Fetch the image
-    const response = await fetch(url);
+    let fetchUrl = url;
+    if (fetchUrl.includes('drive.google.com') && fetchUrl.includes('export=view')) {
+      fetchUrl = fetchUrl.replace('export=view', 'export=download');
+    }
+    const response = await fetch(fetchUrl);
     if (!response.ok) {
       return res.status(response.status).send('Failed to fetch image');
     }

@@ -100,6 +100,14 @@ const userSchema = new mongoose.Schema({
     canViewQRAnalytics: {
       type: Boolean,
       default: false
+    },
+    canViewAuditLogs: {
+      type: Boolean,
+      default: false
+    },
+    canViewFeedbacks: {
+      type: Boolean,
+      default: false
     }
   },
   adminType: {
