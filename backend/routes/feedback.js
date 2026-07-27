@@ -198,13 +198,13 @@ router.post('/', async (req, res) => {
 
     await feedback.save();
 
-    // Fetch config and send email if configured
-    const config = await LoyaltyConfig.getConfig();
-    if (config && config.feedbackRedirectEmail) {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      // Run asynchronously without blocking the response
-      sendFeedbackEmail(feedback, config.feedbackRedirectEmail, baseUrl);
-    }
+    // Fetch config and send email if configured (Temporarily disabled due to Render firewall)
+    // const config = await LoyaltyConfig.getConfig();
+    // if (config && config.feedbackRedirectEmail) {
+    //   const baseUrl = `${req.protocol}://${req.get('host')}`;
+    //   // Run asynchronously without blocking the response
+    //   sendFeedbackEmail(feedback, config.feedbackRedirectEmail, baseUrl);
+    // }
 
     res.status(201).json({
       success: true,

@@ -131,19 +131,18 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
 
     setLoading(true);
     try {
-      let imageUrls = [];
-      
-      // Upload all images sequentially
-      for (const file of imageFiles) {
+      // Upload all images in parallel for much faster submission
+      const uploadPromises = imageFiles.map(async (file) => {
         const formData = new FormData();
         formData.append('image', file);
         const uploadRes = await uploadAPI.uploadImage(formData);
         if (uploadRes.data.success) {
-          imageUrls.push(uploadRes.data.data.url);
+          return uploadRes.data.data.url;
         } else {
           throw new Error('Image upload failed');
         }
-      }
+      });
+      let imageUrls = await Promise.all(uploadPromises);
 
       const finalUserType = applicatorId ? 'applicator' : 'customer';
 
