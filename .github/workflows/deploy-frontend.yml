@@ -56,11 +56,11 @@ jobs:
         server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
-        protocol: ftp
-        timeout: 120000
+        protocol: ftps
+        port: 21
+        timeout: 60000
         local-dir: ./frontend/build/
         server-dir: ./
-        # Exclude files you don't want to upload
         exclude: |
           **/.git*
           **/.git*/**
