@@ -190,8 +190,19 @@ router.post('/', async (req, res) => {
     const dateString = now.getFullYear().toString().slice(2) + 
                        String(now.getMonth() + 1).padStart(2, '0') + 
                        String(now.getDate()).padStart(2, '0');
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
-    const complaintNumber = `FB-${dateString}-${randomDigits}`;
+                       
+    // Find latest feedback for today to sequence it
+    const latestFeedback = await Feedback.findOne({ complaintNumber: new RegExp(`^FB-${dateString}-`) }).sort({ createdAt: -1 });
+    let seq = 1;
+    if (latestFeedback) {
+      const parts = latestFeedback.complaintNumber.split('-');
+      if (parts.length === 3) {
+        const lastSeq = parseInt(parts[2], 10);
+        if (!isNaN(lastSeq)) seq = lastSeq + 1;
+      }
+    }
+    const seqString = String(seq).padStart(4, '0');
+    const complaintNumber = `FB-${dateString}-${seqString}`;
 
     const feedback = new Feedback({
       userType: userType || 'applicator',

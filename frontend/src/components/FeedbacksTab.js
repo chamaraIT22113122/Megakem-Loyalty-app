@@ -18,6 +18,7 @@ const FeedbacksTab = () => {
   const [selectedGallery, setSelectedGallery] = useState({ open: false, images: [], index: 0 });
   const [redirectEmail, setRedirectEmail] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState({ open: false, url: '', filename: '' });
 
   const fetchFeedbacks = async () => {
     try {
@@ -215,12 +216,10 @@ const FeedbacksTab = () => {
       
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `Complaint_${feedback.complaintNumber || 'Report'}.pdf`;
-      link.click();
+      const url = URL.createObjectURL(blob);
+      setPdfPreview({ open: true, url, filename: `Complaint_${feedback.complaintNumber || 'Report'}.pdf` });
       
-      setSnackbar({ open: true, msg: 'PDF Downloaded Successfully', type: 'success' });
+      setSnackbar({ open: true, msg: 'PDF Preview Generated', type: 'success' });
     } catch (err) {
       console.error('Error generating PDF:', err);
       setSnackbar({ open: true, msg: 'Failed to generate PDF', type: 'error' });
@@ -391,6 +390,42 @@ const FeedbacksTab = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSelectedGallery({ open: false, images: [], index: 0 })}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog 
+        open={pdfPreview.open} 
+        onClose={() => setPdfPreview({ open: false, url: '', filename: '' })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>PDF Preview</DialogTitle>
+        <DialogContent dividers sx={{ height: '70vh', p: 0 }}>
+          {pdfPreview.url && (
+            <iframe 
+              src={pdfPreview.url} 
+              width="100%" 
+              height="100%" 
+              style={{ border: 'none' }} 
+              title="PDF Preview"
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPdfPreview({ open: false, url: '', filename: '' })}>Close</Button>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = pdfPreview.url;
+              link.download = pdfPreview.filename;
+              link.click();
+              setSnackbar({ open: true, msg: 'PDF Downloaded Successfully', type: 'success' });
+            }}
+          >
+            Download PDF
+          </Button>
         </DialogActions>
       </Dialog>
 
