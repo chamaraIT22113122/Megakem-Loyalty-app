@@ -33,6 +33,13 @@ const feedbackSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  emailStatus: {
+    type: String,
+    default: 'pending'
+  },
+  emailError: {
+    type: String
   }
 });
 

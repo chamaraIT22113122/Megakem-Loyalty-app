@@ -6,20 +6,26 @@ const nodemailer = require('nodemailer');
 
 // Helper function to send email
 const sendFeedbackEmail = async (feedback, redirectEmail, baseUrl = '') => {
-  if (!redirectEmail) return;
+  if (!redirectEmail) {
+    feedback.emailStatus = 'skipped';
+    feedback.emailError = 'No redirect email configured';
+    await feedback.save();
+    return;
+  }
 
   try {
-    // In a real application, you should configure these in .env
-    // e.g. SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
-    // Here we use Outlook SMTP as requested by the user.
-    // The user will need to set SMTP_USER and SMTP_PASS in their .env
+    const smtpHost = (process.env.SMTP_HOST || 'smtp-mail.outlook.com').replace(/['"]/g, '').trim();
+    const smtpPort = parseInt((process.env.SMTP_PORT || '587').toString().replace(/['"]/g, '').trim(), 10);
+    const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.replace(/['"]/g, '').trim() : '';
+    const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/['"]/g, '').trim() : '';
+
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
-      port: process.env.SMTP_PORT || 587,
+      host: smtpHost,
+      port: smtpPort,
       secure: false, // true for 465, false for other ports
       auth: {
-        user: process.env.SMTP_USER, 
-        pass: process.env.SMTP_PASS, 
+        user: smtpUser, 
+        pass: smtpPass, 
       },
       tls: {
         ciphers: 'SSLv3'
@@ -64,14 +70,21 @@ const sendFeedbackEmail = async (feedback, redirectEmail, baseUrl = '') => {
     `;
 
     await transporter.sendMail({
-      from: `"Megakem Feedback" <${process.env.SMTP_USER || 'no-reply@megakem.com'}>`, // sender address
+      from: `"Megakem Feedback" <${smtpUser || 'no-reply@megakem.com'}>`, // sender address
       to: redirectEmail, // list of receivers
       subject: `New Feedback from ${feedback.userType === 'customer' ? feedback.name : feedback.applicatorId}`, // Subject line
       html: htmlContent, // html body
     });
+    
     console.log('Feedback email sent successfully to', redirectEmail);
+    feedback.emailStatus = 'sent';
+    feedback.emailError = '';
+    await feedback.save();
   } catch (error) {
     console.error('Error sending feedback email:', error);
+    feedback.emailStatus = 'failed';
+    feedback.emailError = error.message;
+    await feedback.save();
   }
 };
 
