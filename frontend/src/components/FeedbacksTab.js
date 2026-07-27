@@ -6,7 +6,7 @@ import {
   DialogContent, DialogActions, Button, Tooltip, Avatar, Chip, TextField, InputAdornment
 } from '@mui/material';
 import { Delete, Visibility, Image as ImageIcon, ArrowBackIos, ArrowForwardIos, Save, Email } from '@mui/icons-material';
-import { feedbackAPI } from '../services/api';
+import { feedbackAPI, API_BASE_URL } from '../services/api';
 
 const FeedbacksTab = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -222,7 +222,10 @@ const FeedbacksTab = () => {
           
           {selectedGallery.images.length > 0 && (
             <img 
-              src={selectedGallery.images[selectedGallery.index]} 
+              src={selectedGallery.images[selectedGallery.index]?.startsWith('http') 
+                ? selectedGallery.images[selectedGallery.index] 
+                : `${API_BASE_URL.replace('/api', '')}${selectedGallery.images[selectedGallery.index]?.startsWith('/') ? '' : '/'}${selectedGallery.images[selectedGallery.index]}`
+              } 
               alt="Feedback" 
               style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 4 }} 
             />
