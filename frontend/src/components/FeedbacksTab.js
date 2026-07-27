@@ -5,10 +5,8 @@ import {
   CircularProgress, Snackbar, Alert, Dialog, DialogTitle,
   DialogContent, DialogActions, Button, Tooltip, Avatar, Chip, TextField, InputAdornment
 } from '@mui/material';
-import { Delete, Visibility, Image as ImageIcon, ArrowBackIos, ArrowForwardIos, Save, Email, PictureAsPdf } from '@mui/icons-material';
+import { Delete, Visibility, Email, PictureAsPdf } from '@mui/icons-material';
 import { feedbackAPI, API_BASE_URL } from '../services/api';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import pdfTemplateUrl from '../assets/Megakem_Rewards_feedback_Template.pdf';
 
@@ -178,7 +176,7 @@ const FeedbacksTab = () => {
         currentY -= lineHeight;
         
         for (const src of imagesToLoad) {
-          const imgUrl = src.startsWith('http') ? src : `${API_BASE_URL.replace(/\\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
+          const imgUrl = src.startsWith('http') ? src : `${API_BASE_URL.replace(/\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
           try {
             const imgBytes = await fetch(imgUrl).then(res => res.arrayBuffer());
             
@@ -378,7 +376,7 @@ const FeedbacksTab = () => {
             <img 
               src={selectedGallery.images[selectedGallery.index]?.startsWith('http') 
                 ? selectedGallery.images[selectedGallery.index] 
-                : `${API_BASE_URL.replace(/\\/api$/, '')}${selectedGallery.images[selectedGallery.index]?.startsWith('/') ? '' : '/'}${selectedGallery.images[selectedGallery.index]}`
+                : `${API_BASE_URL.replace(/\/api$/, '')}${selectedGallery.images[selectedGallery.index]?.startsWith('/') ? '' : '/'}${selectedGallery.images[selectedGallery.index]}`
               } 
               alt="Feedback" 
               style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 4 }} 
