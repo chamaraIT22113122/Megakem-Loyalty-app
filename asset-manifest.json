@@ -1,16 +1,18 @@
 {
   "files": {
-    "main.css": "./static/css/main.e6e25ce1.css",
-    "main.js": "./static/js/main.d552ad95.js",
+    "main.css": "./static/css/main.713ea733.css",
+    "main.js": "./static/js/main.a5ac5ff8.js",
     "static/js/82.b99c05cf.chunk.js": "./static/js/82.b99c05cf.chunk.js",
     "static/js/239.57732ca3.chunk.js": "./static/js/239.57732ca3.chunk.js",
     "static/media/Megakem  Rewards logo .png": "./static/media/Megakem  Rewards logo .0d9ae7efdcaacfb61638.png",
+    "static/media/WTC ID CARD F-Backside.png": "./static/media/WTC ID CARD F-Backside.6bb995d1c0237770d4f1.png",
+    "static/media/WTC ID CARD front side Template.png": "./static/media/WTC ID CARD front side Template.d033e7efe7adfab6a355.png",
     "static/media/MegakemLogo.png": "./static/media/MegakemLogo.f9d1032af7adb880423c.png",
     "static/media/MegakemBrandLogo.png": "./static/media/MegakemBrandLogo.e68fc05a8779fc4c003c.png",
     "index.html": "./index.html"
   },
   "entrypoints": [
-    "static/css/main.e6e25ce1.css",
-    "static/js/main.d552ad95.js"
+    "static/css/main.713ea733.css",
+    "static/js/main.a5ac5ff8.js"
   ]
 }
