@@ -5,7 +5,7 @@ import {
   CircularProgress, Snackbar, Alert, Dialog, DialogTitle,
   DialogContent, DialogActions, Button, Tooltip, Avatar, Chip, TextField, InputAdornment
 } from '@mui/material';
-import { Delete, Visibility, Email, PictureAsPdf } from '@mui/icons-material';
+import { Delete, Visibility, Image as ImageIcon, ArrowBackIos, ArrowForwardIos, Save, Email, PictureAsPdf } from '@mui/icons-material';
 import { feedbackAPI, API_BASE_URL } from '../services/api';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import pdfTemplateUrl from '../assets/Megakem_Rewards_feedback_Template.pdf';
