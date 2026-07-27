@@ -8,7 +8,7 @@ import {
 import { Delete, Visibility, Image as ImageIcon, ArrowBackIos, ArrowForwardIos, Save, Email, PictureAsPdf } from '@mui/icons-material';
 import { feedbackAPI, API_BASE_URL } from '../services/api';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const FeedbacksTab = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -142,7 +142,7 @@ const FeedbacksTab = () => {
           detailsData.push(['Applicator ID:', feedback.applicatorId || 'N/A']);
         }
         
-        doc.autoTable({
+        autoTable(doc, {
           startY: currentY + 5,
           body: detailsData,
           theme: 'plain',
