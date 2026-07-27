@@ -163,9 +163,55 @@ const FeedbacksTab = () => {
         const splitMessage = doc.splitTextToSize(feedback.message || 'No message provided', 180);
         doc.text(splitMessage, 14, finalY + 22);
         
-        // Save PDF
         const filename = `Complaint_${feedback.complaintNumber || 'Report'}.pdf`;
-        doc.save(filename);
+        
+        // Handle images
+        const imagesToLoad = feedback.imageUrls && feedback.imageUrls.length > 0 ? feedback.imageUrls : (feedback.imageUrl ? [feedback.imageUrl] : []);
+        
+        if (imagesToLoad.length > 0) {
+          let currentYPos = finalY + 22 + (splitMessage.length * 6) + 10;
+          
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Attached Images:', 14, currentYPos);
+          currentYPos += 10;
+          
+          const loadImage = (src) => new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = src.startsWith('http') ? src : `${API_BASE_URL.replace(/\\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
+          });
+
+          Promise.all(imagesToLoad.map(loadImage)).then((loadedImages) => {
+            loadedImages.forEach((imgObj) => {
+              if (imgObj) {
+                const maxWidth = 180;
+                const maxHeight = 100;
+                let width = imgObj.width;
+                let height = imgObj.height;
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = width * ratio;
+                height = height * ratio;
+                
+                if (currentYPos + height > 280) {
+                  doc.addPage();
+                  currentYPos = 20;
+                }
+                
+                // Determine format
+                const format = imgObj.src.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
+                doc.addImage(imgObj, format, 14, currentYPos, width, height);
+                currentYPos += height + 10;
+              }
+            });
+            doc.save(filename);
+          });
+        } else {
+          // Save PDF directly if no images
+          doc.save(filename);
+        }
       };
 
       logo.onload = () => generateDocument(true);
@@ -326,7 +372,7 @@ const FeedbacksTab = () => {
             <img 
               src={selectedGallery.images[selectedGallery.index]?.startsWith('http') 
                 ? selectedGallery.images[selectedGallery.index] 
-                : `${API_BASE_URL.replace('/api', '')}${selectedGallery.images[selectedGallery.index]?.startsWith('/') ? '' : '/'}${selectedGallery.images[selectedGallery.index]}`
+                : `${API_BASE_URL.replace(/\\/api$/, '')}${selectedGallery.images[selectedGallery.index]?.startsWith('/') ? '' : '/'}${selectedGallery.images[selectedGallery.index]}`
               } 
               alt="Feedback" 
               style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 4 }} 
