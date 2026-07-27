@@ -44,19 +44,25 @@ router.get('/', protect, hasPermission('canManageUsers'), async (req, res) => {
       query.performedBy = { $in: userIds };
     }
 
+    const limitNum = parseInt(limit);
+    const pageNum = parseInt(page);
     const logs = await AuditLog.find(query)
       .populate('performedBy', 'username email')
       .sort({ timestamp: -1 })
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit));
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum);
 
     const total = await AuditLog.countDocuments(query);
 
     res.json({
       success: true,
-      count: logs.length,
-      total,
-      data: logs
+      data: logs,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: total,
+        pages: Math.ceil(total / limitNum)
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

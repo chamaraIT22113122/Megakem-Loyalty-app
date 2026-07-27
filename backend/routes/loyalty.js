@@ -6,6 +6,7 @@ const Product = require('../models/Product');
 const { protect } = require('../middleware/auth');
 const { logAction } = require('../middleware/audit');
 const { updateBackupSchedule } = require('../utils/scheduler');
+const { getFromCache, setInCache, clearCacheKey, clearCache } = require('../utils/cache');
 
 // @route   GET /api/loyalty/config
 // @desc    Get loyalty configuration
@@ -19,7 +20,20 @@ router.get('/config', protect, async (req, res) => {
       });
     }
 
+    const cacheKey = 'loyalty_config';
+    const cachedConfig = getFromCache(cacheKey);
+    if (cachedConfig) {
+      console.log('📦 Serving loyalty config from cache');
+      return res.json({
+        success: true,
+        data: cachedConfig,
+        cached: true
+      });
+    }
+
     const config = await LoyaltyConfig.getConfig();
+    setInCache(cacheKey, config);
+
     res.json({
       success: true,
       data: config
@@ -116,6 +130,7 @@ router.put('/config', protect, [
       updateBackupSchedule();
     }
 
+    clearCacheKey('loyalty_config');
     await logAction(req, 'UPDATE_LOYALTY_CONFIG', 'SETTINGS', req.body);
 
     res.json({
@@ -188,6 +203,9 @@ router.put('/products/:id/points', protect, [
       pointsPerProduct: product.pointsPerProduct,
       pointsPerPackSize: product.pointsPerPackSize
     });
+
+    // We updated a product, so we should clear the product cache
+    clearCache();
 
     res.json({
       success: true,

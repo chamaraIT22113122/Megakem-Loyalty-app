@@ -3,6 +3,7 @@ const router = express.Router();
 const Product = require('../models/Product');
 const { protect, authorize, hasPermission } = require('../middleware/auth');
 const { logAction } = require('../middleware/audit');
+const { getFromCache, setInCache, clearCache } = require('../utils/cache');
 
 // @route   GET /api/products
 // @desc    Get all products
@@ -25,10 +26,23 @@ router.get('/', async (req, res) => {
       query.isActive = isActive === 'true' || isActive === true;
     }
 
+    const cacheKey = `products_${JSON.stringify(query)}`;
+    const cachedData = getFromCache(cacheKey);
+    if (cachedData) {
+      console.log('📦 Serving products from cache');
+      return res.json({
+        success: true,
+        count: cachedData.length,
+        data: cachedData,
+        cached: true
+      });
+    }
+
     console.log('📦 Query:', JSON.stringify(query));
     const products = await Product.find(query).sort({ name: 1 });
     console.log('📦 Found products:', products.length);
-    console.log('📦 Products:', products.map(p => ({ name: p.name, code: p.productNo })));
+
+    setInCache(cacheKey, products);
 
     res.json({
       success: true,
@@ -91,6 +105,8 @@ router.post('/sync-loyalty-status', protect, hasPermission('canManageProducts'),
       updatedCount 
     });
 
+    clearCache();
+
     if (req.io) {
       req.io.emit('data_updated', { entity: 'products' });
     }
@@ -121,6 +137,8 @@ router.post('/', protect, hasPermission('canManageProducts'), async (req, res) =
       productName: product.name,
       productNo: product.productNo 
     });
+
+    clearCache();
 
     if (req.io) {
       req.io.emit('data_updated', { entity: 'products' });
@@ -194,6 +212,8 @@ router.put('/:id', protect, hasPermission('canManageProducts'), async (req, res)
       updates: req.body 
     });
 
+    clearCache();
+
     if (req.io) {
       req.io.emit('data_updated', { entity: 'products' });
     }
@@ -234,6 +254,8 @@ router.delete('/:id', protect, hasPermission('canManageProducts'), hasPermission
 
     // Audit Log
     await logAction(req, 'DELETE_PRODUCT', 'PRODUCTS', productData);
+
+    clearCache();
 
     if (req.io) {
       req.io.emit('data_updated', { entity: 'products' });

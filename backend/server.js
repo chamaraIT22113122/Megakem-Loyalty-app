@@ -207,6 +207,7 @@ app.use('/api/audit-logs', require('./routes/auditLogs'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/push', require('./routes/push'));
 app.use('/api/backup', require('./routes/backup'));
+app.use('/api/feedback', require('./routes/feedback'));
 
 // Health check
 app.get('/api/health', (req, res) => {

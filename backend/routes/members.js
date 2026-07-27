@@ -62,6 +62,116 @@ router.get('/stats/summary', protect, async (req, res) => {
   }
 });
 
+
+// @route   GET /api/members/loyalty-stats
+// @desc    Get members with aggregated scan stats (server-side paginated)
+// @access  Private/Admin
+router.get('/loyalty-stats', protect, async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    const isCoAdmin = req.user.role === 'co-admin';
+    const hasUsersPerm = req.user.permissions?.canManageUsers === true;
+
+    if (!isAdmin && !(isCoAdmin && hasUsersPerm)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { role, tier, search, sortBy = 'points', sortOrder = 'desc', page = 1, limit = 50 } = req.query;
+
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 50;
+
+    // Match conditions
+    let match = {};
+    if (role && role !== 'all') {
+      match.role = role;
+    }
+    if (tier && tier !== 'all') {
+      match.tier = tier;
+    }
+    if (search) {
+      match.$or = [
+        { memberId: { $regex: search, $options: 'i' } },
+        { memberName: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Determine sort
+    let sort = {};
+    const order = sortOrder === 'asc' ? 1 : -1;
+    if (sortBy === 'points') sort.actualTotalPoints = order;
+    else if (sortBy === 'scans') sort.actualTotalScans = order;
+    else if (sortBy === 'amount') sort.actualTotalAmount = order;
+    else if (sortBy === 'name') sort.memberName = order;
+    else if (sortBy === 'id') sort.memberId = order;
+    else sort.actualTotalPoints = order;
+
+    // Aggregation pipeline
+    // 1. First, we need to join scans to calculate the stats
+    // Note: If DB grows huge, this lookup before skip/limit might become slow.
+    // However, it accurately mimics the legacy client-side aggregation by filtering only members with scans.
+    
+    const pipeline = [
+      { $match: match },
+      {
+        $lookup: {
+          from: 'scans',
+          localField: 'memberId',
+          foreignField: 'memberId',
+          as: 'memberScans'
+        }
+      },
+      // IMPORTANT: Filter out members with no scans, as per legacy UI behavior
+      {
+        $match: {
+          "memberScans.0": { $exists: true }
+        }
+      },
+      {
+        $addFields: {
+          actualTotalScans: { $size: "$memberScans" },
+          actualTotalAmount: { $sum: "$memberScans.price" },
+          actualTotalPoints: { $sum: "$memberScans.points" }
+        }
+      },
+      {
+        $project: {
+          memberScans: 0 // Exclude raw scans to save bandwidth
+        }
+      },
+      { $sort: sort },
+      {
+        $facet: {
+          metadata: [{ $count: "total" }],
+          data: [{ $skip: (pageNum - 1) * limitNum }, { $limit: limitNum }]
+        }
+      }
+    ];
+
+    const result = await Member.aggregate(pipeline);
+    
+    const total = result[0]?.metadata[0]?.total || 0;
+    const members = result[0]?.data || [];
+
+    res.json({
+      success: true,
+      data: members,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: total,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // @route   GET /api/members
 // @desc    Get all members (customers and applicators)
 // @access  Private/Admin

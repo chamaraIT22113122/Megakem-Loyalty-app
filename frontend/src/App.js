@@ -2,17 +2,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider, Collapse, Drawer } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay, KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay, KeyboardArrowDown, KeyboardArrowUp, Feedback as FeedbackIcon } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import * as faceapi from '@vladmandic/face-api';
 import autoTable from 'jspdf-autotable';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
-import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI, backupAPI } from './services/api';
+import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI, backupAPI, feedbackAPI } from './services/api';
 import { generateIDCard } from './utils/generateIDCard';
 import QRCodeManager from './components/QRCodeManager';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import SriLankaZoneMap from './components/SriLankaZoneMap';
+import FeedbackDialog from './components/FeedbackDialog';
+import FeedbacksTab from './components/FeedbacksTab';
 import IDCardInteractivePreview from './components/IDCardInteractivePreview';
 import DataManagement from './components/DataManagement';
 import megakemLogo from './assets/MegakemLogo.png';
@@ -731,6 +733,7 @@ function App() {
   const [coAdminRequestsDialogOpen, setCoAdminRequestsDialogOpen] = useState(false);
   
   const [auditLogDetailsDialog, setAuditLogDetailsDialog] = useState({ open: false, log: null });
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMember, setDrawerMember] = useState(null);
 
@@ -817,6 +820,7 @@ function App() {
   const [historyProductFilter, setHistoryProductFilter] = useState('');
   const [historySortBy, setHistorySortBy] = useState('date-desc');
   const [stats, setStats] = useState(null);
+  const [dashboardData, setDashboardData] = useState(null);
   const [users, setUsers] = useState([]);
   const [members, setMembers] = useState([]);
   const [loyaltyConfig, setLoyaltyConfig] = useState(null);
@@ -881,6 +885,10 @@ function App() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [scanSearchQuery, setScanSearchQuery] = useState('');
   const [scanDateFilter, setScanDateFilter] = useState({ start: '', end: '' });
+  const [serverScanPage, setServerScanPage] = useState(0);
+  const [serverScanRowsPerPage, setServerScanRowsPerPage] = useState(25);
+  const [serverScanTotal, setServerScanTotal] = useState(0);
+  const [paginatedScans, setPaginatedScans] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [scansPerPage] = useState(10);
   const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -2791,6 +2799,41 @@ function App() {
     }
   };
 
+  const loadDashboardData = async () => {
+    if (!adminAuth) return;
+    try {
+      let start = dashboardStartDate;
+      let end = dashboardEndDate;
+
+      if (!start && !end) {
+        const now = new Date();
+        if (dateFilter === 'today') {
+           start = new Date(now.setHours(0, 0, 0, 0)).toISOString();
+        } else if (dateFilter === '7days') {
+           start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        } else if (dateFilter === '30days') {
+           start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        }
+      }
+      
+      const params = {};
+      if (start) params.startDate = start;
+      if (end) params.endDate = end;
+
+      const res = await analyticsAPI.getDashboard(params);
+      setDashboardData(res.data?.data);
+      setStats(res.data?.data?.summary || {});
+    } catch (e) {
+      console.error('Error loading dashboard data', e);
+    }
+  };
+
+  useEffect(() => {
+    if (adminTab === 'dashboard') {
+      loadDashboardData();
+    }
+  }, [dashboardStartDate, dashboardEndDate, dateFilter, adminAuth, adminTab]);
+
   const loadAdminData = async () => {
     if (!adminAuth) return;
     try {
@@ -2848,8 +2891,7 @@ function App() {
         });
       };
 
-      const [statsRes, scansRes, usersRes, productsRes, loyaltyConfigRes, allScansRes] = await Promise.all([
-        handleApiError(scansAPI.getStats(), {}, 'Failed to load stats.'),
+      const [scansRes, usersRes, productsRes, loyaltyConfigRes, allScansRes] = await Promise.all([
         handleApiError(scansAPI.getLive(), [], 'Failed to load recent scans.'),
         handleApiError(usersPromise, [], 'Failed to load users.'),
         handleApiError(productsAPI.getAll(), [], 'Failed to load products.'),
@@ -2869,7 +2911,6 @@ function App() {
       // Audit logs fetch moved to a dedicated useEffect to handle pagination and filtering
 
       console.log('📦 Products response:', productsRes.data);
-      setStats(statsRes.data?.data || {});
       setScanHistory(scansRes.data?.data || []);
       setUsers(usersRes.data?.data || []);
       
@@ -3147,6 +3188,27 @@ function App() {
       loadAdminData();
     }
   }, [scanHistory.length, adminAuth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchPaginatedScans = async () => {
+    if (!adminAuth || adminTab !== 'scans') return;
+    try {
+      const params = {
+        page: serverScanPage + 1,
+        limit: serverScanRowsPerPage,
+      };
+      if (scanSearchQuery) params.search = scanSearchQuery;
+      if (scanDateFilter.start) params.startDate = scanDateFilter.start;
+      if (scanDateFilter.end) params.endDate = scanDateFilter.end;
+      const res = await scansAPI.getAll(params);
+      setPaginatedScans(res.data.data || []);
+      if (res.data.pagination) setServerScanTotal(res.data.pagination.total);
+    } catch (e) { console.error('Error fetching paginated scans', e); }
+  };
+
+  useEffect(() => {
+    fetchPaginatedScans();
+  }, [serverScanPage, serverScanRowsPerPage, scanSearchQuery, scanDateFilter, adminTab, adminAuth]);
+
   // Auto-refresh dashboard data every 30 seconds when enabled
   useEffect(() => {
     if (autoRefresh && adminAuth && view === 'admin' && adminTab === 'dashboard') {
@@ -4097,7 +4159,7 @@ function App() {
             </Card></Grid>
             */}
           </Grid>
-          <Box sx={{ mt: 4, textAlign: 'center' }}>
+          <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Button 
               variant='outlined' 
               size='large' 
@@ -4114,7 +4176,28 @@ function App() {
             >
               Search Purchase History
             </Button>
+            <Button 
+              variant='contained' 
+              color='primary'
+              size='large' 
+              startIcon={<Edit />}
+              onClick={() => setFeedbackDialogOpen(true)}
+              sx={{ 
+                borderRadius: '12px', 
+                px: 4, 
+                py: 1.5,
+                fontWeight: 600
+              }}
+            >
+              Submit Feedback
+            </Button>
           </Box>
+          <FeedbackDialog 
+            open={feedbackDialogOpen}
+            onClose={() => setFeedbackDialogOpen(false)}
+            defaultApplicatorId={memberId}
+            defaultRole={role}
+          />
         </Box>}
 
         {view === 'history' && <Box sx={{ py: { xs: 2, sm: 3 }, animation: 'fadeIn 0.5s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
@@ -5430,6 +5513,7 @@ function App() {
                 />
               )}
               {hasPermission('canManageApplicators') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
+              <Tab icon={<FeedbackIcon />} label='Feedbacks' value='feedbacks' />
               <Tab icon={<Settings />} label='Profile' value='profile' />
             </Tabs>
           </Paper>
@@ -7169,47 +7253,25 @@ function App() {
             )}
 
             {(() => {
-              // Filter scans
-              let filteredScans = scanHistory.filter(item => {
-                const matchesSearch = !scanSearchQuery || 
-                  item.memberName?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
-                  item.memberId?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
-                  item.productName?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
-                  item.productNo?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
-                  item.batchNo?.toLowerCase().includes(scanSearchQuery.toLowerCase()) ||
-                  item.location?.toLowerCase().includes(scanSearchQuery.toLowerCase());
-                
-                const scanDate = item.timestamp ? new Date(item.timestamp) : new Date();
-                const matchesStartDate = !scanDateFilter.start || scanDate >= new Date(scanDateFilter.start);
-                const matchesEndDate = !scanDateFilter.end || scanDate <= new Date(scanDateFilter.end + 'T23:59:59');
-                
-                return matchesSearch && matchesStartDate && matchesEndDate;
-              });
-              
-              // Infinite Scroll Slicing
-              const indexOfLastScan = currentPage * scansPerPage;
-              const currentScans = filteredScans.slice(0, indexOfLastScan);
-              const hasMore = indexOfLastScan < filteredScans.length;
+              const currentScans = paginatedScans;
               
               return (
                 <>
-                  {filteredScans.length === 0 ? (
+                  {serverScanTotal === 0 ? (
                     <Box sx={{ textAlign: 'center', mt: 8, opacity: 0.5 }}>
                       <HistoryIcon sx={{ fontSize: 60, mb: 2 }} />
                       <Typography variant='h6' gutterBottom>
-                        {scanHistory.length === 0 ? 'No scans yet.' : 'No scans match your filters.'}
+                        {serverScanTotal === 0 ? 'No scans yet.' : 'No scans match your filters.'}
                       </Typography>
-                      {scanHistory.length > 0 && (
-                        <Button onClick={() => { setScanSearchQuery(''); setScanDateFilter({ start: '', end: '' }); }} sx={{ mt: 2 }}>
-                          Clear Filters
-                        </Button>
-                      )}
+                      <Button onClick={() => { setScanSearchQuery(''); setScanDateFilter({ start: '', end: '' }); }} sx={{ mt: 2 }}>
+                        Clear Filters
+                      </Button>
                     </Box>
                   ) : (
                     <>
                       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Typography variant='body2' color='text.secondary'>
-                          Showing {Math.min(currentScans.length, filteredScans.length)} of {filteredScans.length} scans
+                          Showing {currentScans.length} of {serverScanTotal} scans
                         </Typography>
                       </Box>
                       {currentScans.map((item, i) => <Card key={item._id || i} sx={{ mb: 2, borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
@@ -7354,33 +7416,18 @@ function App() {
                 </CardContent>
               </Card>)}
               
-              {hasMore && (
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                  <Button 
-                    variant='outlined'
-                    size='medium' 
-                    onClick={() => setCurrentPage(prev => prev + 1)} 
-                    sx={{
-                      borderRadius: '12px',
-                      px: 4,
-                      py: 1,
-                      fontWeight: 600,
-                      borderWidth: 2,
-                      borderColor: 'primary.main',
-                      color: 'primary.main',
-                      transition: 'all 0.3s',
-                      '&:hover': {
-                        borderWidth: 2,
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                        transform: 'scale(1.02)'
-                      }
-                    }}
-                  >
-                    Load More Scans
-                  </Button>
-                </Box>
-              )}
+              <TablePagination
+                component="div"
+                count={serverScanTotal}
+                page={serverScanPage}
+                onPageChange={(e, newPage) => setServerScanPage(newPage)}
+                rowsPerPage={serverScanRowsPerPage}
+                onRowsPerPageChange={(e) => {
+                  setServerScanRowsPerPage(parseInt(e.target.value, 10));
+                  setServerScanPage(0);
+                }}
+                rowsPerPageOptions={[10, 25, 50, 100]}
+              />
               </>
             )}
           </>
@@ -9521,6 +9568,11 @@ function App() {
           {/* Reprint Requests Tab */}
           {adminTab === 'reprint-requests' && (isMainAdmin() || hasPermission('canManageCoAdminRequests')) && <Box>
             <ReprintRequestsPanel onShowNotification={showNotification} onRequestsChanged={loadPendingRequestsCount} />
+          </Box>}
+
+          {/* Feedbacks Tab */}
+          {adminTab === 'feedbacks' && <Box>
+            <FeedbacksTab />
           </Box>}
 
           {/* Profile Settings Tab */}

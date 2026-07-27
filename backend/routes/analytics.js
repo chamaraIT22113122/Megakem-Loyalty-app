@@ -25,6 +25,17 @@ router.get('/dashboard', protect, hasPermission('canViewDashboard'), async (req,
     const totalUsers = await User.countDocuments({ role: 'user' });
     const totalProducts = await Scan.distinct('productName', dateFilter);
 
+    const now = Date.now();
+    const last24Hours = await Scan.countDocuments({ ...dateFilter, timestamp: { $gte: new Date(now - 24 * 60 * 60 * 1000) } });
+    const lastWeek = await Scan.countDocuments({ ...dateFilter, timestamp: { $gte: new Date(now - 7 * 24 * 60 * 60 * 1000) } });
+    const previousWeek = await Scan.countDocuments({
+      ...dateFilter,
+      timestamp: {
+        $gte: new Date(now - 14 * 24 * 60 * 60 * 1000),
+        $lt: new Date(now - 7 * 24 * 60 * 60 * 1000)
+      }
+    });
+
     // User tier distribution
     const tierStats = await User.aggregate([
       { $match: { role: 'user' } },
@@ -58,18 +69,62 @@ router.get('/dashboard', protect, hasPermission('canViewDashboard'), async (req,
       { $group: { _id: '$role', count: { $sum: 1 } } }
     ]);
 
+    // Hourly scan trends
+    const hourlyDistribution = await Scan.aggregate([
+      { $match: dateFilter },
+      { $group: { _id: { $hour: '$timestamp' }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Day of week trends (1 = Sunday, 7 = Saturday)
+    const dayOfWeekDistribution = await Scan.aggregate([
+      { $match: dateFilter },
+      { $group: { _id: { $dayOfWeek: '$timestamp' }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Unique cities count
+    const uniqueCitiesResult = await Scan.distinct('location', { ...dateFilter, location: { $ne: null, $ne: '' } });
+    const uniqueCities = uniqueCitiesResult.length;
+
+    // Top members
+    const topMembers = await Scan.aggregate([
+      { $match: dateFilter },
+      { $group: { _id: { id: '$memberId', name: '$memberName' }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+
+    // Recent scans
+    const recentScans = await Scan.find(dateFilter)
+      .sort({ timestamp: -1 })
+      .limit(10);
+
+    // Total value
+    const totalValueResult = await Scan.aggregate([
+      { $match: dateFilter },
+      { $group: { _id: null, total: { $sum: '$price' } } }
+    ]);
+    const totalValue = totalValueResult.length > 0 ? totalValueResult[0].total : 0;
+
     res.json({
       success: true,
       data: {
         summary: {
           totalScans,
           totalUsers,
-          totalProducts: totalProducts.length
+          totalProducts: totalProducts.length,
+          uniqueCities,
+          totalValue
         },
         tierDistribution: tierStats,
         topProducts,
         dailyTrends,
-        roleDistribution: roleStats
+        roleDistribution: roleStats,
+        hourlyDistribution,
+        dayOfWeekDistribution,
+        topMembers,
+        recentScans
       }
     });
   } catch (error) {

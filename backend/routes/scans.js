@@ -67,7 +67,7 @@ function verifyQRSig(productNo, batchNo, packageNo, sig) {
 // @access  Public (but optionally authenticated)
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 50, role, memberId, phone } = req.query;
+    const { page = 1, limit = 50, role, memberId, phone, search, startDate, endDate } = req.query;
     
     const query = {};
     if (role) query.role = role;
@@ -78,6 +78,25 @@ router.get('/', optionalAuth, async (req, res) => {
         { phone: phone.trim() },
         { memberId: { $regex: phone.trim(), $options: 'i' } }
       ];
+    }
+    
+    if (search) {
+      const searchRegex = { $regex: search.trim(), $options: 'i' };
+      if (!query.$or) query.$or = [];
+      query.$or.push(
+        { memberName: searchRegex },
+        { memberId: searchRegex },
+        { productName: searchRegex },
+        { productNo: searchRegex },
+        { batchNo: searchRegex },
+        { location: searchRegex }
+      );
+    }
+    
+    if (startDate || endDate) {
+      query.timestamp = {};
+      if (startDate) query.timestamp.$gte = new Date(startDate);
+      if (endDate) query.timestamp.$lte = new Date(endDate + 'T23:59:59.999Z');
     }
 
     const scans = await Scan.find(query)

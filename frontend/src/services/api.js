@@ -210,4 +210,12 @@ export const backupAPI = {
   triggerArchive: (thresholdMonths) => api.post('/backup/archive', { thresholdMonths })
 };
 
+export const feedbackAPI = {
+  create: (data) => api.post('/feedback', data),
+  getAll: () => api.get('/feedback'),
+  delete: (id) => api.delete(`/feedback/${id}`),
+  getSettings: () => api.get('/feedback/settings'),
+  updateSettings: (data) => api.post('/feedback/settings', data),
+};
+
 export default api;

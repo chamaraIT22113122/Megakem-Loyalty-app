@@ -183,6 +183,11 @@ const loyaltyConfigSchema = new mongoose.Schema({
       type: String,
       default: ''
     }
+  },
+  // Feedback Settings
+  feedbackRedirectEmail: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true
