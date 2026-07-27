@@ -29,7 +29,10 @@ const sendFeedbackEmail = async (feedback, redirectEmail, baseUrl = '') => {
       },
       tls: {
         ciphers: 'SSLv3'
-      }
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000
     });
 
     // Determine user info
@@ -88,7 +91,44 @@ const sendFeedbackEmail = async (feedback, redirectEmail, baseUrl = '') => {
   }
 };
 
-// @route   GET /api/feedback/settings
+// @route   GET /api/feedback/test-smtp
+// @desc    Test SMTP connection directly
+// @access  Public
+router.get('/test-smtp', async (req, res) => {
+  try {
+    const smtpHost = (process.env.SMTP_HOST || 'smtp-mail.outlook.com').replace(/['"]/g, '').trim();
+    const smtpPort = parseInt((process.env.SMTP_PORT || '587').toString().replace(/['"]/g, '').trim(), 10);
+    const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.replace(/['"]/g, '').trim() : '';
+    const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/['"]/g, '').trim() : '';
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: false,
+      auth: {
+        user: smtpUser, 
+        pass: smtpPass, 
+      },
+      tls: {
+        ciphers: 'SSLv3'
+      },
+      connectionTimeout: 10000, // 10 seconds timeout
+      greetingTimeout: 10000,
+      socketTimeout: 10000
+    });
+
+    const info = await transporter.sendMail({
+      from: `"Megakem Feedback" <${smtpUser || 'no-reply@megakem.com'}>`,
+      to: 'lahin@megakemglobal.com',
+      subject: 'SMTP Test from Render',
+      text: 'This is a direct SMTP test from the Render backend.'
+    });
+
+    res.status(200).json({ success: true, info });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message, stack: error.stack });
+  }
+});
 // @desc    Get feedback settings
 // @access  Private/Admin
 router.get('/settings', async (req, res) => {
