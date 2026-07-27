@@ -9,6 +9,8 @@ import { Delete, Visibility, Image as ImageIcon, ArrowBackIos, ArrowForwardIos, 
 import { feedbackAPI, API_BASE_URL } from '../services/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import pdfTemplateUrl from '../assets/Megakem_Rewards_feedback_Template.pdf';
 
 const FeedbacksTab = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -90,133 +92,137 @@ const FeedbacksTab = () => {
 
   const handleDownloadPDF = async (feedback) => {
     try {
-      const doc = new jsPDF();
+      setSnackbar({ open: true, msg: 'Generating PDF...', type: 'info' });
       
-      // Load logo
-      const logo = new Image();
-      logo.src = '/logo512.png';
+      // Load template
+      const templateBytes = await fetch(pdfTemplateUrl).then(res => res.arrayBuffer());
+      const pdfDoc = await PDFDocument.load(templateBytes);
       
-      const generateDocument = (hasLogo) => {
-        let currentY = 10;
-        
-        if (hasLogo) {
-          doc.addImage(logo, 'PNG', 14, 10, 30, 30);
-          
-          doc.setFontSize(20);
-          doc.setTextColor(40);
-          doc.text('Megakem Loyalty App', 50, 22);
-          
-          doc.setFontSize(14);
-          doc.setTextColor(100);
-          doc.text('Complaint / Feedback Report', 50, 32);
-          
-          currentY = 45;
-        } else {
-          doc.setFontSize(20);
-          doc.setTextColor(40);
-          doc.text('Megakem Loyalty App', 14, 22);
-          
-          doc.setFontSize(14);
-          doc.setTextColor(100);
-          doc.text('Complaint / Feedback Report', 14, 32);
-          
-          currentY = 40;
-        }
-        
-        // Line separator
-        doc.setDrawColor(200);
-        doc.line(14, currentY, 196, currentY);
-        
-        // Details
-        const detailsData = [
-          ['Complaint No:', feedback.complaintNumber || 'N/A'],
-          ['Date:', new Date(feedback.createdAt).toLocaleString()],
-          ['User Type:', feedback.userType === 'customer' ? 'Customer' : 'Applicator'],
-          ['Batch Number:', feedback.batchNumber || 'N/A']
-        ];
-        
-        if (feedback.userType === 'customer') {
-          detailsData.push(['Customer Name:', feedback.name || 'N/A']);
-          detailsData.push(['Customer Phone:', feedback.phone || 'N/A']);
-        } else {
-          detailsData.push(['Applicator ID:', feedback.applicatorId || 'N/A']);
-        }
-        
-        autoTable(doc, {
-          startY: currentY + 5,
-          body: detailsData,
-          theme: 'plain',
-          styles: { fontSize: 11, cellPadding: 2 },
-          columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } }
-        });
-        
-        // Message Section
-        const finalY = doc.lastAutoTable.finalY || currentY + 5;
-        doc.setFontSize(12);
-        doc.setTextColor(40);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Message / Details:', 14, finalY + 15);
-        
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(11);
-        
-        const splitMessage = doc.splitTextToSize(feedback.message || 'No message provided', 180);
-        doc.text(splitMessage, 14, finalY + 22);
-        
-        const filename = `Complaint_${feedback.complaintNumber || 'Report'}.pdf`;
-        
-        // Handle images
-        const imagesToLoad = feedback.imageUrls && feedback.imageUrls.length > 0 ? feedback.imageUrls : (feedback.imageUrl ? [feedback.imageUrl] : []);
-        
-        if (imagesToLoad.length > 0) {
-          let currentYPos = finalY + 22 + (splitMessage.length * 6) + 10;
-          
-          doc.setFontSize(12);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Attached Images:', 14, currentYPos);
-          currentYPos += 10;
-          
-          const loadImage = (src) => new Promise((resolve) => {
-            const img = new Image();
-            img.crossOrigin = 'Anonymous';
-            img.onload = () => resolve(img);
-            img.onerror = () => resolve(null);
-            img.src = src.startsWith('http') ? src : `${API_BASE_URL.replace(/\\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
-          });
-
-          Promise.all(imagesToLoad.map(loadImage)).then((loadedImages) => {
-            loadedImages.forEach((imgObj) => {
-              if (imgObj) {
-                const maxWidth = 180;
-                const maxHeight = 100;
-                let width = imgObj.width;
-                let height = imgObj.height;
-                const ratio = Math.min(maxWidth / width, maxHeight / height);
-                width = width * ratio;
-                height = height * ratio;
-                
-                if (currentYPos + height > 280) {
-                  doc.addPage();
-                  currentYPos = 20;
-                }
-                
-                // Determine format
-                const format = imgObj.src.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
-                doc.addImage(imgObj, format, 14, currentYPos, width, height);
-                currentYPos += height + 10;
-              }
-            });
-            doc.save(filename);
-          });
-        } else {
-          // Save PDF directly if no images
-          doc.save(filename);
-        }
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      const pages = pdfDoc.getPages();
+      let page = pages[0];
+      const { width, height } = page.getSize();
+      
+      let currentY = height - 160; // Start drawing below the header
+      const marginX = 50;
+      const lineHeight = 18;
+      
+      const drawText = (p, text, x, y, size = 11, isBold = false) => {
+        p.drawText(text, { x, y, size, font: isBold ? fontBold : font, color: rgb(0.2, 0.2, 0.2) });
       };
 
-      logo.onload = () => generateDocument(true);
-      logo.onerror = () => generateDocument(false);
+      // Header
+      drawText(page, 'Complaint / Feedback Report', marginX, currentY, 16, true);
+      currentY -= 30;
+
+      // Details
+      drawText(page, 'Complaint No:', marginX, currentY, 11, true);
+      drawText(page, feedback.complaintNumber || 'N/A', marginX + 120, currentY, 11);
+      currentY -= lineHeight;
       
+      drawText(page, 'Date:', marginX, currentY, 11, true);
+      drawText(page, new Date(feedback.createdAt).toLocaleString(), marginX + 120, currentY, 11);
+      currentY -= lineHeight;
+      
+      drawText(page, 'User Type:', marginX, currentY, 11, true);
+      drawText(page, feedback.userType === 'customer' ? 'Customer' : 'Applicator', marginX + 120, currentY, 11);
+      currentY -= lineHeight;
+      
+      drawText(page, 'Batch Number:', marginX, currentY, 11, true);
+      drawText(page, feedback.batchNumber || 'N/A', marginX + 120, currentY, 11);
+      currentY -= lineHeight;
+      
+      if (feedback.userType === 'customer') {
+        drawText(page, 'Customer Name:', marginX, currentY, 11, true);
+        drawText(page, feedback.name || 'N/A', marginX + 120, currentY, 11);
+        currentY -= lineHeight;
+        
+        drawText(page, 'Customer Phone:', marginX, currentY, 11, true);
+        drawText(page, feedback.phone || 'N/A', marginX + 120, currentY, 11);
+        currentY -= lineHeight;
+      } else {
+        drawText(page, 'Applicator ID:', marginX, currentY, 11, true);
+        drawText(page, feedback.applicatorId || 'N/A', marginX + 120, currentY, 11);
+        currentY -= lineHeight;
+      }
+      
+      currentY -= 15;
+      drawText(page, 'Message / Details:', marginX, currentY, 12, true);
+      currentY -= lineHeight;
+      
+      // Simple word wrap
+      const message = feedback.message || 'No message provided';
+      const words = message.split(' ');
+      let line = '';
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const testWidth = font.widthOfTextAtSize(testLine, 11);
+        if (testWidth > width - marginX * 2 && n > 0) {
+          drawText(page, line, marginX, currentY, 11);
+          line = words[n] + ' ';
+          currentY -= lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      drawText(page, line, marginX, currentY, 11);
+      currentY -= 30;
+      
+      // Images
+      const imagesToLoad = feedback.imageUrls && feedback.imageUrls.length > 0 ? feedback.imageUrls : (feedback.imageUrl ? [feedback.imageUrl] : []);
+      
+      if (imagesToLoad.length > 0) {
+        drawText(page, 'Attached Images:', marginX, currentY, 12, true);
+        currentY -= lineHeight;
+        
+        for (const src of imagesToLoad) {
+          const imgUrl = src.startsWith('http') ? src : `${API_BASE_URL.replace(/\\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
+          try {
+            const imgBytes = await fetch(imgUrl).then(res => res.arrayBuffer());
+            
+            let pdfImage;
+            if (imgUrl.toLowerCase().includes('.png')) {
+              pdfImage = await pdfDoc.embedPng(imgBytes);
+            } else {
+              pdfImage = await pdfDoc.embedJpg(imgBytes);
+            }
+            
+            const imgDims = pdfImage.scaleToFit(width - marginX * 2, 250);
+            
+            if (currentY - imgDims.height < 50) {
+              // Add new page using template
+              const [newPage] = await pdfDoc.copyPages(pdfDoc, [0]);
+              pdfDoc.addPage(newPage);
+              page = newPage;
+              currentY = height - 150; // reset Y for new page
+            }
+            
+            page.drawImage(pdfImage, {
+              x: marginX,
+              y: currentY - imgDims.height,
+              width: imgDims.width,
+              height: imgDims.height,
+            });
+            
+            currentY -= (imgDims.height + 20);
+          } catch (imgErr) {
+            console.error('Failed to embed image in PDF:', imgErr);
+            drawText(page, '(Image could not be loaded)', marginX, currentY, 10);
+            currentY -= lineHeight;
+          }
+        }
+      }
+      
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Complaint_${feedback.complaintNumber || 'Report'}.pdf`;
+      link.click();
+      
+      setSnackbar({ open: true, msg: 'PDF Downloaded Successfully', type: 'success' });
     } catch (err) {
       console.error('Error generating PDF:', err);
       setSnackbar({ open: true, msg: 'Failed to generate PDF', type: 'error' });
