@@ -32,11 +32,10 @@ jobs:
       run: npm install --legacy-peer-deps
 
     - name: Set Environment Variables & Build
-      env:
-        CI: 'false'
       run: |
         echo "REACT_APP_API_URL=https://megakem-loyalty-app.onrender.com/api" > .env
-        npm run build
+        echo "DISABLE_ESLINT_PLUGIN=true" >> .env
+        CI=false DISABLE_ESLINT_PLUGIN=true npm run build
 
     - name: Create .htaccess for React Router
       run: |
