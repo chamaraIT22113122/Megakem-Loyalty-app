@@ -177,12 +177,24 @@ const FeedbacksTab = () => {
         currentY -= lineHeight;
         
         for (const src of imagesToLoad) {
-          const imgUrl = src.startsWith('http') ? src : `${API_BASE_URL.replace(/\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
+          const isExternal = src.startsWith('http');
+          const originalImgUrl = isExternal ? src : `${API_BASE_URL.replace(/\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
+          
+          // Proxy external URLs (like Google Drive) to bypass CORS when fetching bytes
+          const fetchUrl = isExternal && !src.includes(API_BASE_URL)
+            ? `${API_BASE_URL}/upload/proxy?url=${encodeURIComponent(originalImgUrl)}`
+            : originalImgUrl;
+
           try {
-            const imgBytes = await fetch(imgUrl).then(res => res.arrayBuffer());
+            const res = await fetch(fetchUrl);
+            if (!res.ok) {
+              console.warn(`Failed to load image for PDF. Status: ${res.status}`);
+              throw new Error(`HTTP Error ${res.status}`);
+            }
+            const imgBytes = await res.arrayBuffer();
             
             let pdfImage;
-            if (imgUrl.toLowerCase().includes('.png')) {
+            if (originalImgUrl.toLowerCase().includes('.png')) {
               pdfImage = await pdfDoc.embedPng(imgBytes);
             } else {
               pdfImage = await pdfDoc.embedJpg(imgBytes);

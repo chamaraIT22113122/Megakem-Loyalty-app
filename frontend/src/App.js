@@ -702,6 +702,9 @@ function App() {
   const [adminTab, setAdminTab] = useState(() => localStorage.getItem('adminTab') || 'dashboard');
   useEffect(() => {
     localStorage.setItem('adminTab', adminTab);
+    if (adminTab === 'feedbacks') {
+      setPendingFeedbacksCount(0);
+    }
   }, [adminTab]);
 
   useEffect(() => {
@@ -712,12 +715,17 @@ function App() {
       });
       socket.on('data_updated', (data) => {
         console.log('Socket update received for:', data?.entity);
-        if (data && ['products', 'qr_codes', 'reprint_requests', 'users', 'scans'].includes(data.entity)) {
+        if (data && ['products', 'qr_codes', 'reprint_requests', 'users', 'scans', 'feedbacks'].includes(data.entity)) {
           // Re-fetch the required data
-          loadAdminData();
+          if (data.entity !== 'feedbacks') {
+            loadAdminData();
+          }
           if (data.entity === 'reprint_requests') {
              loadPendingRequestsCount();
              loadCoAdminRequests();
+          }
+          if (data.entity === 'feedbacks') {
+             setPendingFeedbacksCount(prev => prev + 1);
           }
         }
       });
@@ -730,6 +738,7 @@ function App() {
   const [dashboardStartDate, setDashboardStartDate] = useState('');
   const [dashboardEndDate, setDashboardEndDate] = useState('');
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [pendingFeedbacksCount, setPendingFeedbacksCount] = useState(0);
   const [coAdminApprovedCount, setCoAdminApprovedCount] = useState(0);
   const [coAdminRequestsDialogOpen, setCoAdminRequestsDialogOpen] = useState(false);
   
@@ -4108,7 +4117,7 @@ function App() {
                 '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
               }}
             >
-              <Badge badgeContent={isMainAdmin() ? pendingRequestsCount : coAdminApprovedCount} color="error">
+              <Badge badgeContent={isMainAdmin() ? (pendingRequestsCount + pendingFeedbacksCount) : coAdminApprovedCount} color="error">
                 <Notifications />
               </Badge>
             </IconButton>

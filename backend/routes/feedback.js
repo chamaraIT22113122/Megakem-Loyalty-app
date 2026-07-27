@@ -218,6 +218,10 @@ router.post('/', async (req, res) => {
 
     await feedback.save();
 
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'feedbacks' });
+    }
+
     // Fetch config and send email if configured (Temporarily disabled due to Render firewall)
     // const config = await LoyaltyConfig.getConfig();
     // if (config && config.feedbackRedirectEmail) {
