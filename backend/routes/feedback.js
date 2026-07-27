@@ -30,6 +30,7 @@ const sendFeedbackEmail = async (feedback, redirectEmail, baseUrl = '') => {
       tls: {
         ciphers: 'SSLv3'
       },
+      family: 4, // Force IPv4
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 10000
@@ -112,6 +113,7 @@ router.get('/test-smtp', async (req, res) => {
       tls: {
         ciphers: 'SSLv3'
       },
+      family: 4, // Force IPv4
       connectionTimeout: 10000, // 10 seconds timeout
       greetingTimeout: 10000,
       socketTimeout: 10000
