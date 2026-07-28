@@ -1258,9 +1258,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             </div>
             ` : ''}
             <div class="batch-info">
-              BATCH: <strong>${qr.batchNo}</strong><br>
-              ${mfgDateToShow ? `MFG DATE: <strong>${mfgDateToShow}</strong><br>` : ''}
-              ${expDateToShow ? `EXP DATE: <strong>${expDateToShow}</strong>` : ''}
+              <strong>BATCH: ${qr.batchNo}</strong><br>
+              ${mfgDateToShow ? `<strong>MFG DATE: ${mfgDateToShow}</strong><br>` : ''}
+              ${expDateToShow ? `<strong>EXP DATE: ${expDateToShow}</strong>` : ''}
             </div>
             <div class="description-area" style="font-size: ${pFontSizeDesc}pt; font-weight: bold; height: 4.5mm; margin-top: 1mm; text-transform: uppercase; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
               ${qr.description ? qr.description : '&nbsp;'}
