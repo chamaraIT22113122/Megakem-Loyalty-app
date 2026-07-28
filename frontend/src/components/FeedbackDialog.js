@@ -247,6 +247,7 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
                 placeholder="e.g. MA000123"
                 disabled={isCustomerInfoFilled}
                 required={!isCustomerInfoFilled}
+                autoComplete="off"
               />
             </Box>
 

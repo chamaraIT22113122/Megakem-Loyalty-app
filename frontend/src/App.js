@@ -4258,7 +4258,7 @@ function App() {
           <FeedbackDialog 
             open={feedbackDialogOpen}
             onClose={() => setFeedbackDialogOpen(false)}
-            defaultApplicatorId={memberId}
+            defaultApplicatorId={['admin', 'co-admin'].includes(role) ? '' : memberId}
             defaultRole={role}
           />
         </Box>}
