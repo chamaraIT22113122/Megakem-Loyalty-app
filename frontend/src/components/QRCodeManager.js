@@ -164,7 +164,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         if (parts.length < 4) {
           parts = qr.batchNo.trim().split(/\s+/);
         }
-        if (parts.length >= 5) {
+        if (parts.length >= 4) {
           const packSizeCode = parts[3];
           const numericValue = parseInt(packSizeCode, 10);
           packSize = isNaN(numericValue) ? packSizeCode : `${numericValue}kg`;
@@ -1179,8 +1179,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           }
           .batch-info { 
             font-size: ${pFontSizeBatch}pt; 
-            margin: 0.5mm 0;
-            line-height: 1.2;
+            margin: 0;
+            line-height: 1.1;
             width: 100%;
             overflow: hidden;
           }
@@ -1658,13 +1658,35 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
 
           <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Quantity"
+                type="number"
+                value={quantity}
+                onChange={(e) => {
+                  setQuantity(e.target.value);
+                  const qty = parseInt(e.target.value || 0);
+                  const start = parseInt(startNo || 0);
+                  if (!isNaN(qty) && !isNaN(start)) setEndNo(start + qty - 1);
+                }}
+                margin="normal"
+                required
+                helperText="Total number of QR codes to generate"
+              />
+            </Grid>
             <Grid item xs={6}>
               <TextField
                 fullWidth
                 label="Start No"
                 type="number"
                 value={startNo}
-                onChange={(e) => setStartNo(e.target.value)}
+                onChange={(e) => {
+                  setStartNo(e.target.value);
+                  const qty = parseInt(quantity || 0);
+                  const start = parseInt(e.target.value || 0);
+                  if (!isNaN(qty) && !isNaN(start)) setEndNo(start + qty - 1);
+                }}
                 margin="normal"
                 required
               />
@@ -1675,16 +1697,17 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 label="End No"
                 type="number"
                 value={endNo}
-                onChange={(e) => setEndNo(e.target.value)}
+                onChange={(e) => {
+                  setEndNo(e.target.value);
+                  const end = parseInt(e.target.value || 0);
+                  const start = parseInt(startNo || 0);
+                  if (!isNaN(end) && !isNaN(start)) setQuantity(end - start + 1);
+                }}
                 margin="normal"
                 required
               />
             </Grid>
           </Grid>
-
-          <Typography variant="caption" color="textSecondary">
-            This will generate {parseInt(endNo) - parseInt(startNo) + 1} QR codes.
-          </Typography>
 
           <TextField
             fullWidth

@@ -8,7 +8,7 @@ import {
   Close, PhotoCamera, QrCodeScanner, CloudUpload 
 } from '@mui/icons-material';
 import { feedbackAPI, uploadAPI } from '../services/api';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => {
   const [applicatorId, setApplicatorId] = useState(defaultApplicatorId || '');
@@ -39,45 +39,65 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
     }
   }, [open, defaultApplicatorId]);
 
+  const scannerRef = useRef(null);
+
   useEffect(() => {
-    let scanner = null;
     if (scanning) {
-      scanner = new Html5QrcodeScanner("feedback-qr-reader", {
-        fps: 10,
+      const html5QrCode = new Html5Qrcode("feedback-qr-reader");
+      scannerRef.current = html5QrCode;
+
+      const config = {
+        fps: 12,
         qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
-      }, false);
+      };
 
-      scanner.render((decodedText) => {
-        try {
-          const url = new URL(decodedText);
-          const batch = url.searchParams.get('b') || url.searchParams.get('batch') || url.searchParams.get('batchNo');
-          
-          if (batch) {
-            setBatchNumber(batch);
-            setScanning(false);
-            scanner.clear().catch(console.error);
-            setSnackbar({ open: true, msg: 'Batch number scanned successfully!', type: 'success' });
-          } else {
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        config,
+        (decodedText) => {
+          try {
+            const url = new URL(decodedText);
+            const batch = url.searchParams.get('b') || url.searchParams.get('batch') || url.searchParams.get('batchNo');
+            
+            if (batch) {
+              setBatchNumber(batch);
+              setSnackbar({ open: true, msg: 'Batch number scanned successfully!', type: 'success' });
+            } else {
+              setBatchNumber(decodedText);
+              setSnackbar({ open: true, msg: 'QR scanned!', type: 'info' });
+            }
+          } catch (e) {
             setBatchNumber(decodedText);
-            setScanning(false);
-            scanner.clear().catch(console.error);
             setSnackbar({ open: true, msg: 'QR scanned!', type: 'info' });
           }
-        } catch (e) {
-          setBatchNumber(decodedText);
-          setScanning(false);
-          scanner.clear().catch(console.error);
-          setSnackbar({ open: true, msg: 'QR scanned!', type: 'info' });
+          
+          if (scannerRef.current) {
+            scannerRef.current.stop().then(() => {
+              scannerRef.current.clear();
+              scannerRef.current = null;
+              setScanning(false);
+            }).catch(console.error);
+          } else {
+             setScanning(false);
+          }
+        },
+        (error) => {
+          // Ignored, continuous scanning
         }
-      }, (error) => {
-        // Ignored, continuous scanning
+      ).catch((err) => {
+        console.error("Camera access failed", err);
+        setSnackbar({ open: true, msg: 'Camera access denied or unavailable', type: 'error' });
+        setScanning(false);
       });
     }
 
     return () => {
-      if (scanner) {
-        scanner.clear().catch(console.error);
+      if (scannerRef.current) {
+        scannerRef.current.stop().then(() => {
+          scannerRef.current.clear();
+          scannerRef.current = null;
+        }).catch(console.error);
       }
     };
   }, [scanning]);
