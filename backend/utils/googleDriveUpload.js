@@ -90,20 +90,8 @@ const uploadImageToGoogleDrive = async (filePath, fileName, mimeType = 'image/jp
     }
 
     let FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID_FEEDBACK_IMAGES || process.env.GOOGLE_DRIVE_FOLDER_ID;
-
-    // Also try to get it from the database configuration if enabled
-    try {
-      const LoyaltyConfig = require('../models/LoyaltyConfig');
-      const config = await LoyaltyConfig.getConfig();
-      if (config && config.cloudSync && config.cloudSync.gcpEnabled && config.cloudSync.googleDriveFolderId) {
-        FOLDER_ID = config.cloudSync.googleDriveFolderId;
-      }
-    } catch (e) {
-      console.warn('⚠️ Could not fetch LoyaltyConfig for Google Drive ID:', e.message);
-    }
-
     if (!FOLDER_ID) {
-      console.warn('⚠️ Google Drive Upload Skipped: GOOGLE_DRIVE_FOLDER_ID_FEEDBACK_IMAGES not set and not configured in DB.');
+      console.warn('⚠️ Google Drive Upload Skipped: GOOGLE_DRIVE_FOLDER_ID_FEEDBACK_IMAGES not set.');
       return null;
     }
 
