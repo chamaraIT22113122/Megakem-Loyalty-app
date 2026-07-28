@@ -181,11 +181,12 @@ const FeedbacksTab = () => {
         currentY -= lineHeight;
         
         for (const src of imagesToLoad) {
-          const isExternal = src.startsWith('http');
-          const originalImgUrl = isExternal ? src : `${API_BASE_URL.replace(/\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
+          const normalizedSrc = src.replace(/\\/g, '/');
+          const isExternal = normalizedSrc.startsWith('http');
+          const originalImgUrl = isExternal ? normalizedSrc : `${API_BASE_URL.replace(/\/api$/, '')}${normalizedSrc.startsWith('/') ? '' : '/'}${normalizedSrc}`;
           
           // Proxy external URLs (like Google Drive) to bypass CORS when fetching bytes
-          const fetchUrl = isExternal && !src.includes(API_BASE_URL)
+          const fetchUrl = isExternal && !normalizedSrc.includes(API_BASE_URL)
             ? `${API_BASE_URL}/upload/proxy?url=${encodeURIComponent(originalImgUrl)}`
             : originalImgUrl;
 
@@ -392,9 +393,10 @@ const FeedbacksTab = () => {
               src={(() => {
                 const src = selectedGallery.images[selectedGallery.index];
                 if (!src) return '';
-                const isExternal = src.startsWith('http');
-                const originalImgUrl = isExternal ? src : `${API_BASE_URL.replace(/\/api$/, '')}${src.startsWith('/') ? '' : '/'}${src}`;
-                return isExternal && !src.includes(API_BASE_URL)
+                const normalizedSrc = src.replace(/\\/g, '/');
+                const isExternal = normalizedSrc.startsWith('http');
+                const originalImgUrl = isExternal ? normalizedSrc : `${API_BASE_URL.replace(/\/api$/, '')}${normalizedSrc.startsWith('/') ? '' : '/'}${normalizedSrc}`;
+                return isExternal && !normalizedSrc.includes(API_BASE_URL)
                   ? `${API_BASE_URL}/upload/proxy?url=${encodeURIComponent(originalImgUrl)}`
                   : originalImgUrl;
               })()} 
