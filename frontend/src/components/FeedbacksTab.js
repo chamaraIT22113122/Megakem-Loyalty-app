@@ -396,9 +396,7 @@ const FeedbacksTab = () => {
                 const normalizedSrc = src.replace(/\\/g, '/');
                 const isExternal = normalizedSrc.startsWith('http');
                 const originalImgUrl = isExternal ? normalizedSrc : `${API_BASE_URL.replace(/\/api$/, '')}${normalizedSrc.startsWith('/') ? '' : '/'}${normalizedSrc}`;
-                return isExternal && !normalizedSrc.includes(API_BASE_URL)
-                  ? `${API_BASE_URL}/upload/proxy?url=${encodeURIComponent(originalImgUrl)}`
-                  : originalImgUrl;
+                return originalImgUrl;
               })()} 
               alt="Feedback" 
               style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 4 }} 
