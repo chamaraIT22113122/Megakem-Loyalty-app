@@ -182,8 +182,10 @@ const FeedbacksTab = () => {
         
         for (const src of imagesToLoad) {
           const normalizedSrc = src.replace(/\\/g, '/');
+          const isBase64 = normalizedSrc.startsWith('data:image/');
           const isExternal = normalizedSrc.startsWith('http');
-          const originalImgUrl = isExternal ? normalizedSrc : `${API_BASE_URL.replace(/\/api$/, '')}${normalizedSrc.startsWith('/') ? '' : '/'}${normalizedSrc}`;
+          
+          const originalImgUrl = isBase64 ? normalizedSrc : (isExternal ? normalizedSrc : `${API_BASE_URL.replace(new RegExp('/api$'), '')}${normalizedSrc.startsWith('/') ? '' : '/'}${normalizedSrc}`);
           
           // Proxy external URLs (like Google Drive) to bypass CORS when fetching bytes
           const fetchUrl = isExternal && !normalizedSrc.includes(API_BASE_URL)
@@ -191,12 +193,24 @@ const FeedbacksTab = () => {
             : originalImgUrl;
 
           try {
-            const res = await fetch(fetchUrl);
-            if (!res.ok) {
-              console.warn(`Failed to load image for PDF. Status: ${res.status}`);
-              throw new Error(`HTTP Error ${res.status}`);
+            let imgBytes;
+            if (isBase64) {
+              const base64Data = originalImgUrl.split(',')[1];
+              const binaryString = window.atob(base64Data);
+              const len = binaryString.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              imgBytes = bytes.buffer;
+            } else {
+              const res = await fetch(fetchUrl);
+              if (!res.ok) {
+                console.warn(`Failed to load image for PDF. Status: ${res.status}`);
+                throw new Error(`HTTP Error ${res.status}`);
+              }
+              imgBytes = await res.arrayBuffer();
             }
-            const imgBytes = await res.arrayBuffer();
             
             let pdfImage;
             if (originalImgUrl.toLowerCase().includes('.png')) {
@@ -394,8 +408,9 @@ const FeedbacksTab = () => {
                 const src = selectedGallery.images[selectedGallery.index];
                 if (!src) return '';
                 const normalizedSrc = src.replace(/\\/g, '/');
+                const isBase64 = normalizedSrc.startsWith('data:image/');
                 const isExternal = normalizedSrc.startsWith('http');
-                const originalImgUrl = isExternal ? normalizedSrc : `${API_BASE_URL.replace(/\/api$/, '')}${normalizedSrc.startsWith('/') ? '' : '/'}${normalizedSrc}`;
+                const originalImgUrl = isBase64 ? normalizedSrc : (isExternal ? normalizedSrc : `${API_BASE_URL.replace(new RegExp('/api$'), '')}${normalizedSrc.startsWith('/') ? '' : '/'}${normalizedSrc}`);
                 return originalImgUrl;
               })()} 
               alt="Feedback" 

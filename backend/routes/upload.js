@@ -65,10 +65,29 @@ router.post('/', upload.single('image'), async (req, res) => {
       imageUrl = `https://drive.google.com/uc?export=view&id=${driveResult.id}`;
       isDriveUrl = true;
       
-      // Optional: Delete the local file after successful upload to Drive
-      // fs.unlink(req.file.path, (err) => {
-      //   if (err) console.error('Error deleting local file after Drive upload:', err);
-      // });
+      // Delete the local file after successful upload to Drive
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error('Error deleting local file after Drive upload:', err);
+      });
+    } else {
+      // Google Drive failed, fallback to storing compressed image in MongoDB via Base64
+      try {
+        const sharp = require('sharp');
+        const compressedBuffer = await sharp(req.file.path)
+          .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 60 })
+          .toBuffer();
+          
+        imageUrl = `data:image/jpeg;base64,${compressedBuffer.toString('base64')}`;
+        
+        // Delete the local file since we are using Base64 now
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error('Error deleting local file after sharp compression:', err);
+        });
+      } catch (sharpErr) {
+        console.error('Error compressing image with sharp:', sharpErr);
+        // If sharp fails, we leave it as the local file URL so it doesn't break
+      }
     }
     
     res.status(200).json({
