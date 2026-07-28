@@ -147,14 +147,37 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const getProductPrice = (qr) => {
     if (!qr || !products || products.length === 0) return 0;
     const prodId = qr.product?._id || qr.product;
+    let product;
     if (prodId) {
-      const product = products.find(p => p._id === prodId);
-      if (product) return product.price || 0;
+      product = products.find(p => p._id === prodId);
     }
-    const product = products.find(p => 
-      p.productNo && qr.productNo && p.productNo.toUpperCase() === qr.productNo.toUpperCase()
-    );
-    return product ? (product.price || 0) : 0;
+    if (!product) {
+      product = products.find(p => 
+        p.productNo && qr.productNo && p.productNo.toUpperCase() === qr.productNo.toUpperCase()
+      );
+    }
+
+    if (product) {
+      let packSize = '1kg';
+      if (qr.batchNo) {
+        let parts = qr.batchNo.trim().split('_');
+        if (parts.length < 4) {
+          parts = qr.batchNo.trim().split(/\s+/);
+        }
+        if (parts.length >= 5) {
+          const packSizeCode = parts[3];
+          const numericValue = parseInt(packSizeCode, 10);
+          packSize = isNaN(numericValue) ? packSizeCode : `${numericValue}kg`;
+        }
+      }
+
+      if (product.packSizePricing && product.packSizePricing.length > 0) {
+        const pricing = product.packSizePricing.find(p => p.packSize.toLowerCase() === packSize.toLowerCase());
+        if (pricing && pricing.price > 0) return pricing.price;
+      }
+      return product.price || 0;
+    }
+    return 0;
   };
 
   const getProductDetails = (qr) => {
