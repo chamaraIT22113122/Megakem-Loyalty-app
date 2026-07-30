@@ -3263,7 +3263,7 @@ function App() {
         if (adminTab === 'qr-codes' && !hasPermission('canManageQRCodes')) return false;
         if (adminTab === 'reprint-requests' && !hasPermission('canManageCoAdminRequests')) return false;
         if (adminTab === 'applicator' && !hasPermission('canManageApplicators')) return false;
-        if (adminTab === 'applicator-program' && !hasPermission('canManageApplicators')) return false;
+        if (adminTab === 'applicator-program' && !hasPermission('canManageApplicatorProgram')) return false;
         if (adminTab === 'audit-logs' && !hasPermission('canViewAuditLogs')) return false;
         if (adminTab === 'feedbacks' && !hasPermission('canViewFeedbacks')) return false;
         return true;
@@ -3276,8 +3276,8 @@ function App() {
         else if (hasPermission('canManageUsers')) setAdminTab('members');
         else if (hasPermission('canManageProducts')) setAdminTab('products');
         else if (hasPermission('canManageQRCodes')) setAdminTab('qr-codes');
-        else if (hasPermission('canManageApplicators')) setAdminTab('applicator-program');
         else if (hasPermission('canManageApplicators')) setAdminTab('applicator');
+        else if (hasPermission('canManageApplicatorProgram')) setAdminTab('applicator-program');
         else if (hasPermission('canViewAuditLogs')) setAdminTab('audit-logs');
         else if (hasPermission('canViewFeedbacks')) setAdminTab('feedbacks');
         else setAdminTab('profile');
@@ -5618,7 +5618,7 @@ function App() {
                 />
               )}
               {hasPermission('canManageApplicators') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
-              {hasPermission('canManageApplicators') && <Tab icon={<Star />} label='Applicator Program' value='applicator-program' />}
+              {hasPermission('canManageApplicatorProgram') && <Tab icon={<Star />} label='Applicator Program' value='applicator-program' />}
               {hasPermission('canViewAuditLogs') && <Tab icon={<Security />} label='Audit Logs' value='audit-logs' />}
               {hasPermission('canViewFeedbacks') && <Tab icon={<FeedbackIcon />} label='Feedbacks' value='feedbacks' />}
               <Tab icon={<Settings />} label='Profile' value='profile' />
@@ -7598,6 +7598,7 @@ function App() {
                       canManageQRCodes: false,
                       canManageCoAdminRequests: false,
                       canManageApplicators: false,
+                      canManageApplicatorProgram: false,
                       canViewAuditLogs: false,
                       canViewFeedbacks: false
                     } 
@@ -7653,6 +7654,9 @@ function App() {
                           <Chip label='QR' size='small' color='secondary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Requests' size='small' color='warning' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Applicators' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Appl. Program' size='small' color='secondary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Audit Logs' size='small' color='error' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+                          <Chip label='Feedbacks' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Delete' size='small' color='error' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                           <Chip label='Export' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
                         </>
@@ -7669,6 +7673,7 @@ function App() {
                           {u.permissions?.canManageQRCodes === true && <Chip label='QR' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageCoAdminRequests === true && <Chip label='Requests' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canManageApplicators === true && <Chip label='Applicators' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
+                          {u.permissions?.canManageApplicatorProgram === true && <Chip label='Appl. Program' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canViewAuditLogs === true && <Chip label='Audit Logs' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canViewFeedbacks === true && <Chip label='Feedbacks' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
                           {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
@@ -7709,6 +7714,7 @@ function App() {
                               canManageQRCodes: u.permissions?.canManageQRCodes === true,
                               canManageCoAdminRequests: u.permissions?.canManageCoAdminRequests === true,
                               canManageApplicators: u.permissions?.canManageApplicators === true,
+                              canManageApplicatorProgram: u.permissions?.canManageApplicatorProgram === true,
                               canViewAuditLogs: u.permissions?.canViewAuditLogs === true,
                               canViewFeedbacks: u.permissions?.canViewFeedbacks === true
                             }
@@ -10210,6 +10216,28 @@ function App() {
                       }));
                     }} 
                     color='info' 
+                  />
+                </Box>
+
+                {/* 10b. Applicator Program */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Access Applicator Program</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Applicator Program tab</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canManageApplicatorProgram === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canManageApplicatorProgram: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='secondary' 
                   />
                 </Box>
 
