@@ -16,6 +16,8 @@ import SriLankaZoneMap from './components/SriLankaZoneMap';
 import FeedbackDialog from './components/FeedbackDialog';
 import FeedbacksTab from './components/FeedbacksTab';
 import IDCardInteractivePreview from './components/IDCardInteractivePreview';
+import ApplicatorProgramDashboard from './components/ApplicatorProgramDashboard';
+import MembersAndLoyaltyTab from './components/MembersAndLoyaltyTab';
 import DataManagement from './components/DataManagement';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
@@ -699,7 +701,16 @@ function App() {
     return localStorage.getItem('adminEmail') || '';
   });
   const [adminPassword, setAdminPassword] = useState('');
-  const [adminTab, setAdminTab] = useState(() => localStorage.getItem('adminTab') || 'dashboard');
+  const [adminTab, setAdminTab] = useState(() => {
+    const saved = localStorage.getItem('adminTab');
+    if (saved === 'rewards' || saved === 'leaderboard-admin') return 'applicator-program';
+    return saved || 'dashboard';
+  });
+  const [applicatorProgramSubTab, setApplicatorProgramSubTab] = useState(() => {
+    const saved = localStorage.getItem('adminTab');
+    if (saved === 'rewards') return 'rewards';
+    return 'summary';
+  });
   useEffect(() => {
     localStorage.setItem('adminTab', adminTab);
     if (adminTab === 'feedbacks') {
@@ -3248,12 +3259,11 @@ function App() {
         if (adminTab === 'scans' && !hasPermission('canViewScans')) return false;
         if (adminTab === 'co-admins' && !hasPermission('canManageCoAdmins')) return false;
         if (adminTab === 'members' && !hasPermission('canManageUsers')) return false;
-        if (adminTab === 'rewards' && !hasPermission('canViewRewards')) return false;
-        if (adminTab === 'leaderboard-admin' && !hasPermission('canViewLeaderboard')) return false;
         if (adminTab === 'products' && !hasPermission('canManageProducts')) return false;
         if (adminTab === 'qr-codes' && !hasPermission('canManageQRCodes')) return false;
         if (adminTab === 'reprint-requests' && !hasPermission('canManageCoAdminRequests')) return false;
         if (adminTab === 'applicator' && !hasPermission('canManageApplicators')) return false;
+        if (adminTab === 'applicator-program' && !hasPermission('canManageApplicators')) return false;
         if (adminTab === 'audit-logs' && !hasPermission('canViewAuditLogs')) return false;
         if (adminTab === 'feedbacks' && !hasPermission('canViewFeedbacks')) return false;
         return true;
@@ -3264,10 +3274,9 @@ function App() {
         else if (hasPermission('canViewAdvancedInsights')) setAdminTab('advanced-insights');
         else if (hasPermission('canViewScans')) setAdminTab('scans');
         else if (hasPermission('canManageUsers')) setAdminTab('members');
-        else if (hasPermission('canViewRewards')) setAdminTab('rewards');
-        else if (hasPermission('canViewLeaderboard')) setAdminTab('leaderboard-admin');
         else if (hasPermission('canManageProducts')) setAdminTab('products');
         else if (hasPermission('canManageQRCodes')) setAdminTab('qr-codes');
+        else if (hasPermission('canManageApplicators')) setAdminTab('applicator-program');
         else if (hasPermission('canManageApplicators')) setAdminTab('applicator');
         else if (hasPermission('canViewAuditLogs')) setAdminTab('audit-logs');
         else if (hasPermission('canViewFeedbacks')) setAdminTab('feedbacks');
@@ -3295,7 +3304,7 @@ function App() {
 
   // Auto-calculate and load cash rewards when tab or date changes
   useEffect(() => {
-    if (view === 'admin' && adminTab === 'rewards' && selectedYear && selectedMonth) {
+    if (view === 'admin' && adminTab === 'applicator-program' && applicatorProgramSubTab === 'rewards' && selectedYear && selectedMonth) {
       const loadRewards = async () => {
         setLoading(true);
         try {
@@ -3311,7 +3320,7 @@ function App() {
       };
       loadRewards();
     }
-  }, [view, adminTab, selectedYear, selectedMonth]);
+  }, [view, adminTab, applicatorProgramSubTab, selectedYear, selectedMonth]);
 
   // Load advanced insights when tab is selected
   useEffect(() => {
@@ -4192,7 +4201,7 @@ function App() {
           {view === 'admin' ? 'App' : 'Admin'}
         </Button>
       </Toolbar></AppBar>
-      <Container maxWidth={view === 'admin' && adminAuth ? 'lg' : 'sm'} sx={{ flexGrow: 1, py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column' }}>
+      <Container maxWidth={['admin', 'profile'].includes(view) ? 'xl' : 'sm'} sx={{ flexGrow: 1, py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column' }}>
         {view === 'welcome' && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', animation: 'fadeIn 0.6s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
           <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 5 } }}>
             <Box sx={{ mb: { xs: 2, sm: 4 }, display: 'flex', justifyContent: 'center', animation: 'logoFloat 3s ease-in-out infinite', '@keyframes logoFloat': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-15px)' } } }}>
@@ -4654,123 +4663,159 @@ function App() {
 
                         {/* Stats Cards */}
                         <Grid item xs={12} md={7.5} lg={8.5}>
-                          <Grid container spacing={3}>
-                            <Grid item xs={12} sm={6} md={3}>
+                          <Grid container spacing={2}>
+                            <Grid item xs={6} sm={6} md={6} lg={3}>
                               <Box sx={{ 
-                                bgcolor: 'rgba(255,255,255,0.95)',
-                                borderRadius: 3,
+                                bgcolor: 'rgba(255,255,255,0.9)',
+                                backdropFilter: 'blur(10px)',
+                                borderRadius: 4,
                                 p: 3,
                                 textAlign: 'center',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                                height: '100%'
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                                border: '1px solid rgba(255,255,255,0.4)',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                height: '100%',
+                                '&:hover': {
+                                  transform: 'translateY(-5px) scale(1.02)',
+                                  boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+                                  bgcolor: 'rgba(255,255,255,0.95)'
+                                }
                               }}>
                                 <Box sx={{ 
-                                  width: 60,
-                                  height: 60,
+                                  width: 64,
+                                  height: 64,
                                   borderRadius: '50%',
-                                  bgcolor: 'primary.lighter',
+                                  background: 'linear-gradient(135deg, #e6f2ff 0%, #b3d9ff 100%)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   mx: 'auto',
-                                  mb: 2
+                                  mb: 2,
+                                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 12px rgba(0,51,102,0.15)'
                                 }}>
                                   <Typography variant="h4">📊</Typography>
                                 </Box>
-                                <Typography variant="h3" fontWeight={800} color="primary.main" sx={{ mb: 1, fontSize: { xs: '2rem', sm: '2.5rem', md: '2.5rem' } }}>
+                                <Typography variant="h3" fontWeight={800} sx={{ mb: 1, fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' }, background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                                   {totalScans}
                                 </Typography>
-                                <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                                <Typography variant="body1" color="text.secondary" fontWeight={700} sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                   Total Scans
                                 </Typography>
                               </Box>
                             </Grid>
-                            <Grid item xs={12} sm={6} md={3}>
+                            <Grid item xs={6} sm={6} md={6} lg={3}>
                               <Box sx={{ 
-                                bgcolor: 'rgba(255,255,255,0.95)',
-                                borderRadius: 3,
+                                bgcolor: 'rgba(255,255,255,0.9)',
+                                backdropFilter: 'blur(10px)',
+                                borderRadius: 4,
                                 p: 3,
                                 textAlign: 'center',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                                height: '100%'
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                                border: '1px solid rgba(255,255,255,0.4)',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                height: '100%',
+                                '&:hover': {
+                                  transform: 'translateY(-5px) scale(1.02)',
+                                  boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+                                  bgcolor: 'rgba(255,255,255,0.95)'
+                                }
                               }}>
                                 <Box sx={{ 
-                                  width: 60,
-                                  height: 60,
+                                  width: 64,
+                                  height: 64,
                                   borderRadius: '50%',
-                                  bgcolor: 'success.lighter',
+                                  background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   mx: 'auto',
-                                  mb: 2
+                                  mb: 2,
+                                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 12px rgba(16,185,129,0.15)'
                                 }}>
                                   <Typography variant="h4">💰</Typography>
                                 </Box>
-                                <Typography variant="h4" fontWeight={800} color="success.main" sx={{ mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' } }}>
+                                <Typography variant="h4" fontWeight={800} sx={{ mb: 1, fontSize: { xs: '1.1rem', sm: '1.3rem', md: '1.5rem' }, background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                                   Rs. {totalAmount.toLocaleString()}
                                 </Typography>
-                                <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                                <Typography variant="body1" color="text.secondary" fontWeight={700} sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                   Total Amount
                                 </Typography>
                               </Box>
                             </Grid>
-                            <Grid item xs={12} sm={6} md={3}>
+                            <Grid item xs={6} sm={6} md={6} lg={3}>
                               <Box sx={{ 
-                                bgcolor: 'rgba(255,255,255,0.95)',
-                                borderRadius: 3,
+                                bgcolor: 'rgba(255,255,255,0.9)',
+                                backdropFilter: 'blur(10px)',
+                                borderRadius: 4,
                                 p: 3,
                                 textAlign: 'center',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                                height: '100%'
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                                border: '1px solid rgba(255,255,255,0.4)',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                height: '100%',
+                                '&:hover': {
+                                  transform: 'translateY(-5px) scale(1.02)',
+                                  boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+                                  bgcolor: 'rgba(255,255,255,0.95)'
+                                }
                               }}>
                                 <Box sx={{ 
-                                  width: 60,
-                                  height: 60,
+                                  width: 64,
+                                  height: 64,
                                   borderRadius: '50%',
-                                  bgcolor: 'secondary.lighter',
+                                  background: 'linear-gradient(135deg, #f5fce8 0%, #dcf09e 100%)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   mx: 'auto',
-                                  mb: 2
+                                  mb: 2,
+                                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 12px rgba(164,210,51,0.15)'
                                 }}>
                                   <Typography variant="h4">⭐</Typography>
                                 </Box>
-                                <Typography variant="h4" fontWeight={800} color="secondary.main" sx={{ mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' } }}>
+                                <Typography variant="h4" fontWeight={800} sx={{ mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' }, background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                                   {(currentMember?.annualPoints || 0).toLocaleString()}
                                 </Typography>
-                                <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                                <Typography variant="body1" color="text.secondary" fontWeight={700} sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                   Annual Points
                                 </Typography>
                               </Box>
                             </Grid>
-                            <Grid item xs={12} sm={6} md={3}>
+                            <Grid item xs={6} sm={6} md={6} lg={3}>
                               <Box sx={{ 
-                                bgcolor: 'rgba(255,255,255,0.95)',
-                                borderRadius: 3,
+                                bgcolor: 'rgba(255,255,255,0.9)',
+                                backdropFilter: 'blur(10px)',
+                                borderRadius: 4,
                                 p: 3,
                                 textAlign: 'center',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                                height: '100%'
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                                border: '1px solid rgba(255,255,255,0.4)',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                height: '100%',
+                                '&:hover': {
+                                  transform: 'translateY(-5px) scale(1.02)',
+                                  boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+                                  bgcolor: 'rgba(255,255,255,0.95)'
+                                }
                               }}>
                                 <Box sx={{ 
-                                  width: 60,
-                                  height: 60,
+                                  width: 64,
+                                  height: 64,
                                   borderRadius: '50%',
-                                  bgcolor: 'warning.lighter',
+                                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   mx: 'auto',
-                                  mb: 2
+                                  mb: 2,
+                                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 12px rgba(245,158,11,0.15)'
                                 }}>
-                                  <EmojiEvents sx={{ fontSize: '2rem', color: 'warning.main' }} />
+                                  <EmojiEvents sx={{ fontSize: '2.2rem', color: 'warning.main' }} />
                                 </Box>
-                                <Typography variant="h3" fontWeight={800} color="warning.main" sx={{ mb: 1, fontSize: { xs: '2rem', sm: '2.5rem', md: '2.5rem' } }}>
+                                <Typography variant="h3" fontWeight={800} sx={{ mb: 1, fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' }, background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                                   {totalPoints.toLocaleString()}
                                 </Typography>
-                                <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                                <Typography variant="body1" color="text.secondary" fontWeight={700} sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                   Loyalty Points
                                 </Typography>
                               </Box>
@@ -4867,13 +4912,13 @@ function App() {
                   */}
 
                   {/* Cash Rewards History Section */}
-                  <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', mb: 3 }}>
-                    <Box sx={{ p: 3, bgcolor: 'secondary.main', color: 'white' }}>
+                  <Card sx={{ borderRadius: 4, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', mb: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+                    <Box sx={{ p: 3, background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)', color: 'white' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="h4">💵</Typography>
+                        <Typography variant="h4" sx={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>💵</Typography>
                         <Box>
-                          <Typography variant="h5" fontWeight={700}>Cash Rewards History</Typography>
-                          <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.15)' }}>Cash Rewards History</Typography>
+                          <Typography variant="body2" sx={{ opacity: 0.95, fontWeight: 500 }}>
                             Monthly cash rewards details and payments
                           </Typography>
                         </Box>
@@ -4925,13 +4970,13 @@ function App() {
                   </Card>
 
                   {/* Scan History Section */}
-                  <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-                    <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
+                  <Card sx={{ borderRadius: 4, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', mb: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+                    <Box sx={{ p: 3, background: 'linear-gradient(135deg, #001a33 0%, #003366 100%)', color: 'white' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <HistoryIcon sx={{ fontSize: '2rem' }} />
+                        <HistoryIcon sx={{ fontSize: '2.5rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} />
                         <Box>
-                          <Typography variant="h5" fontWeight={700}>Scan History</Typography>
-                          <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.15)' }}>Scan History</Typography>
+                          <Typography variant="body2" sx={{ opacity: 0.95, fontWeight: 500 }}>
                             Complete purchase records and loyalty points earned
                           </Typography>
                         </Box>
@@ -5556,10 +5601,8 @@ function App() {
               {hasPermission('canViewDashboard') && <Tab icon={<DashboardIcon />} label='Dashboard' value='dashboard' />}
               {hasPermission('canViewScans') && <Tab icon={<HistoryIcon />} label='Scans' value='scans' />}
               {hasPermission('canManageCoAdmins') && <Tab icon={<People />} label='Co-Admins' value='co-admins' />}
-              {hasPermission('canManageUsers') && <Tab icon={<EmojiEvents />} label='Members & Loyalty' value='members' />}
-              {hasPermission('canViewRewards') && <Tab icon={<CardGiftcard />} label='Cash Rewards' value='rewards' />}
+
               {/* {hasPermission('canManageProducts') && <Tab icon={<Star />} label='Rewards Catalog' value='catalog' />} HIDDEN FOR NOW */}
-              {hasPermission('canViewLeaderboard') && <Tab icon={<TrendingUp />} label='Leaderboard' value='leaderboard-admin' />}
               {hasPermission('canViewAdvancedInsights') && <Tab icon={<Insights />} label='Advanced Insights' value='advanced-insights' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
@@ -5575,6 +5618,7 @@ function App() {
                 />
               )}
               {hasPermission('canManageApplicators') && <Tab icon={<Build />} label='Applicator & Hardware' value='applicator' />}
+              {hasPermission('canManageApplicators') && <Tab icon={<Star />} label='Applicator Program' value='applicator-program' />}
               {hasPermission('canViewAuditLogs') && <Tab icon={<Security />} label='Audit Logs' value='audit-logs' />}
               {hasPermission('canViewFeedbacks') && <Tab icon={<FeedbackIcon />} label='Feedbacks' value='feedbacks' />}
               <Tab icon={<Settings />} label='Profile' value='profile' />
@@ -5703,23 +5747,28 @@ function App() {
               </Box>
             </Grid>
             
-            {/* Quick Performance Metrics Bar */}
+             {/* Quick Performance Metrics Bar */}
             <Grid item xs={12}>
-              <Paper sx={{ 
-                p: 2, 
-                background: 'linear-gradient(135deg, #003366 0%, #001a33 100%)',
+              <Box sx={{ 
+                p: 2.5, 
+                background: 'linear-gradient(135deg, rgba(0, 26, 51, 0.9) 0%, rgba(0, 51, 102, 0.8) 100%)',
+                backdropFilter: 'blur(10px)',
                 color: 'white',
-                borderRadius: 3,
-                boxShadow: 2
+                borderRadius: 4,
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2
               }}>
-                <Typography variant='subtitle2' gutterBottom sx={{ opacity: 0.9, fontWeight: 600 }}>
-                  <Speed sx={{ fontSize: '1rem', mr: 0.5 }} /> Quick Performance Metrics
+                <Typography variant='subtitle2' sx={{ opacity: 0.9, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  <Speed sx={{ fontSize: '1.2rem', mr: 0.5, verticalAlign: 'middle', color: '#4dabf5' }} /> Quick Performance Metrics
                 </Typography>
-                <Grid container spacing={2}>
+                <Grid container spacing={3}>
                   <Grid item xs={6} sm={3}>
-                    <Box>
-                      <Typography variant='caption' sx={{ opacity: 0.8 }}>Avg Scans/Day</Typography>
-                      <Typography variant='h6' fontWeight={700}>
+                    <Box sx={{ borderRight: { sm: '1px solid rgba(255,255,255,0.2)' }, pr: { sm: 2 } }}>
+                      <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>Avg Scans/Day</Typography>
+                      <Typography variant='h5' fontWeight={800} sx={{ color: '#4dabf5' }}>
                         {stats.dailyStats && stats.dailyStats.length > 0 
                           ? Math.round(stats.total / stats.dailyStats.length)
                           : stats.total}
@@ -5727,31 +5776,30 @@ function App() {
                     </Box>
                   </Grid>
                   <Grid item xs={6} sm={3}>
-                    <Box>
-                      <Typography variant='caption' sx={{ opacity: 0.8 }}>App/Cust Ratio</Typography>
-                      <Typography variant='h6' fontWeight={700}>
+                    <Box sx={{ borderRight: { sm: '1px solid rgba(255,255,255,0.2)' }, pr: { sm: 2 } }}>
+                      <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>App/Cust Ratio</Typography>
+                      <Typography variant='h5' fontWeight={800} sx={{ color: '#66bb6a' }}>
                         {stats.customer > 0 ? (stats.applicator / stats.customer).toFixed(2) : stats.applicator}:1
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={6} sm={3}>
-                    <Box>
-                      <Typography variant='caption' sx={{ opacity: 0.8 }}>Scans This Week</Typography>
-                      <Typography variant='h6' fontWeight={700}>
+                    <Box sx={{ borderRight: { sm: '1px solid rgba(255,255,255,0.2)' }, pr: { sm: 2 } }}>
+                      <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>Scans This Week</Typography>
+                      <Typography variant='h5' fontWeight={800} sx={{ color: '#ffca28' }}>
                         {stats.lastWeek || 0}
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={6} sm={3}>
                     <Box>
-                      <Typography variant='caption' sx={{ opacity: 0.8 }}>Active Products</Typography>
                       <Typography variant='h6' fontWeight={700}>
                         {stats.topProducts?.length || 0}
                       </Typography>
                     </Box>
                   </Grid>
                 </Grid>
-              </Paper>
+              </Box>
             </Grid>
 
             {/* Calendar View Section */}
@@ -6472,14 +6520,25 @@ function App() {
                       else { acc.push({ location: scan.location, count: 1 }); } 
                       return acc; 
                     }, []).sort((a, b) => b.count - a.count).slice(0, 6).map((loc, i) => 
-                      <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: i === 0 ? 'success.main' : 'grey.400', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                      <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'rgba(255, 255, 255, 0.5)', borderRadius: 1 }}>
                         <ListItemText 
                           primary={<Typography variant='body1' fontWeight={600}>{loc.location}</Typography>} 
-                          secondary={<Chip label={`${loc.count} scans`} size='small' color={i === 0 ? 'success' : 'default'} />} 
+                          secondary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
+                              <Chip label={loc.count + " scans"} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} />
+                              <Typography variant='caption' color='text.secondary'>#{i + 1} Top City</Typography>
+                            </Box>
+                          } 
                           primaryTypographyProps={{ component: 'div' }}
                           secondaryTypographyProps={{ component: 'div' }}
                         />
                       </ListItem>
+                    )}
+                    {filteredDashboardScans.filter(s => s.location).length === 0 && (
+                      <Box sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}>
+                        <Typography variant="h3" sx={{ mb: 1 }}>📍</Typography>
+                        <Typography variant="body2" color="text.secondary">No cities recorded yet</Typography>
+                      </Box>
                     )}
                   </List>
                   <Typography variant='caption' color='text.secondary' sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
@@ -6582,11 +6641,11 @@ function App() {
                                 price: product ? product.price : (scan.price || 0),
                                 scans: 0, 
                                 totalQty: 0 
-                              }; 
-                            } 
-                            acc[key].scans += 1; 
-                            acc[key].totalQty += 1; 
-                            return acc; 
+                      }; 
+                    } 
+                    acc[key].scans += 1; 
+                    acc[key].totalQty += 1; 
+                    return acc; 
                           }, {}); 
                           return Object.entries(productStats).sort((a, b) => (b[1].price * b[1].totalQty) - (a[1].price * a[1].totalQty)).slice(0, 6).map(([key, data]) => 
                             <TableRow key={key} sx={{ '&:hover': { bgcolor: 'action.hover' }, bgcolor: data.price === 0 ? 'warning.50' : 'inherit' }}>
@@ -6751,7 +6810,12 @@ function App() {
                 sx={{ 
                   cursor: 'pointer',
                   transition: 'all 0.3s',
-                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
+                  bgcolor: 'rgba(255, 255, 255, 0.7)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255, 255, 255, 0.4)',
+                  borderRadius: 3,
+                  boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
+                  '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 40px 0 rgba(31, 38, 135, 0.1)' }
                 }}
                 onClick={() => {
                   setExpandedCardDialog({ open: true, type: 'products', data: stats.topProducts || [] });
@@ -6771,24 +6835,31 @@ function App() {
                     )}
                   </Box>
                   <List dense>
-                    {stats.topProducts?.slice(0, 6).map((p, i) => 
-                      <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                        <ListItemText 
-                          primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} 
-                          secondary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
-                              <Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} />
-                              <Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography>
-                            </Box>
-                          } 
-                          primaryTypographyProps={{ component: 'div' }}
-                          secondaryTypographyProps={{ component: 'div' }}
-                        />
-                      </ListItem>
+                    {stats.topProducts?.length > 0 ? (
+                      stats.topProducts.slice(0, 6).map((p, i) => 
+                        <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'rgba(255, 255, 255, 0.5)', borderRadius: 1 }}>
+                          <ListItemText 
+                            primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} 
+                            secondary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
+                                <Chip label={p.count + " scans"} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} />
+                                <Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography>
+                              </Box>
+                            } 
+                            primaryTypographyProps={{ component: 'div' }}
+                            secondaryTypographyProps={{ component: 'div' }}
+                          />
+                        </ListItem>
+                      )
+                    ) : (
+                      <Box sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}>
+                        <Typography variant="h3" sx={{ mb: 1 }}>??</Typography>
+                        <Typography variant="body2" color="text.secondary">No product scans recorded yet</Typography>
+                      </Box>
                     )}
                   </List>
                   <Typography variant='caption' color='text.secondary' sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
-                    Click to view all products
+                    {stats.topProducts?.length > 0 ? "Click to view all products" : ""}
                   </Typography>
                 </CardContent>
               </Card>
@@ -6837,7 +6908,7 @@ function App() {
               </Box>
             </Grid>
             
-            <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>⏰ Peak Activity Hours</Typography><List dense>{(() => {
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>⏰ Peak Activity Hours</Typography><List dense>{(() => {
               const hourCounts = filteredDashboardScans.reduce((acc, scan) => {
                 if (scan.timestamp) {
                   const hour = new Date(scan.timestamp).getHours();
@@ -6860,7 +6931,7 @@ function App() {
                 ));
             })()}</List></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📅 Weekly Trends</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>Scans by Day of Week</Typography>{(() => {
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📅 Weekly Trends</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>Scans by Day of Week</Typography>{(() => {
               const dayCounts = filteredDashboardScans.reduce((acc, scan) => {
                 if (scan.timestamp) {
                   const day = new Date(scan.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
@@ -6883,7 +6954,7 @@ function App() {
               ));
             })()}</CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🎯 Performance Metrics</Typography><Box sx={{ mt: 2 }}>
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🎯 Performance Metrics</Typography><Box sx={{ mt: 2 }}>
               <Box sx={{ mb: 2, p: 2, bgcolor: 'success.50', borderRadius: 2 }}>
                 <Typography variant='body2' color='text.secondary'>Avg Scans/Day</Typography>
                 <Typography variant='h5' fontWeight='bold' color='success.dark'>{(filteredDashboardScans.length / Math.max(1, Math.ceil((Date.now() - new Date(filteredDashboardScans[filteredDashboardScans.length - 1]?.timestamp || Date.now()).getTime()) / (1000 * 60 * 60 * 24)))).toFixed(1)}</Typography>
@@ -6898,7 +6969,7 @@ function App() {
               </Box>
             </Box></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>💎 Tier Distribution</Typography><Box sx={{ mt: 2 }}>{(() => {
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>💎 Tier Distribution</Typography><Box sx={{ mt: 2 }}>{(() => {
               const tierCounts = filteredDashboardScans.reduce((acc, scan) => {
                 const member = members.find(m => m.memberId === scan.memberId);
                 const tier = member?.tier || 'bronze';
@@ -6926,7 +6997,7 @@ function App() {
               ));
             })()}</Box></CardContent></Card></Grid>
 
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📊 Member Activity Ranking</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Rank</TableCell><TableCell sx={{ fontWeight: 700 }}>Member</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Role</TableCell></TableRow></TableHead><TableBody>{(() => {
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📊 Member Activity Ranking</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Rank</TableCell><TableCell sx={{ fontWeight: 700 }}>Member</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Role</TableCell></TableRow></TableHead><TableBody>{(() => {
               const memberStats = filteredDashboardScans.reduce((acc, scan) => {
                 const key = scan.memberId || 'unknown';
                 if (!acc[key]) {
@@ -6948,7 +7019,7 @@ function App() {
                 ));
             })()}</TableBody></Table></TableContainer></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography><List dense>{activityLog.slice(0, 8).map((log, i) => (
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography><List dense>{activityLog.slice(0, 8).map((log, i) => (
               <ListItem key={log.id} sx={{ borderLeft: '3px solid', borderLeftColor: log.severity === 'error' ? 'error.main' : log.severity === 'warning' ? 'warning.main' : log.severity === 'success' ? 'success.main' : 'info.main', mb: 0.5, bgcolor: 'grey.50', borderRadius: 1, flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 0.5 }}>
                   <Typography variant='body2' fontWeight={600}>{log.action}</Typography>
@@ -6957,7 +7028,7 @@ function App() {
                 <Typography variant='caption' color='text.secondary'>{log.details}</Typography>
                 <Chip label={log.user} size='small' sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />
               </ListItem>
-            ))}{activityLog.length === 0 && <Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center', py: 2 }}>No recent activity</Typography>}</List></CardContent></Card></Grid>
+            ))}{activityLog.length === 0 && <Box sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}><Typography variant='h3' sx={{ mb: 1 }}>📭</Typography><Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center' }}>No recent activity to show</Typography></Box>}</List></CardContent></Card></Grid>
           </Grid>
             );
           })()}
@@ -7500,327 +7571,6 @@ function App() {
 
 
 
-        {adminTab === 'members' && (() => {
-          // Compute real-time stats and sort list
-          let filteredMembers = members.filter(m => {
-            const hasScans = scanHistory.some(s => s.memberId === m.memberId);
-            const matchesSearch = !memberSearchQuery || 
-              m.memberId?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-              m.memberName?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-              m.phone?.toLowerCase().includes(memberSearchQuery.toLowerCase());
-            const matchesRole = memberRoleFilter === 'all' || m.role === memberRoleFilter;
-            const matchesTier = memberTierFilter === 'all' || m.tier === memberTierFilter;
-            return hasScans && matchesSearch && matchesRole && matchesTier;
-          });
-
-          // Map stats for sorting
-          const membersWithStats = filteredMembers.map(m => {
-            const memberScans = scanHistory.filter(s => s.memberId === m.memberId);
-            const actualTotalScans = memberScans.length;
-            const actualTotalAmount = memberScans.reduce((sum, s) => sum + (s.price || 0), 0);
-            const actualTotalPoints = memberScans.reduce((sum, s) => sum + (s.points || 0), 0);
-            return {
-              member: m,
-              scansCount: actualTotalScans,
-              totalAmount: actualTotalAmount,
-              totalPoints: actualTotalPoints
-            };
-          });
-
-          // Sort members
-          membersWithStats.sort((a, b) => {
-            if (memberSortKey === 'points-desc') return b.totalPoints - a.totalPoints;
-            if (memberSortKey === 'points-asc') return a.totalPoints - b.totalPoints;
-            if (memberSortKey === 'scans-desc') return b.scansCount - a.scansCount;
-            if (memberSortKey === 'scans-asc') return a.scansCount - b.scansCount;
-            if (memberSortKey === 'amount-desc') return b.totalAmount - a.totalAmount;
-            if (memberSortKey === 'name-asc') return (a.member.memberName || '').localeCompare(b.member.memberName || '');
-            if (memberSortKey === 'name-desc') return (b.member.memberName || '').localeCompare(b.member.memberName || '');
-            if (memberSortKey === 'id-asc') return (a.member.memberId || '').localeCompare(b.member.memberId || '');
-            return 0;
-          });
-
-          return (
-            <Box>
-              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-                <Box>
-                  <Typography variant='h6' sx={{ fontWeight: 700 }}>MEMBERS & LOYALTY</Typography>
-                  <Typography variant='body2' color='text.secondary'>
-                    Total: {filteredMembers.length} | Applicators: {filteredMembers.filter(m => m.role === 'applicator').length} | Hardwares: {filteredMembers.filter(m => m.role === 'customer').length}
-                  </Typography>
-                </Box>
-                <Button
-                  variant='contained'
-                  startIcon={<Settings />}
-                  onClick={() => {
-                    setLoyaltyConfigTab(0);
-                    setLoyaltyConfigDialog({ open: true });
-                  }}
-                  sx={{
-                    background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)',
-                    boxShadow: '0 4px 14px 0 rgba(0,51,102,0.25)',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #001a33 0%, #003366 100%)',
-                      transform: 'translateY(-2px)'
-                    }
-                  }}
-                >
-                  Loyalty & Tier Config
-                </Button>
-                {isMainAdmin() && (
-                  <Button
-                    variant='outlined'
-                    color='warning'
-                    size='small'
-                    onClick={handleFixRoles}
-                    disabled={loading}
-                    title='One-time fix: correct role for all MA->Applicator / MH->Hardware members'
-                    sx={{ whiteSpace: 'nowrap' }}
-                  >
-                    ?? Fix Roles (MA/MH)
-                  </Button>
-                )}
-              </Box>
-              <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                <TextField 
-                  size='small' 
-                  placeholder='Search by member ID, name, phone...' 
-                  value={memberSearchQuery}
-                  onChange={(e) => setMemberSearchQuery(e.target.value)}
-                  sx={{ flexGrow: 1, minWidth: 200 }}
-                  InputProps={{
-                    startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
-                  }}
-                />
-                <ToggleButtonGroup
-                  size='small'
-                  value={memberRoleFilter}
-                  exclusive
-                  onChange={(e, newVal) => {
-                    if (newVal !== null) {
-                      setMemberRoleFilter(newVal);
-                    }
-                  }}
-                  sx={{
-                    bgcolor: 'background.paper',
-                    boxShadow: '0 2px 8px rgba(0,51,102,0.05)',
-                    borderRadius: '12px',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    '& .MuiToggleButton-root': {
-                      px: { xs: 1.5, sm: 2.5 },
-                      py: 0.75,
-                      border: 'none',
-                      fontWeight: 600,
-                      textTransform: 'none',
-                      color: 'text.secondary',
-                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                      '&.Mui-selected': {
-                        bgcolor: 'primary.lighter',
-                        color: 'primary.main',
-                        '&:hover': {
-                          bgcolor: 'primary.lighter'
-                        }
-                      }
-                    }
-                  }}
-                >
-                  <ToggleButton value='all'>All Members</ToggleButton>
-                  <ToggleButton value='applicator'>Applicator</ToggleButton>
-                  <ToggleButton value='customer'>Hardware</ToggleButton>
-                </ToggleButtonGroup>
-
-                <FormControl size='small' sx={{ minWidth: 130 }}>
-                  <InputLabel id="member-tier-filter-label">Tier</InputLabel>
-                  <Select
-                    labelId="member-tier-filter-label"
-                    value={memberTierFilter}
-                    label="Tier"
-                    onChange={(e) => setMemberTierFilter(e.target.value)}
-                  >
-                    <MenuItem value='all'>All Tiers</MenuItem>
-                    <MenuItem value='bronze'>Bronze</MenuItem>
-                    <MenuItem value='silver'>Silver</MenuItem>
-                    <MenuItem value='gold'>Gold</MenuItem>
-                    <MenuItem value='platinum'>Platinum</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <FormControl size='small' sx={{ minWidth: 160 }}>
-                  <InputLabel id="member-sort-label">Sort By</InputLabel>
-                  <Select
-                    labelId="member-sort-label"
-                    value={memberSortKey}
-                    label="Sort By"
-                    onChange={(e) => setMemberSortKey(e.target.value)}
-                  >
-                    <MenuItem value='points-desc'>Points: High to Low</MenuItem>
-                    <MenuItem value='points-asc'>Points: Low to High</MenuItem>
-                    <MenuItem value='scans-desc'>Total Scans: High to Low</MenuItem>
-                    <MenuItem value='scans-asc'>Total Scans: Low to High</MenuItem>
-                    <MenuItem value='amount-desc'>Total Amount: High to Low</MenuItem>
-                    <MenuItem value='name-asc'>Name: A to Z</MenuItem>
-                    <MenuItem value='name-desc'>Name: Z to A</MenuItem>
-                    <MenuItem value='id-asc'>Member ID: A to Z</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <Button
-                  variant='outlined'
-                  startIcon={<GetApp />}
-                  onClick={() => {
-                    if (membersWithStats.length === 0) {
-                      showNotification('No member data to export', 'warning');
-                      return;
-                    }
-                    
-                    const wb = XLSX.utils.book_new();
-                    const wsData = [
-                      ['Megakem Rewards Members Report'],
-                      ['Generated:', new Date().toLocaleString()],
-                      [],
-                      ['Member ID', 'Name', 'Phone', 'Role', 'Tier', 'Total Scans', 'Total Amount (Rs.)', 'Total Points'],
-                      ...membersWithStats.map(item => [
-                        item.member.memberId,
-                        item.member.memberName,
-                        item.member.phone || '',
-                        item.member.role === 'applicator' ? 'Applicator' : 'Hardware',
-                        getTierDisplayName(item.member.tier),
-                        item.scansCount,
-                        item.totalAmount,
-                        item.totalPoints
-                      ])
-                    ];
-                    
-                    const ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws['!cols'] = [
-                      { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 15 }
-                    ];
-                    
-                    XLSX.utils.book_append_sheet(wb, ws, 'Members');
-                    XLSX.writeFile(wb, `megakem_members_${new Date().toISOString().split('T')[0]}.xlsx`);
-                    showNotification('Member list exported successfully!', 'success');
-                  }}
-                  disabled={membersWithStats.length === 0}
-                  size='small'
-                >
-                  Export Excel
-                </Button>
-
-                {(memberSearchQuery || memberRoleFilter !== 'all' || memberTierFilter !== 'all') && (
-                  <Button 
-                    size='small' 
-                    onClick={() => { 
-                      setMemberSearchQuery(''); 
-                      setMemberRoleFilter('all');
-                      setMemberTierFilter('all');
-                      setMemberSortKey('points-desc');
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                )}
-              </Box>
-              <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>Member ID</strong></TableCell>
-                      <TableCell><strong>Name</strong></TableCell>
-                      <TableCell><strong>Role</strong></TableCell>
-                      <TableCell><strong>Tier</strong></TableCell>
-                      <TableCell><strong>Total Scans</strong></TableCell>
-                      <TableCell><strong>Total Amount (Rs.)</strong></TableCell>
-                      <TableCell><strong>Total Points</strong></TableCell>
-                      <TableCell><strong>Actions</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {membersWithStats.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                          <Typography variant='body1' color='text.secondary'>
-                            {members.length === 0 
-                              ? 'No members found. Members are created automatically when they scan products.'
-                              : 'No members match your filters.'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      membersWithStats.map(({ member: m, scansCount, totalAmount, totalPoints }) => (
-                        <TableRow key={m._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                          <TableCell>
-                            <Typography variant='body2' fontWeight={600}>{m.memberId}</Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant='body2'>{m.memberName}</Typography>
-                            {m.phone && <Typography variant='caption' color='text.secondary'>{m.phone}</Typography>}
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={m.role === 'applicator' ? 'Applicator' : 'Hardware'} 
-                              size='small' 
-                              color={m.role === 'applicator' ? 'warning' : 'info'}
-                              sx={{ fontWeight: 600 }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={getTierDisplayName(m.tier)} 
-                              size='small' 
-                              sx={{ 
-                                fontWeight: 800,
-                                bgcolor: 
-                                  m.tier === 'platinum' ? '#E5E4E2' :
-                                  m.tier === 'gold' ? '#FFD700' :
-                                  m.tier === 'silver' ? '#C0C0C0' : '#CD7F32',
-                                color: m.tier === 'platinum' || m.tier === 'gold' || m.tier === 'silver' ? 'black' : 'white',
-                                boxShadow: 1
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant='body2' fontWeight={600}>{scansCount}</Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={`Rs. ${totalAmount.toLocaleString()}`}
-                              size='small' 
-                              color='primary' 
-                              sx={{ fontWeight: 700, fontSize: '0.875rem' }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={`${totalPoints.toLocaleString()} pts`}
-                              size='small' 
-                              color='success' 
-                              sx={{ fontWeight: 700, fontSize: '0.875rem' }}
-                              icon={<EmojiEvents sx={{ fontSize: '1rem !important' }} />}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <IconButton 
-                              size='small' 
-                              color='info' 
-                              onClick={() => {
-                                setMemberId(m.memberId);
-                                setView('profile');
-                              }} 
-                              title='View Member Profile'
-                            >
-                              <Visibility />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          );
-        })()}
 
           {adminTab === 'co-admins' && hasPermission('canManageCoAdmins') && <Box>
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -7985,8 +7735,43 @@ function App() {
             </TableContainer>
           </Box>}
 
+          {/* Applicator Program Navigation */}
+          {adminTab === 'applicator-program' && (
+            <Paper sx={{ mb: 3 }}>
+              <Tabs value={applicatorProgramSubTab} onChange={(e, v) => setApplicatorProgramSubTab(v)} variant='scrollable' scrollButtons='auto'>
+                <Tab label="Dashboard" value="summary" icon={<Star />} />
+                {hasPermission('canViewRewards') && <Tab label="Cash Rewards" value="rewards" icon={<CardGiftcard />} />}
+                {hasPermission('canManageUsers') && <Tab label="Members & Loyalty" value="members" icon={<EmojiEvents />} />}
+              </Tabs>
+            </Paper>
+          )}
+
+          {(adminTab === 'applicator-program' && applicatorProgramSubTab === 'members') && (
+            <MembersAndLoyaltyTab
+              members={members}
+              scanHistory={scanHistory}
+              memberSearchQuery={memberSearchQuery}
+              setMemberSearchQuery={setMemberSearchQuery}
+              memberRoleFilter={memberRoleFilter}
+              setMemberRoleFilter={setMemberRoleFilter}
+              memberTierFilter={memberTierFilter}
+              setMemberTierFilter={setMemberTierFilter}
+              memberSortKey={memberSortKey}
+              setMemberSortKey={setMemberSortKey}
+              setLoyaltyConfigTab={setLoyaltyConfigTab}
+              setLoyaltyConfigDialog={setLoyaltyConfigDialog}
+              isMainAdmin={isMainAdmin}
+              handleFixRoles={handleFixRoles}
+              loading={loading}
+              exportToExcel={exportToExcel}
+              getTierDisplayName={getTierDisplayName}
+              setMemberId={setMemberId}
+              setView={setView}
+            />
+          )}
+
           {/* Cash Rewards Management Tab */}
-          {adminTab === 'rewards' && <Box>
+          {(adminTab === 'applicator-program' && applicatorProgramSubTab === 'rewards') && <Box>
             <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
               <Typography variant='h5' sx={{ flexGrow: 1 }}>
                 <CardGiftcard sx={{ mr: 1, verticalAlign: 'middle' }} />
@@ -8796,7 +8581,7 @@ function App() {
           )}
 
           {/* Leaderboard Admin Tab */}
-          {adminTab === 'leaderboard-admin' && (() => {
+          {(adminTab === 'applicator-program' && applicatorProgramSubTab === 'leaderboard') && (() => {
             const sortedByPoints = [...members].sort((a, b) => (b.points || 0) - (a.points || 0));
             const sortedByScans = [...members].sort((a, b) => (b.totalScans || 0) - (a.totalScans || 0));
             const totalPointsAll = members.reduce((s, m) => s + (m.points || 0), 0);
@@ -9018,6 +8803,13 @@ function App() {
             </TableContainer>
           </Box>}
 
+          {/* Applicator Program Summary Tab */}
+          {(adminTab === 'applicator-program' && applicatorProgramSubTab === 'summary') && (
+            <Box sx={{ mb: 3 }}>
+              <ApplicatorProgramDashboard />
+            </Box>
+          )}
+
           {/* Applicator & Hardware Info Tab */}
           {adminTab === 'applicator' && <Box>
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
@@ -9093,7 +8885,6 @@ function App() {
                       const finalExportData = applicatorTypeFilter === 'all' 
                         ? dataToExport 
                         : dataToExport.filter(a => isHardware ? a.equipment === 'Hardware' : a.equipment !== 'Hardware');
-
                       generatePDFReport(finalExportData, title, isHardware);
                     } catch (error) {
                       console.error('Export error:', error);

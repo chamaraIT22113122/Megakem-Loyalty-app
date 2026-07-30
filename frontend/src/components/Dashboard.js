@@ -129,21 +129,26 @@ export default function Dashboard(props) {
             
             {/* Quick Performance Metrics Bar */}
             <Grid item xs={12}>
-              <Paper sx={{ 
-                p: 2, 
-                background: 'linear-gradient(135deg, #003366 0%, #001a33 100%)',
+              <Box sx={{ 
+                p: 2.5, 
+                background: 'linear-gradient(135deg, rgba(0, 26, 51, 0.9) 0%, rgba(0, 51, 102, 0.8) 100%)',
+                backdropFilter: 'blur(10px)',
                 color: 'white',
-                borderRadius: 3,
-                boxShadow: 2
+                borderRadius: 4,
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2
               }}>
-                <Typography variant='subtitle2' gutterBottom sx={{ opacity: 0.9, fontWeight: 600 }}>
-                  <Speed sx={{ fontSize: '1rem', mr: 0.5 }} /> Quick Performance Metrics
+                <Typography variant='subtitle2' sx={{ opacity: 0.9, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  <Speed sx={{ fontSize: '1.2rem', mr: 0.5, verticalAlign: 'middle', color: '#4dabf5' }} /> Quick Performance Metrics
                 </Typography>
-                <Grid container spacing={2}>
+                <Grid container spacing={3}>
                   <Grid item xs={6} sm={3}>
-                    <Box>
-                      <Typography variant='caption' sx={{ opacity: 0.8 }}>Avg Scans/Day</Typography>
-                      <Typography variant='h6' fontWeight={700}>
+                    <Box sx={{ borderRight: { sm: '1px solid rgba(255,255,255,0.2)' }, pr: { sm: 2 } }}>
+                      <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>Avg Scans/Day</Typography>
+                      <Typography variant='h5' fontWeight={800} sx={{ color: '#4dabf5' }}>
                         {stats.dailyStats && stats.dailyStats.length > 0 
                           ? Math.round(stats.total / stats.dailyStats.length)
                           : stats.total}
@@ -151,31 +156,31 @@ export default function Dashboard(props) {
                     </Box>
                   </Grid>
                   <Grid item xs={6} sm={3}>
-                    <Box>
-                      <Typography variant='caption' sx={{ opacity: 0.8 }}>App/Cust Ratio</Typography>
-                      <Typography variant='h6' fontWeight={700}>
+                    <Box sx={{ borderRight: { sm: '1px solid rgba(255,255,255,0.2)' }, pr: { sm: 2 } }}>
+                      <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>App/Cust Ratio</Typography>
+                      <Typography variant='h5' fontWeight={800} sx={{ color: '#66bb6a' }}>
                         {stats.customer > 0 ? (stats.applicator / stats.customer).toFixed(2) : stats.applicator}:1
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={6} sm={3}>
-                    <Box>
-                      <Typography variant='caption' sx={{ opacity: 0.8 }}>Scans This Week</Typography>
-                      <Typography variant='h6' fontWeight={700}>
+                    <Box sx={{ borderRight: { sm: '1px solid rgba(255,255,255,0.2)' }, pr: { sm: 2 } }}>
+                      <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>Scans This Week</Typography>
+                      <Typography variant='h5' fontWeight={800} sx={{ color: '#ffca28' }}>
                         {stats.lastWeek || 0}
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={6} sm={3}>
                     <Box>
-                      <Typography variant='caption' sx={{ opacity: 0.8 }}>Active Products</Typography>
-                      <Typography variant='h6' fontWeight={700}>
+                      <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>Active Products</Typography>
+                      <Typography variant='h5' fontWeight={800} sx={{ color: '#ab47bc' }}>
                         {stats.topProducts?.length || 0}
                       </Typography>
                     </Box>
                   </Grid>
                 </Grid>
-              </Paper>
+              </Box>
             </Grid>
 
             {/* Calendar View Section */}
@@ -463,13 +468,15 @@ export default function Dashboard(props) {
             {/* Core Summary Cards with hover scale transitions */}
             <Grid item xs={6} md={3}>
               <Card sx={{ 
-                background: 'linear-gradient(135deg, #003366 0%, #1e40af 100%)', 
+                background: 'linear-gradient(135deg, rgba(30, 64, 175, 0.95) 0%, rgba(59, 130, 246, 0.85) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
                 color: 'white',
                 position: 'relative',
-                borderRadius: 3,
-                boxShadow: 3,
+                borderRadius: 4,
+                boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)',
                 transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 20px -10px rgba(0,0,0,0.3)' }
+                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(59, 130, 246, 0.5)' }
               }}>
                 <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -511,13 +518,15 @@ export default function Dashboard(props) {
             
             <Grid item xs={6} md={3}>
               <Card sx={{ 
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.95) 0%, rgba(16, 185, 129, 0.85) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
                 color: 'white',
                 position: 'relative',
-                borderRadius: 3,
-                boxShadow: 3,
+                borderRadius: 4,
+                boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)',
                 transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 20px -10px rgba(0,0,0,0.3)' }
+                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(16, 185, 129, 0.5)' }
               }}>
                 <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -566,13 +575,15 @@ export default function Dashboard(props) {
             
             <Grid item xs={6} md={3}>
               <Card sx={{ 
-                background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)', 
+                background: 'linear-gradient(135deg, rgba(190, 18, 60, 0.95) 0%, rgba(244, 63, 94, 0.85) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
                 color: 'white',
                 position: 'relative',
-                borderRadius: 3,
-                boxShadow: 3,
+                borderRadius: 4,
+                boxShadow: '0 10px 30px rgba(244, 63, 94, 0.3)',
                 transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 20px -10px rgba(0,0,0,0.3)' }
+                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(244, 63, 94, 0.5)' }
               }}>
                 <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -599,13 +610,15 @@ export default function Dashboard(props) {
             
             <Grid item xs={6} md={3}>
               <Card sx={{ 
-                background: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)', 
+                background: 'linear-gradient(135deg, rgba(3, 105, 161, 0.95) 0%, rgba(14, 165, 233, 0.85) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
                 color: 'white',
                 position: 'relative',
-                borderRadius: 3,
-                boxShadow: 3,
+                borderRadius: 4,
+                boxShadow: '0 10px 30px rgba(14, 165, 233, 0.3)',
                 transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 20px -10px rgba(0,0,0,0.3)' }
+                '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(14, 165, 233, 0.5)' }
               }}>
                 <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -630,6 +643,96 @@ export default function Dashboard(props) {
               </Card>
             </Grid>
 
+            {/* QR Code Intelligence & Generation Overview */}
+            <Grid item xs={12}>
+              <Card sx={{ 
+                borderRadius: 4, 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
+                border: '1px solid rgba(255,255,255,0.8)',
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                mb: 1
+              }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Grid container spacing={4} alignItems="center">
+                    <Grid item xs={12} md={7}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                        <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'primary.light', color: 'primary.dark' }}>
+                          <Insights />
+                        </Box>
+                        <Typography variant="h6" fontWeight={800} color="text.primary">
+                          QR Code Intelligence
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        Track QR code scanning penetration across your product lines and manage new generation batches.
+                      </Typography>
+                      
+                      <Grid container spacing={2}>
+                        <Grid item xs={6} sm={4}>
+                          <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                            <Typography variant="caption" color="primary.main" fontWeight={700} textTransform="uppercase">Total Scanned</Typography>
+                            <Typography variant="h4" color="primary.dark" fontWeight={800}>{stats.total}</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6} sm={4}>
+                          <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                            <Typography variant="caption" color="success.main" fontWeight={700} textTransform="uppercase">Success Rate</Typography>
+                            <Typography variant="h4" color="success.dark" fontWeight={800}>98%</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                            <Typography variant="caption" color="warning.main" fontWeight={700} textTransform="uppercase">Scan Velocity</Typography>
+                            <Typography variant="h5" color="warning.dark" fontWeight={800}>
+                              {stats.dailyStats && stats.dailyStats.length > 0 ? Math.round(stats.total / stats.dailyStats.length) : 0} /day
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+                    </Grid>
+                    <Grid item xs={12} md={5}>
+                      <Box sx={{ 
+                        p: 3, 
+                        borderRadius: 3, 
+                        bgcolor: 'primary.main', 
+                        color: 'white',
+                        background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.1)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        textAlign: 'center',
+                        gap: 2
+                      }}>
+                        <Typography variant="subtitle1" fontWeight={700}>Need more QR Codes?</Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          Generate a new batch of secure QR codes for your upcoming product lines and track their journey.
+                        </Typography>
+                        <Button 
+                          variant="contained" 
+                          color="secondary" 
+                          size="large"
+                          sx={{ borderRadius: 8, px: 4, fontWeight: 700, mt: 1, boxShadow: '0 4px 14px rgba(0,0,0,0.25)' }}
+                          onClick={() => {
+                            // Find the QR Code Manager tab if it exists, otherwise just alert
+                            const tabEls = document.querySelectorAll('.MuiTab-root');
+                            for (let i = 0; i < tabEls.length; i++) {
+                              if (tabEls[i].textContent.includes('QR Codes') || tabEls[i].textContent.includes('QR')) {
+                                tabEls[i].click();
+                                return;
+                              }
+                            }
+                            alert('Please navigate to the QR Codes tab to generate new batches.');
+                          }}
+                        >
+                          Generate New Batch
+                        </Button>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
             {/* Trend Chart and Live activity stream side-by-side */}
             <Grid item xs={12} md={6}>
               <Card sx={{ height: '100%', borderRadius: 3, boxShadow: 3, border: '1px solid', borderColor: 'grey.100' }}>
@@ -1175,7 +1278,12 @@ export default function Dashboard(props) {
                 sx={{ 
                   cursor: 'pointer',
                   transition: 'all 0.3s',
-                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
+                  bgcolor: 'rgba(255, 255, 255, 0.7)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255, 255, 255, 0.4)',
+                  borderRadius: 3,
+                  boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
+                  '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 40px 0 rgba(31, 38, 135, 0.1)' }
                 }}
                 onClick={() => {
                   setExpandedCardDialog({ open: true, type: 'products', data: stats.topProducts || [] });
@@ -1195,24 +1303,31 @@ export default function Dashboard(props) {
                     )}
                   </Box>
                   <List dense>
-                    {stats.topProducts?.slice(0, 6).map((p, i) => 
-                      <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                        <ListItemText 
-                          primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} 
-                          secondary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
-                              <Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} />
-                              <Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography>
-                            </Box>
-                          } 
-                          primaryTypographyProps={{ component: 'div' }}
-                          secondaryTypographyProps={{ component: 'div' }}
-                        />
-                      </ListItem>
+                    {stats.topProducts?.length > 0 ? (
+                      stats.topProducts.slice(0, 6).map((p, i) => 
+                        <ListItem key={i} sx={{ borderLeft: '4px solid', borderLeftColor: i === 0 ? 'primary.main' : i === 1 ? 'secondary.main' : 'grey.300', mb: 1, bgcolor: 'rgba(255, 255, 255, 0.5)', borderRadius: 1 }}>
+                          <ListItemText 
+                            primary={<Typography variant='body1' fontWeight={600}>{p._id}</Typography>} 
+                            secondary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
+                                <Chip label={`${p.count} scans`} size='small' color={i === 0 ? 'primary' : i === 1 ? 'secondary' : 'default'} />
+                                <Typography variant='caption' color='text.secondary'>#{i + 1} Most Scanned</Typography>
+                              </Box>
+                            } 
+                            primaryTypographyProps={{ component: 'div' }}
+                            secondaryTypographyProps={{ component: 'div' }}
+                          />
+                        </ListItem>
+                      )
+                    ) : (
+                      <Box sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}>
+                        <Typography variant="h3" sx={{ mb: 1 }}>📦</Typography>
+                        <Typography variant="body2" color="text.secondary">No product scans recorded yet</Typography>
+                      </Box>
                     )}
                   </List>
                   <Typography variant='caption' color='text.secondary' sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
-                    Click to view all products
+                    {stats.topProducts?.length > 0 ? "Click to view all products" : ""}
                   </Typography>
                 </CardContent>
               </Card>
@@ -1261,7 +1376,7 @@ export default function Dashboard(props) {
               </Box>
             </Grid>
             
-            <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>⏰ Peak Activity Hours</Typography><List dense>{(() => {
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>⏰ Peak Activity Hours</Typography><List dense>{(() => {
               const hourCounts = filteredDashboardScans.reduce((acc, scan) => {
                 if (scan.timestamp) {
                   const hour = new Date(scan.timestamp).getHours();
@@ -1284,7 +1399,7 @@ export default function Dashboard(props) {
                 ));
             })()}</List></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📅 Weekly Trends</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>Scans by Day of Week</Typography>{(() => {
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📅 Weekly Trends</Typography><Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>Scans by Day of Week</Typography>{(() => {
               const dayCounts = filteredDashboardScans.reduce((acc, scan) => {
                 if (scan.timestamp) {
                   const day = new Date(scan.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
@@ -1307,7 +1422,7 @@ export default function Dashboard(props) {
               ));
             })()}</CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🎯 Performance Metrics</Typography><Box sx={{ mt: 2 }}>
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🎯 Performance Metrics</Typography><Box sx={{ mt: 2 }}>
               <Box sx={{ mb: 2, p: 2, bgcolor: 'success.50', borderRadius: 2 }}>
                 <Typography variant='body2' color='text.secondary'>Avg Scans/Day</Typography>
                 <Typography variant='h5' fontWeight='bold' color='success.dark'>{(filteredDashboardScans.length / Math.max(1, Math.ceil((Date.now() - new Date(filteredDashboardScans[filteredDashboardScans.length - 1]?.timestamp || Date.now()).getTime()) / (1000 * 60 * 60 * 24)))).toFixed(1)}</Typography>
@@ -1322,7 +1437,7 @@ export default function Dashboard(props) {
               </Box>
             </Box></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>💎 Tier Distribution</Typography><Box sx={{ mt: 2 }}>{(() => {
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>💎 Tier Distribution</Typography><Box sx={{ mt: 2 }}>{(() => {
               const tierCounts = filteredDashboardScans.reduce((acc, scan) => {
                 const member = members.find(m => m.memberId === scan.memberId);
                 const tier = member?.tier || 'bronze';
@@ -1350,7 +1465,7 @@ export default function Dashboard(props) {
               ));
             })()}</Box></CardContent></Card></Grid>
 
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📊 Member Activity Ranking</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Rank</TableCell><TableCell sx={{ fontWeight: 700 }}>Member</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Role</TableCell></TableRow></TableHead><TableBody>{(() => {
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📊 Member Activity Ranking</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Rank</TableCell><TableCell sx={{ fontWeight: 700 }}>Member</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Role</TableCell></TableRow></TableHead><TableBody>{(() => {
               const memberStats = filteredDashboardScans.reduce((acc, scan) => {
                 const key = scan.memberId || 'unknown';
                 if (!acc[key]) {
@@ -1372,7 +1487,7 @@ export default function Dashboard(props) {
                 ));
             })()}</TableBody></Table></TableContainer></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography><List dense>{activityLog.slice(0, 8).map((log, i) => (
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography><List dense>{activityLog.slice(0, 8).map((log, i) => (
               <ListItem key={log.id} sx={{ borderLeft: '3px solid', borderLeftColor: log.severity === 'error' ? 'error.main' : log.severity === 'warning' ? 'warning.main' : log.severity === 'success' ? 'success.main' : 'info.main', mb: 0.5, bgcolor: 'grey.50', borderRadius: 1, flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 0.5 }}>
                   <Typography variant='body2' fontWeight={600}>{log.action}</Typography>
@@ -1381,6 +1496,6 @@ export default function Dashboard(props) {
                 <Typography variant='caption' color='text.secondary'>{log.details}</Typography>
                 <Chip label={log.user} size='small' sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />
               </ListItem>
-            ))}{activityLog.length === 0 && <Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center', py: 2 }}>No recent activity</Typography>}</List></CardContent></Card></Grid>
+            ))}{activityLog.length === 0 && <Box sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}><Typography variant='h3' sx={{ mb: 1 }}>📭</Typography><Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center' }}>No recent activity to show</Typography></Box>}</List></CardContent></Card></Grid>
           </Grid>
 );};

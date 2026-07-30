@@ -60,7 +60,18 @@ async function calculateMonthlyPurchaseValueAndPoints(memberId, year, month, con
 }
 
 // Helper function to calculate reward breakdown
-function calculateRewardBreakdown(totalPurchaseValue, configTiers) {
+function calculateRewardBreakdown(totalPurchaseValue, configTiers, year, month, pointsEarned) {
+  const isNewSystem = year > 2026 || (year === 2026 && month >= 7);
+  if (isNewSystem) {
+    return [{
+      tier: 'Product Points',
+      amount: pointsEarned || 0,
+      rate: '1 pt = Rs. 1',
+      reward: pointsEarned || 0,
+      isNewSystem: true
+    }];
+  }
+
   const tier1Rate = (configTiers && configTiers.tier1 !== undefined) ? (Number(configTiers.tier1) / 100) : 0.045;
   const tier2Rate = (configTiers && configTiers.tier2 !== undefined) ? (Number(configTiers.tier2) / 100) : 0.05;
   const tier3Rate = (configTiers && configTiers.tier3 !== undefined) ? (Number(configTiers.tier3) / 100) : 0.055;
@@ -94,7 +105,8 @@ function calculateRewardBreakdown(totalPurchaseValue, configTiers) {
         tier: tier.label,
         amount: tierAmount,
         rate: (tier.rate * 100).toFixed(2) + '%',
-        reward: Math.round(reward * 100) / 100
+        reward: Math.round(reward * 100) / 100,
+        isNewSystem: false
       });
       remaining -= tierAmount;
     }
@@ -405,7 +417,7 @@ router.post('/calculate/:memberId', protect, hasPermission('canViewRewards'), as
       p => p.year === parseInt(year) && p.month === parseInt(month)
     );
 
-    const breakdown = calculateRewardBreakdown(purchase.totalPurchaseValue, config.cashRewardTiers);
+    const breakdown = calculateRewardBreakdown(purchase.totalPurchaseValue, config.cashRewardTiers, parseInt(year), parseInt(month), pointsEarned);
 
     await logAction(req, 'CALCULATE_CASH_REWARDS', 'CASH_REWARDS', { memberId: member.memberId, year, month, purchaseValue, cashReward });
 
