@@ -11,13 +11,50 @@ const api = axios.create({
   },
 });
 
-// Add token to requests if available
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Check if this is a modifying request
+    const isModifyingRequest = ['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase());
+    const bypassUrls = ['/auth/login', '/auth/refresh', '/change-requests'];
+    const isBypass = bypassUrls.some(url => config.url?.includes(url));
+    
+    let user = null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) user = JSON.parse(userStr);
+    } catch (e) {}
+
+    // If it has bypass header, let it through
+    if (config.headers['X-Bypass-Approval']) {
+      return config;
+    }
+
+    if (isModifyingRequest && !isBypass && user && user.role === 'co-admin') {
+      try {
+        const result = await new Promise((resolve, reject) => {
+          const event = new CustomEvent('require_change_request', {
+            detail: { config, resolve, reject }
+          });
+          window.dispatchEvent(event);
+        });
+
+        if (result.submitted) {
+          // Cancel the original request since it was converted to a change request
+          return Promise.reject(new axios.Cancel('CHANGE_REQUEST_SUBMITTED'));
+        }
+      } catch (error) {
+        if (axios.isCancel(error)) {
+          return Promise.reject(error);
+        }
+        return Promise.reject(new axios.Cancel('CHANGE_REQUEST_CANCELLED'));
+      }
+    }
+
     return config;
   },
   (error) => {
@@ -29,6 +66,23 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // If the request was converted to a change request, mock a successful response
+    // to prevent caller components from throwing an error and breaking the UI.
+    if (axios.isCancel(error) && error.message === 'CHANGE_REQUEST_SUBMITTED') {
+      return Promise.resolve({ 
+        data: { 
+          success: true, 
+          message: 'Request submitted for approval', 
+          data: null, 
+          __isChangeRequest: true 
+        } 
+      });
+    }
+
+    if (axios.isCancel(error) && error.message === 'CHANGE_REQUEST_CANCELLED') {
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config;
 
     // If error is 401 and we haven't tried to refresh yet

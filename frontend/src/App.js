@@ -4,14 +4,15 @@ import { io } from 'socket.io-client';
 import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, Menu, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider, Collapse, Drawer } from '@mui/material';
 import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay, KeyboardArrowDown, KeyboardArrowUp, Feedback as FeedbackIcon } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
+import ChangeRequestDialog from './components/ChangeRequestDialog';
+import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import jsPDF from 'jspdf';
-import * as faceapi from '@vladmandic/face-api';
 import autoTable from 'jspdf-autotable';
+import * as faceapi from '@vladmandic/face-api';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI, backupAPI, feedbackAPI } from './services/api';
 import { generateIDCard } from './utils/generateIDCard';
 import QRCodeManager from './components/QRCodeManager';
-import ReprintRequestsPanel from './components/ReprintRequestsPanel';
 import SriLankaZoneMap from './components/SriLankaZoneMap';
 import FeedbackDialog from './components/FeedbackDialog';
 import FeedbacksTab from './components/FeedbacksTab';
@@ -3610,6 +3611,7 @@ function App() {
         username,
         email,
         role: role || 'admin',
+        managerAdminId: userDialog.user?.managerAdminId || null,
         permissions: {
           canViewDashboard: permissions?.canViewDashboard === true,
           canViewAdvancedInsights: permissions?.canViewAdvancedInsights === true,
@@ -4119,7 +4121,7 @@ function App() {
           <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: { xs: '0.55rem', sm: '0.65rem' }, opacity: 0.9, display: { xs: 'none', sm: 'block' } }}>WHERE TRUST MEETS EXCELLENCE</Typography>
         </Box>
         {adminAuth && view === 'admin' && (
-          <Tooltip title={isMainAdmin() ? "Pending Co-Admin Requests" : "My Requests & Notifications"}>
+          <Tooltip title={isMainAdmin() ? "Pending Requests" : "My Requests & Notifications"}>
             <IconButton 
               color='inherit' 
               onClick={(e) => setNotificationAnchorEl(e.currentTarget)}
@@ -5613,7 +5615,7 @@ function App() {
                       <Notifications />
                     </Badge>
                   } 
-                  label="Co-Admin Requests" 
+                  label="Requests" 
                   value="reprint-requests" 
                 />
               )}
@@ -7606,7 +7608,7 @@ function App() {
                 })}
                 disabled={!isMainAdmin()}
               >
-                Add Co-Admin
+                Add User
               </Button>
               <TextField 
                 size='small' 
@@ -7618,7 +7620,7 @@ function App() {
                   startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
                 }}
               />
-              <Typography variant='body2' color='text.secondary'>Total Co-Admins: {users.filter(u => (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com').length}</Typography>
+              <Typography variant='body2' color='text.secondary'>Total Users: {users.filter(u => (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com').length}</Typography>
             </Box>
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table><TableHead><TableRow>
@@ -7643,43 +7645,19 @@ function App() {
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                       {u.email === 'admin@megakem.com' ? (
-                        <>
-                          <Chip label='Dashboard' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Scans' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Co-Admins' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Members & Loyalty' size='small' color='warning' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Cash Rewards' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Leaderboard' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Products' size='small' color='success' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='QR' size='small' color='secondary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Requests' size='small' color='warning' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Applicators' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Appl. Program' size='small' color='secondary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Audit Logs' size='small' color='error' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Feedbacks' size='small' color='info' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Delete' size='small' color='error' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                          <Chip label='Export' size='small' color='primary' sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-                        </>
-                      ) : (
-                        <>
-                          {u.permissions?.canViewDashboard === true && <Chip label='Dashboard' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canViewAdvancedInsights === true && <Chip label='Insights' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canViewScans === true && <Chip label='Scans' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageCoAdmins === true && <Chip label='Co-Admins' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageUsers === true && <Chip label='Members & Loyalty' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canViewRewards === true && <Chip label='Cash Rewards' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canViewLeaderboard === true && <Chip label='Leaderboard' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageProducts === true && <Chip label='Products' size='small' color='success' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageQRCodes === true && <Chip label='QR' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageCoAdminRequests === true && <Chip label='Requests' size='small' color='warning' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageApplicators === true && <Chip label='Applicators' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canManageApplicatorProgram === true && <Chip label='Appl. Program' size='small' color='secondary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canViewAuditLogs === true && <Chip label='Audit Logs' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canViewFeedbacks === true && <Chip label='Feedbacks' size='small' color='info' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canDelete === true && <Chip label='Delete' size='small' color='error' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                          {u.permissions?.canExport === true && <Chip label='Export' size='small' color='primary' variant='outlined' sx={{ fontSize: '0.7rem' }} />}
-                        </>
-                      )}
+                        <Chip label='All Permissions (Main Admin)' size='small' color='success' sx={{ fontWeight: 600 }} />
+                      ) : (() => {
+                        const activePerms = Object.entries(u.permissions || {}).filter(([k, v]) => v).map(([k]) => k.replace('canView', '').replace('canManage', '').replace('can', ''));
+                        return (
+                          <Tooltip title={
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                              {activePerms.length > 0 ? activePerms.map(p => <Typography variant="caption" key={p}>• {p}</Typography>) : <Typography variant="caption">No permissions</Typography>}
+                            </Box>
+                          }>
+                            <Chip label={`${activePerms.length} Permissions`} size="small" color={activePerms.length > 0 ? "primary" : "default"} variant="outlined" sx={{ cursor: 'help' }} />
+                          </Tooltip>
+                        );
+                      })()}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -9973,6 +9951,27 @@ function App() {
                 </FormControl>
               )}
               
+              {/* Only show Manager Admin selector if not main admin */}
+              {userDialog.user?.email !== 'admin@megakem.com' && (
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>Manager Admin</InputLabel>
+                  <Select 
+                    value={userDialog.user?.managerAdminId || ''} 
+                    label='Manager Admin' 
+                    onChange={(e) => setUserDialog({ ...userDialog, user: { ...userDialog.user, managerAdminId: e.target.value } })}
+                  >
+                    <MenuItem value=''>
+                      <em>None (Main Admin Only)</em>
+                    </MenuItem>
+                    {users.filter(u => u.role === 'admin' || u.email === 'admin@megakem.com').map(admin => (
+                      <MenuItem key={admin._id} value={admin._id}>
+                        {admin.username} ({admin.email})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+              
               <Typography variant='subtitle2' sx={{ mt: 2, mb: 1, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Security /> Permissions
               </Typography>
@@ -10178,8 +10177,8 @@ function App() {
                 {/* 9. Co-Admin Requests */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Access Co-Admin Requests</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Co-Admin Requests tab</Typography>
+                    <Typography variant='body2' fontWeight={600}>Can Access Reprint Requests</Typography>
+                    <Typography variant='caption' color='text.secondary'>Access permission for the Reprint Requests tab</Typography>
                   </Box>
                   <Switch 
                     checked={userDialog.user?.permissions?.canManageCoAdminRequests === true} 
@@ -13695,6 +13694,9 @@ function App() {
           )}
         </Box>
       </Drawer>
+
+      {/* Global Change Request Dialog */}
+      <ChangeRequestDialog showNotification={showNotification} />
 
     </Box></ThemeProvider>
   );

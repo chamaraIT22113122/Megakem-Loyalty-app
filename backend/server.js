@@ -210,7 +210,7 @@ app.use('/api/upload', require('./routes/upload'));
 app.use('/api/push', require('./routes/push'));
 app.use('/api/backup', require('./routes/backup'));
 app.use('/api/feedback', require('./routes/feedback'));
-
+app.use('/api/change-requests', require('./routes/changeRequests'));
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 

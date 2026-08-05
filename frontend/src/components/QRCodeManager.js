@@ -1360,7 +1360,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           }
           sx={{ mb: 3, fontWeight: 'bold' }}
         >
-          🔔 You have {reprintRequests.filter(r => r.status === 'pending').length} pending reprint request(s) from co-admins.
+          🔔 You have {reprintRequests.filter(r => r.status === 'pending').length} pending reprint request(s).
         </Alert>
       )}
 
@@ -1794,7 +1794,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           {selectedQRForReprint ? (
             <Typography variant="body2" sx={{ mb: 2 }} color="textSecondary">
               This QR code (Batch: {selectedQRForReprint?.batchNo}, Pkg: {selectedQRForReprint?.packageNo || 'N/A'}) has already been printed. 
-              Co-admins require reprint approval from the Main Admin to print it again.
+              A reprint request must be approved by the Main Admin to print it again.
             </Typography>
           ) : (
             <Typography variant="body2" sx={{ mb: 2 }} color="textSecondary">

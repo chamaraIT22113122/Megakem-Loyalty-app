@@ -41,10 +41,20 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
       try {
         const notifRes = await api.get('/cash-rewards/admin-notifications');
         const notifications = notifRes.data?.data || [];
-        combinedRequests = [...combinedRequests, ...notifications].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        combinedRequests = [...combinedRequests, ...notifications];
       } catch (notifErr) {
         console.error('Failed to load admin notifications:', notifErr);
       }
+
+      try {
+        const changeRes = await api.get('/change-requests');
+        const changeReqs = changeRes.data?.data || [];
+        combinedRequests = [...combinedRequests, ...changeReqs];
+      } catch (changeErr) {
+        console.error('Failed to load change requests:', changeErr);
+      }
+
+      combinedRequests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
       setRequests(combinedRequests);
     } catch (error) {
@@ -74,11 +84,16 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
     };
   }, []);
 
-  const handleApprove = async (id) => {
+  const handleApprove = async (id, isChangeRequest = false) => {
     try {
       setLoading(true);
-      await api.put(`/qr-codes/reprint-requests/${id}/approve`);
-      onShowNotification('Reprint request approved successfully', 'success');
+      if (isChangeRequest) {
+        await api.put(`/change-requests/${id}/approve`);
+        onShowNotification('Change request approved and executed successfully', 'success');
+      } else {
+        await api.put(`/qr-codes/reprint-requests/${id}/approve`);
+        onShowNotification('Reprint request approved successfully', 'success');
+      }
       loadRequests();
       if (onRequestsChanged) onRequestsChanged();
     } catch (error) {
@@ -87,11 +102,16 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
     }
   };
 
-  const handleReject = async (id) => {
+  const handleReject = async (id, isChangeRequest = false) => {
     try {
       setLoading(true);
-      await api.put(`/qr-codes/reprint-requests/${id}/reject`);
-      onShowNotification('Reprint request rejected successfully', 'success');
+      if (isChangeRequest) {
+        await api.put(`/change-requests/${id}/reject`);
+        onShowNotification('Change request rejected', 'success');
+      } else {
+        await api.put(`/qr-codes/reprint-requests/${id}/reject`);
+        onShowNotification('Reprint request rejected successfully', 'success');
+      }
       loadRequests();
       if (onRequestsChanged) onRequestsChanged();
     } catch (error) {
@@ -100,12 +120,17 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, isChangeRequest = false) => {
     if (!window.confirm('Are you sure you want to delete this request from history?')) return;
     try {
       setLoading(true);
-      await api.delete(`/qr-codes/reprint-requests/${id}`);
-      onShowNotification('Reprint request deleted successfully', 'success');
+      if (isChangeRequest) {
+        await api.delete(`/change-requests/${id}`);
+        onShowNotification('Change request deleted', 'success');
+      } else {
+        await api.delete(`/qr-codes/reprint-requests/${id}`);
+        onShowNotification('Reprint request deleted successfully', 'success');
+      }
       loadRequests();
       if (onRequestsChanged) onRequestsChanged();
     } catch (error) {
@@ -118,7 +143,7 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
     <Box sx={{ p: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Notifications color="primary" /> Co-Admin Requests
+          <Notifications color="primary" /> Requests
         </Typography>
         <Button
           variant="outlined"
@@ -188,29 +213,46 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
                       );
                     }
 
+                    const isChangeRequest = !!req.actionType;
+
                     const statusColor =
                       req.status === 'approved'
                         ? 'success'
                         : req.status === 'rejected'
+                        ? 'error'
+                        : req.status === 'failed'
                         ? 'error'
                         : req.status === 'pending'
                         ? 'warning'
                         : 'default';
 
                     return (
-                      <TableRow key={req._id} hover>
+                      <TableRow key={req._id} hover sx={isChangeRequest ? { bgcolor: 'rgba(25, 118, 210, 0.04)' } : {}}>
                         <TableCell sx={{ fontSize: '0.875rem' }}>
                           {new Date(req.createdAt).toLocaleString()}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.875rem', fontWeight: 'medium' }}>
-                          {req.requestedByEmail || 'Co-Admin'}
+                          {isChangeRequest ? req.requesterId?.email : (req.requestedByEmail || 'Co-Admin')}
+                          {isChangeRequest && <Chip label="Action" size="small" color="info" sx={{ ml: 1, fontSize: '0.65rem', height: 18 }} />}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.875rem' }}>
-                          {req.qrCode?.productName || '-'}
+                          {isChangeRequest ? (
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                              {req.actionType.toUpperCase()} {req.entityType}
+                            </Typography>
+                          ) : (
+                            req.qrCode?.productName || '-'
+                          )}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.875rem' }}>
-                          <Chip label={`B: ${req.qrCode?.batchNo || '-'}`} size="small" variant="outlined" sx={{ mr: 0.5 }} />
-                          <Chip label={`P: ${req.qrCode?.packageNo || '-'}`} size="small" variant="outlined" />
+                          {isChangeRequest ? (
+                            <Chip label={req.endpoint} size="small" variant="outlined" />
+                          ) : (
+                            <>
+                              <Chip label={`B: ${req.qrCode?.batchNo || '-'}`} size="small" variant="outlined" sx={{ mr: 0.5 }} />
+                              <Chip label={`P: ${req.qrCode?.packageNo || '-'}`} size="small" variant="outlined" />
+                            </>
+                          )}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.875rem', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <Tooltip title={req.reason}>
@@ -223,35 +265,33 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
                         <TableCell align="right" sx={{ pr: 3 }}>
                           {req.status === 'pending' ? (
                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                              <Button
-                                size="small"
-                                variant="contained"
-                                color="success"
-                                startIcon={<CheckCircle />}
-                                onClick={() => handleApprove(req._id)}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color="error"
-                                startIcon={<Cancel />}
-                                onClick={() => handleReject(req._id)}
-                              >
-                                Reject
-                              </Button>
+                              <Tooltip title="Approve">
+                                <IconButton
+                                  color="success"
+                                  onClick={() => handleApprove(req._id, isChangeRequest)}
+                                  disabled={loading}
+                                >
+                                  <CheckCircle />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Reject">
+                                <IconButton
+                                  color="error"
+                                  onClick={() => handleReject(req._id, isChangeRequest)}
+                                  disabled={loading}
+                                >
+                                  <Cancel />
+                                </IconButton>
+                              </Tooltip>
                             </Box>
                           ) : (
-                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
-                              <Typography variant="caption" color="textSecondary">
-                                Resolved {req.approvedAt && `on ${new Date(req.approvedAt).toLocaleDateString()}`}
-                              </Typography>
-                              <Tooltip title="Delete Request from History">
-                                <IconButton 
-                                  size="small" 
-                                  color="error" 
-                                  onClick={() => handleDelete(req._id)}
+                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                              <Tooltip title="Delete Record">
+                                <IconButton
+                                  color="default"
+                                  onClick={() => handleDelete(req._id, isChangeRequest)}
+                                  disabled={loading}
+                                  size="small"
                                 >
                                   <Delete fontSize="small" />
                                 </IconButton>
