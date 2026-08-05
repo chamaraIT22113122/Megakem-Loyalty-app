@@ -208,6 +208,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [openBulkDeleteDialog, setOpenBulkDeleteDialog] = useState(false);
   const [openEditBatchDialog, setOpenEditBatchDialog] = useState(false);
   const [editingBatch, setEditingBatch] = useState(null);
+  const [deleteRangeStart, setDeleteRangeStart] = useState('');
+  const [deleteRangeEnd, setDeleteRangeEnd] = useState('');
   const [bulkDeleteBatchNo, setBulkDeleteBatchNo] = useState('');
   const [selectedQRCode, setSelectedQRCode] = useState(null);
   
@@ -956,8 +958,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
     try {
       setLoading(true);
       const res = await api.get('/qr-codes', { params: { batchNo, limit: 1 } });
-      if (res.data.qrCodes && res.data.qrCodes.length > 0) {
-        const qr = res.data.qrCodes[0];
+      if (res.data.data && res.data.data.length > 0) {
+        const qr = res.data.data[0];
         setEditingBatch({
           batchNo: qr.batchNo,
           manufactureDate: qr.manufactureDate ? new Date(qr.manufactureDate).toISOString().split('T')[0] : '',
@@ -990,6 +992,29 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       onShowNotification('Error updating batch: ' + (err.response?.data?.error || err.message), 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteRange = async () => {
+    if (!deleteRangeStart || !deleteRangeEnd) {
+      onShowNotification('Please enter both start and end package numbers', 'error');
+      return;
+    }
+    if (window.confirm(`Are you SURE you want to delete packages from ${deleteRangeStart} to ${deleteRangeEnd} in batch ${editingBatch.batchNo}? This cannot be undone.`)) {
+      try {
+        setLoading(true);
+        const response = await api.delete(`/qr-codes/batches/${editingBatch.batchNo}/range`, {
+          data: { startPkg: deleteRangeStart, endPkg: deleteRangeEnd }
+        });
+        onShowNotification(response.data.message || `Deleted ${response.data.deleted} QR codes`, 'success');
+        setDeleteRangeStart('');
+        setDeleteRangeEnd('');
+        loadData();
+      } catch (err) {
+        onShowNotification('Error deleting QR codes: ' + (err.response?.data?.error || err.message), 'error');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -2197,14 +2222,24 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                   <TableCell padding="checkbox">
                     <Checkbox
-                      checked={selectedForPrint.length === qrCodes.length && qrCodes.length > 0}
+                      checked={
+                        isMainAdmin
+                          ? (selectedForPrint.length === qrCodes.length && qrCodes.length > 0)
+                          : (qrCodes.filter(q => q.status === 'generated' || q.reprintApproved).length > 0 &&
+                             selectedForPrint.length === qrCodes.filter(q => q.status === 'generated' || q.reprintApproved).length)
+                      }
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedForPrint(qrCodes.map(q => q._id));
+                          setSelectedForPrint(
+                            isMainAdmin 
+                              ? qrCodes.map(q => q._id)
+                              : qrCodes.filter(q => q.status === 'generated' || q.reprintApproved).map(q => q._id)
+                          );
                         } else {
                           setSelectedForPrint([]);
                         }
                       }}
+                      disabled={!isMainAdmin && qrCodes.filter(q => q.status === 'generated' || q.reprintApproved).length === 0}
                     />
                   </TableCell>
                   <TableCell><strong>Product</strong></TableCell>
@@ -2222,6 +2257,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   <TableRow key={qr._id}>
                     <TableCell padding="checkbox">
                       <Checkbox
+                        disabled={!isMainAdmin && qr.status !== 'generated' && !qr.reprintApproved}
                         checked={selectedForPrint.includes(qr._id)}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -2767,6 +2803,40 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
               value={editingBatch?.description || ''}
               onChange={(e) => setEditingBatch({ ...editingBatch, description: e.target.value })}
             />
+            <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #eee' }}>
+              <Typography variant="subtitle1" color="error.main" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Delete Specific Package Range
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Enter the package number range to permanently delete those QR codes from this batch.
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, mt: 2, alignItems: 'center' }}>
+                <TextField
+                  label="Start Pkg No"
+                  size="small"
+                  type="number"
+                  value={deleteRangeStart}
+                  onChange={(e) => setDeleteRangeStart(e.target.value)}
+                />
+                <Typography variant="body2">to</Typography>
+                <TextField
+                  label="End Pkg No"
+                  size="small"
+                  type="number"
+                  value={deleteRangeEnd}
+                  onChange={(e) => setDeleteRangeEnd(e.target.value)}
+                />
+                <Button 
+                  variant="outlined" 
+                  color="error" 
+                  onClick={handleDeleteRange}
+                  disabled={loading || !deleteRangeStart || !deleteRangeEnd}
+                  sx={{ whiteSpace: 'nowrap' }}
+                >
+                  Delete Range
+                </Button>
+              </Box>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>

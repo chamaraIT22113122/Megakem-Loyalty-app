@@ -93,6 +93,10 @@ const userSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    canManageApplicatorProgram: {
+      type: Boolean,
+      default: false
+    },
     canPrintQRCodes: {
       type: Boolean,
       default: false

@@ -650,6 +650,7 @@ router.post('/users', protect, async (req, res) => {
       user.set('permissions.canManageQRCodes', permissions.canManageQRCodes === true);
       user.set('permissions.canManageCoAdminRequests', permissions.canManageCoAdminRequests === true);
       user.set('permissions.canManageApplicators', permissions.canManageApplicators === true);
+      user.set('permissions.canManageApplicatorProgram', permissions.canManageApplicatorProgram === true);
       user.set('permissions.canPrintQRCodes', permissions.canPrintQRCodes === true);
       user.set('permissions.canViewQRAnalytics', permissions.canViewQRAnalytics === true);
       user.set('permissions.canViewAdvancedInsights', permissions.canViewAdvancedInsights === true);
@@ -749,6 +750,7 @@ router.put('/users/:id', protect, async (req, res) => {
           'permissions.canViewQRAnalytics': permissions.canViewQRAnalytics === true,
           'permissions.canManageCoAdminRequests': permissions.canManageCoAdminRequests === true,
           'permissions.canManageApplicators': permissions.canManageApplicators === true,
+          'permissions.canManageApplicatorProgram': permissions.canManageApplicatorProgram === true,
           'permissions.canViewAdvancedInsights': permissions.canViewAdvancedInsights === true,
           'permissions.canViewAuditLogs': permissions.canViewAuditLogs === true,
           'permissions.canViewFeedbacks': permissions.canViewFeedbacks === true

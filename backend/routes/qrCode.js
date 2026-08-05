@@ -315,6 +315,52 @@ router.put('/batches/:batchNo', protect, qrAdmin, async (req, res) => {
   }
 });
 
+// Delete specific QR codes in a batch by package number range
+router.delete('/batches/:batchNo/range', protect, qrAdmin, async (req, res) => {
+  try {
+    const { batchNo } = req.params;
+    const { startPkg, endPkg } = req.body;
+
+    if (!startPkg || !endPkg) {
+      return res.status(400).json({ error: 'Start and end package numbers are required' });
+    }
+
+    const start = parseInt(startPkg, 10);
+    const end = parseInt(endPkg, 10);
+
+    if (isNaN(start) || isNaN(end) || start > end) {
+      return res.status(400).json({ error: 'Invalid package range' });
+    }
+
+    // Find QRs in this batch
+    const escapedBatchNo = batchNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const qrCodes = await QRCodeModel.find({ batchNo: { $regex: new RegExp(`^${escapedBatchNo}`, 'i') } });
+
+    const idsToDelete = qrCodes.filter(qr => {
+      // The packageNo might be a string with leading zeros like "001" or "020" or "STD"
+      const pkgInt = parseInt(qr.packageNo, 10);
+      if (isNaN(pkgInt)) return false;
+      return pkgInt >= start && pkgInt <= end;
+    }).map(qr => qr._id);
+
+    if (idsToDelete.length === 0) {
+      return res.status(404).json({ error: 'No QR codes found in the specified range for this batch' });
+    }
+
+    const deleted = await QRCodeModel.deleteMany({ _id: { $in: idsToDelete } });
+
+    await logAction(req, 'DELETE_QR_BATCH_RANGE', 'QR_CODES', { batchNo, startPkg, endPkg, deletedCount: deleted.deletedCount });
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'qr_codes' });
+    }
+
+    res.json({ message: `Deleted ${deleted.deletedCount} QR codes`, deleted: deleted.deletedCount });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get QR codes with filters
 router.get('/', protect, qrAdmin, async (req, res) => {
   try {
@@ -669,7 +715,7 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
 
     if (duplicates.length > 0) {
       return res.status(400).json({
-        error: `Duplicate package numbers detected in this batch: ${duplicates.slice(0, 5).join(', ')}${duplicates.length > 5 ? '...' : ''}`,
+        error: `Cannot generate: Duplicate package numbers detected. Please choose a package number range that has not been generated yet. (Duplicates: ${duplicates.slice(0, 5).join(', ')}${duplicates.length > 5 ? '...' : ''})`,
         duplicateCount: duplicates.length
       });
     }
