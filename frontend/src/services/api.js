@@ -26,7 +26,8 @@ api.interceptors.request.use(
       '/change-requests',
       '/qr-codes/generate',
       '/qr-codes/bulk/generate',
-      '/qr-codes/reprint-requests'
+      '/qr-codes/reprint-requests',
+      '/qr-codes/mark-printed'
     ];
     let isBypass = bypassUrls.some(url => config.url?.includes(url));
 
