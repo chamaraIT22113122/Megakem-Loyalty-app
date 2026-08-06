@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const RecycleBin = require('../models/RecycleBin');
-const { protect, mainAdmin } = require('../middleware/authMiddleware');
+const { protect, admin } = require('../middleware/auth');
 const QRCodeModel = require('../models/QRCode');
 const Member = require('../models/Member');
 const Product = require('../models/Product');
@@ -9,8 +9,8 @@ const User = require('../models/User');
 
 // @route   GET /api/recycle-bin
 // @desc    Get all items in recycle bin
-// @access  Private/MainAdmin
-router.get('/', protect, mainAdmin, async (req, res) => {
+// @access  Private/Admin
+router.get('/', protect, admin, async (req, res) => {
   try {
     const items = await RecycleBin.find({}).sort({ deletedAt: -1 }).populate('deletedBy', 'name email role');
     res.json(items);
@@ -22,8 +22,8 @@ router.get('/', protect, mainAdmin, async (req, res) => {
 
 // @route   POST /api/recycle-bin/restore/:id
 // @desc    Restore a deleted item
-// @access  Private/MainAdmin
-router.post('/restore/:id', protect, mainAdmin, async (req, res) => {
+// @access  Private/Admin
+router.post('/restore/:id', protect, admin, async (req, res) => {
   try {
     const binItem = await RecycleBin.findById(req.params.id);
     if (!binItem) {
@@ -67,33 +67,33 @@ router.post('/restore/:id', protect, mainAdmin, async (req, res) => {
   }
 });
 
-// @route   DELETE /api/recycle-bin/:id
-// @desc    Permanently delete an item
-// @access  Private/MainAdmin
-router.delete('/:id', protect, mainAdmin, async (req, res) => {
+// @route   DELETE /api/recycle-bin/empty
+// @desc    Empty the recycle bin
+// @access  Private/Admin
+router.delete('/empty', protect, admin, async (req, res) => {
   try {
-    const binItem = await RecycleBin.findById(req.params.id);
-    if (!binItem) {
-      return res.status(404).json({ msg: 'Item not found in recycle bin' });
-    }
-
-    await RecycleBin.findByIdAndDelete(req.params.id);
-    res.json({ msg: 'Item permanently deleted' });
+    await RecycleBin.deleteMany({});
+    res.json({ msg: 'Recycle bin emptied successfully' });
   } catch (err) {
-    console.error('Error permanently deleting recycle bin item:', err.message);
+    console.error('Error emptying recycle bin:', err.message);
     res.status(500).send('Server Error');
   }
 });
 
-// @route   DELETE /api/recycle-bin/empty
-// @desc    Empty the recycle bin
-// @access  Private/MainAdmin
-router.delete('/empty', protect, mainAdmin, async (req, res) => {
+// @route   DELETE /api/recycle-bin/:id
+// @desc    Permanently delete an item
+// @access  Private/Admin
+router.delete('/:id', protect, admin, async (req, res) => {
   try {
-    await RecycleBin.deleteMany({});
-    res.json({ msg: 'Recycle bin emptied' });
+    const item = await RecycleBin.findById(req.params.id);
+    if (!item) {
+      return res.status(404).json({ msg: 'Item not found' });
+    }
+    
+    await item.deleteOne();
+    res.json({ msg: 'Item permanently deleted' });
   } catch (err) {
-    console.error('Error emptying recycle bin:', err.message);
+    console.error('Error permanently deleting item:', err.message);
     res.status(500).send('Server Error');
   }
 });
