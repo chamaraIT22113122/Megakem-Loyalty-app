@@ -151,7 +151,6 @@ const extractDateFromBatch = (batchNo) => {
 
 const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts }) => {
   const isMainAdmin = userInfo && (userInfo.email === 'admin@megakem.com' || (userInfo.role === 'admin' && !userInfo.permissions));
-  const isProductionUser = (userInfo && userInfo.email === 'production@megakemglobal.com') || localStorage.getItem('adminEmail') === 'production@megakemglobal.com';
 
   const hasPermission = (permission) => {
     if (isMainAdmin) return true;
@@ -1419,24 +1418,20 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
       {/* Action Buttons */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        {!isProductionUser && (
-          <>
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={() => setOpenGenerateDialog(true)}
-            >
-              Generate QR Codes
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<Add />}
-              onClick={() => setOpenBulkDialog(true)}
-            >
-              {isMainAdmin ? 'Bulk Generate' : 'Print Bulk'}
-            </Button>
-          </>
-        )}
+        <Button
+          variant="contained"
+          startIcon={<Add />}
+          onClick={() => setOpenGenerateDialog(true)}
+        >
+          Generate QR Codes
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<Add />}
+          onClick={() => setOpenBulkDialog(true)}
+        >
+          {isMainAdmin ? 'Bulk Generate' : 'Print Bulk'}
+        </Button>
         {hasPermission('canDelete') && (
           <Button
             variant="outlined"
