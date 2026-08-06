@@ -479,6 +479,8 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
           },
           firstGeneratedDate: { $min: '$createdAt' },
           minExpiryDate: { $min: '$expiryDate' },
+          manufactureDate: { $first: '$manufactureDate' },
+          description: { $first: '$description' },
           product: { $first: '$product' },
           productNo: { $first: '$productNo' }
         }
@@ -509,6 +511,8 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
           lastPrintDate: null,
           firstGeneratedDate: null,
           minExpiryDate: null,
+          manufactureDate: item.manufactureDate,
+          description: item.description,
           product: item.product,
           productNo: item.productNo
         };

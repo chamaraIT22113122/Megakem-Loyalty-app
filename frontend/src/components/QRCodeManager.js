@@ -2471,6 +2471,9 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   <TableRow>
                     <TableCell sx={{ fontWeight: 'bold' }}>Batch No</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Product</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Mfg Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Exp Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Price</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold' }}>Total QRs</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold' }}>Printed</TableCell>
@@ -2487,7 +2490,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                 <TableBody>
                   {batchSummary.filter(batch => batch._id && batch._id.toLowerCase().includes(batchSearchQuery.toLowerCase())).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isMainAdmin ? 8 : 6} align="center" sx={{ py: 3 }}>
+                      <TableCell colSpan={isMainAdmin ? 11 : 9} align="center" sx={{ py: 3 }}>
                         <Typography variant="body2" color="textSecondary">No batches found</Typography>
                       </TableCell>
                     </TableRow>
@@ -2519,6 +2522,17 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                             }
                             return null;
                           })()}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{batch.manufactureDate ? formatPerfectTime(batch.manufactureDate, 'N/A').split(',')[0] : 'N/A'}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{batch.minExpiryDate ? formatPerfectTime(batch.minExpiryDate, 'N/A').split(',')[0] : 'N/A'}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={batch.description || ''}>
+                            {batch.description || 'N/A'}
+                          </Typography>
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">{getProductDetails(batch)?.price ? `Rs. ${getProductDetails(batch).price}` : 'N/A'}</Typography>
