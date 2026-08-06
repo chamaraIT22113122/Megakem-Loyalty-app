@@ -20,7 +20,14 @@ api.interceptors.request.use(
 
     // Check if this is a modifying request
     const isModifyingRequest = ['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase());
-    const bypassUrls = ['/auth/login', '/auth/refresh', '/change-requests'];
+    const bypassUrls = [
+      '/auth/login', 
+      '/auth/refresh', 
+      '/change-requests',
+      '/qr-codes/generate',
+      '/qr-codes/bulk/generate',
+      '/qr-codes/reprint-requests'
+    ];
     const isBypass = bypassUrls.some(url => config.url?.includes(url));
     
     let user = null;
