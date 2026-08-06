@@ -18,15 +18,16 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Check if this is a modifying request
-    const isModifyingRequest = ['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase());
+    // Check if this is a modifying request (exclude 'post' for creates)
+    const isModifyingRequest = ['put', 'delete', 'patch'].includes(config.method?.toLowerCase());
     const bypassUrls = [
       '/auth/login', 
       '/auth/refresh', 
       '/change-requests',
       '/qr-codes/generate',
       '/qr-codes/bulk/generate',
-      '/qr-codes/reprint-requests'
+      '/qr-codes/reprint-requests',
+      '/members'
     ];
     const isBypass = bypassUrls.some(url => config.url?.includes(url));
     
