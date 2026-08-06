@@ -709,7 +709,7 @@ router.post('/users', protect, async (req, res) => {
 // @access  Private/Admin
 router.put('/users/:id', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && !req.user.permissions?.canManageCoAdmins) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'

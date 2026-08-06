@@ -3635,6 +3635,9 @@ function App() {
           canManageQRCodes: permissions?.canManageQRCodes === true,
           canManageCoAdminRequests: permissions?.canManageCoAdminRequests === true,
           canManageApplicators: permissions?.canManageApplicators === true,
+          canManageApplicatorProgram: permissions?.canManageApplicatorProgram === true,
+          canPrintQRCodes: permissions?.canPrintQRCodes === true,
+          canViewQRAnalytics: permissions?.canViewQRAnalytics === true,
           canViewAuditLogs: permissions?.canViewAuditLogs === true,
           canViewFeedbacks: permissions?.canViewFeedbacks === true
         }
@@ -7737,6 +7740,8 @@ function App() {
                       canManageCoAdminRequests: false,
                       canManageApplicators: false,
                       canManageApplicatorProgram: false,
+                      canPrintQRCodes: false,
+                      canViewQRAnalytics: false,
                       canViewAuditLogs: false,
                       canViewFeedbacks: false
                     } 
@@ -7829,6 +7834,8 @@ function App() {
                               canManageCoAdminRequests: u.permissions?.canManageCoAdminRequests === true,
                               canManageApplicators: u.permissions?.canManageApplicators === true,
                               canManageApplicatorProgram: u.permissions?.canManageApplicatorProgram === true,
+                              canPrintQRCodes: u.permissions?.canPrintQRCodes === true,
+                              canViewQRAnalytics: u.permissions?.canViewQRAnalytics === true,
                               canViewAuditLogs: u.permissions?.canViewAuditLogs === true,
                               canViewFeedbacks: u.permissions?.canViewFeedbacks === true
                             }
@@ -10312,6 +10319,50 @@ function App() {
                       }));
                     }} 
                     color='secondary' 
+                  />
+                </Box>
+
+                {/* 8b. Print QR Codes */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Print QR Codes</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to print QR codes</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canPrintQRCodes === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canPrintQRCodes: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='secondary' 
+                  />
+                </Box>
+
+                {/* 8c. QR Analytics */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can View QR Analytics</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to view QR code analytics</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canViewQRAnalytics === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canViewQRAnalytics: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='info' 
                   />
                 </Box>
 
