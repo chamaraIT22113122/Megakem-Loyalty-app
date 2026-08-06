@@ -106,10 +106,27 @@ router.get('/', optionalAuth, async (req, res) => {
       .lean();
 
     const count = await Scan.countDocuments(query);
+    
+    let totalPoints = 0;
+    let totalValue = 0;
+    if (count > 0) {
+      const stats = await Scan.aggregate([
+        { $match: query },
+        { $group: { _id: null, totalPoints: { $sum: "$points" }, totalValue: { $sum: "$price" } } }
+      ]);
+      if (stats.length > 0) {
+        totalPoints = stats[0].totalPoints || 0;
+        totalValue = stats[0].totalValue || 0;
+      }
+    }
 
     res.json({
       success: true,
       data: scans,
+      stats: {
+        totalPoints,
+        totalValue
+      },
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

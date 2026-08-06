@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launch Scan-Trak | Megakem Rewards</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              megakem: '#ffb300',
+              indigoBg: '#1e1b4b',
+            },
+            animation: {
+              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body { margin: 0; overflow: hidden; background-color: #1e1b4b; font-family: 'Inter', system-ui, sans-serif; }
+      
+      /* Triangle shape */
+      .triangle {
+        width: 0; 
+        height: 0; 
+        border-left: 20px solid transparent;
+        border-right: 20px solid transparent;
+        border-bottom: 35px solid transparent;
+      }
+      .triangle-yellow { border-bottom-color: rgba(255, 179, 0, 0.4); }
+      
+      /* Glassmorphism button */
+      .glass-btn {
+        background: rgba(255, 179, 0, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 179, 0, 0.5);
+      }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Babel standalone for JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Import map for modern React + Framer Motion via ESM -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "framer-motion": "https://esm.sh/framer-motion@10.16.4?deps=react@18.2.0"
+      }
+    }
+    </script>
+
+    <script type="text/babel" data-type="module">
+      import React, { useState, useEffect } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { motion, AnimatePresence } from 'framer-motion';
+
+      // Reward Icons SVG definitions
+      const icons = {
+        star: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+        gift: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1h-4v-2h4zM9 4c.55 0 1 .45 1 1h-4c0-.55.45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z"/></svg>',
+        coin: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.64-2.25 1.64-1.74 0-2.1-.96-2.17-1.92H8.01c.09 1.96 1.28 2.87 2.89 3.19V19h2.33v-1.73c1.73-.39 2.87-1.4 2.87-3.03 0-2.22-1.71-2.92-3.79-3.4z"/></svg>',
+        trophy: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M20.2 2H3.8C2.8 2 2 2.8 2 3.8v1.4C2 9.5 5.5 13 9.7 13.2L11 16H8v4h8v-4h-3l1.3-2.8c4.2-.2 7.7-3.7 7.7-8V3.8C22 2.8 21.2 2 20.2 2zM4 5.2V3.8c0-.2.2-.4.4-.4h2v5.3C5.1 8 4 6.7 4 5.2zm16 0c0 1.5-1.1 2.8-2.4 3.5V3.4h2c.2 0 .4.2.4.4v1.4z"/></svg>'
+      };
+
+      // Anti-gravity elements (Reward Icons)
+      const elements = [
+        { id: 1, icon: icons.star, className: 'w-24 h-24 text-megakem opacity-30', style: { top: '15%', left: '15%' }, delay: 0 },
+        { id: 2, icon: icons.trophy, className: 'w-20 h-20 text-blue-400 opacity-40', style: { top: '25%', right: '20%' }, delay: 1 },
+        { id: 3, icon: icons.gift, className: 'w-16 h-16 text-purple-400 opacity-50', style: { bottom: '20%', left: '25%' }, delay: 0.5 },
+        { id: 4, icon: icons.coin, className: 'w-28 h-28 text-cyan-400 opacity-30', style: { bottom: '25%', right: '15%' }, delay: 1.5 },
+        { id: 5, icon: icons.star, className: 'w-12 h-12 text-pink-400 opacity-40', style: { top: '50%', left: '10%' }, delay: 0.8 },
+        { id: 6, icon: icons.gift, className: 'w-14 h-14 text-green-400 opacity-50', style: { bottom: '40%', right: '10%' }, delay: 0.2 },
+        { id: 7, icon: icons.trophy, className: 'w-32 h-32 text-megakem opacity-20', style: { top: '10%', right: '40%' }, delay: 1.2 },
+        { id: 8, icon: icons.coin, className: 'w-16 h-16 text-yellow-300 opacity-40', style: { top: '40%', right: '30%' }, delay: 0.6 },
+      ];
+
+      function LaunchPage() {
+        const [isHovered, setIsHovered] = useState(false);
+        const [isClicked, setIsClicked] = useState(false);
+
+        const handleLaunch = () => {
+          setIsClicked(true);
+          
+          // Trigger redirect after cinematic sequence (1.5s + 0.3s buffer)
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1800);
+        };
+
+        return (
+          <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-br from-indigoBg via-[#0f0c29] to-black flex items-center justify-center">
+            
+            {/* Background elements */}
+            {elements.map((el) => {
+              // Calculate animation based on state
+              const idleY = [-15, 15, -15];
+              const idleRotate = [0, 90, 180];
+              const duration = isHovered ? 2 : 6;
+              
+              return (
+                <motion.div
+                  key={el.id}
+                  className={`absolute ${el.className}`}
+                  style={el.style}
+                  dangerouslySetInnerHTML={{ __html: el.icon }}
+                  animate={isClicked ? {
+                    scale: 20,
+                    opacity: 0,
+                    rotate: 360,
+                    transition: { duration: 1, ease: "easeIn" }
+                  } : {
+                    y: idleY,
+                    rotate: idleRotate,
+                  }}
+                  transition={!isClicked ? {
+                    y: {
+                      duration: duration + el.delay,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    },
+                    rotate: {
+                      duration: duration * 2 + el.delay,
+                      repeat: Infinity,
+                      ease: "linear"
+                    }
+                  } : undefined}
+                />
+              );
+            })}
+
+            {/* Subtle central glow */}
+            <motion.div 
+              className="absolute w-[600px] h-[600px] bg-megakem/10 rounded-full blur-[100px] pointer-events-none"
+              animate={isHovered ? { scale: 1.2, opacity: 0.8 } : { scale: 1, opacity: 0.5 }}
+              transition={{ duration: 0.5 }}
+            />
+
+            {/* Launch Button Centerpiece */}
+            <AnimatePresence>
+              {!isClicked && (
+                <motion.button
+                  onClick={handleLaunch}
+                  onHoverStart={() => setIsHovered(true)}
+                  onHoverEnd={() => setIsHovered(false)}
+                  className="z-10 relative group outline-none"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.8, opacity: 0, transition: { duration: 0.2 } }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <div className="absolute inset-0 bg-megakem rounded-xl blur-lg opacity-40 group-hover:opacity-70 transition duration-300 animate-pulse-fast"></div>
+                  
+                  <div className="glass-btn px-12 py-6 rounded-xl flex flex-col items-center justify-center shadow-[0_0_40px_rgba(255,179,0,0.3)] transition-all duration-300">
+                    <span className="text-megakem text-sm tracking-[0.3em] font-medium mb-1 opacity-80">MEGAKEM REWARDS</span>
+                    <span className="text-white text-3xl font-bold tracking-wider drop-shadow-md">
+                      INITIATE SYSTEM
+                    </span>
+                  </div>
+                </motion.button>
+              )}
+            </AnimatePresence>
+
+            {/* Shockwave effect */}
+            <AnimatePresence>
+              {isClicked && (
+                <motion.div
+                  className="absolute z-50 bg-white rounded-full pointer-events-none"
+                  initial={{ width: 0, height: 0, opacity: 1 }}
+                  animate={{ 
+                    width: '300vw', 
+                    height: '300vw', 
+                    opacity: 1 
+                  }}
+                  transition={{ 
+                    duration: 1.2, 
+                    ease: [0.22, 1, 0.36, 1], // easeOutQuint
+                    delay: 0.1
+                  }}
+                />
+              )}
+            </AnimatePresence>
+
+          </div>
+        );
+      }
+
+      const root = createRoot(document.getElementById('root'));
+      root.render(<LaunchPage />);
+    </script>
+</body>
+</html>

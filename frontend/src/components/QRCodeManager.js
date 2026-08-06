@@ -52,8 +52,24 @@ import {
   Save,
   Lock,
   Search,
-  Settings
+  Settings,
+  KeyboardArrowDown,
+  KeyboardArrowUp
 } from '@mui/icons-material';
+import { Collapse } from '@mui/material';
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  Legend, 
+  ResponsiveContainer 
+} from 'recharts';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import api, { qrCodesAPI } from '../services/api';
@@ -459,6 +475,8 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [activeTab, setActiveTab] = useState('batches');
   const [scanLogs, setScanLogs] = useState([]);
   const [scanLogsLoading, setScanLogsLoading] = useState(false);
+  const [scanLogSearch, setScanLogSearch] = useState('');
+  const [expandedScanRows, setExpandedScanRows] = useState({});
   const [scanLogFilter, setScanLogFilter] = useState('');
 
   // Pagination state
@@ -2572,114 +2590,193 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           )}
 
           {/* Tab 1: Scan Attempt Logs */}
-          {activeTab === 'scan_logs' && (isMainAdmin || hasPermission('canViewScans')) && (
-            <Box>
-              <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                <FormControl sx={{ minWidth: 180 }} size="small">
-                  <InputLabel>Filter by Event</InputLabel>
-                  <Select
-                    value={scanLogFilter}
-                    onChange={(e) => setScanLogFilter(e.target.value)}
-                    label="Filter by Event"
-                  >
-                    <MenuItem value="">All Events</MenuItem>
-                    <MenuItem value="success">✅ Success</MenuItem>
-                    <MenuItem value="duplicate">🔁 Duplicate</MenuItem>
-                    <MenuItem value="invalid_sig">🚨 Counterfeit / Invalid Sig</MenuItem>
-                    <MenuItem value="product_not_found">❓ Product Not Found</MenuItem>
-                    <MenuItem value="legacy">📜 Legacy (Unsigned)</MenuItem>
-                  </Select>
-                </FormControl>
-                <Button variant="outlined" startIcon={<Refresh />} onClick={loadScanLogs} disabled={scanLogsLoading}>
-                  {scanLogsLoading ? <CircularProgress size={20} /> : 'Refresh'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<Download />}
-                  onClick={() => exportCSV(scanLogs.map(l => ({
-                    'Timestamp': new Date(l.timestamp).toLocaleString(),
-                    'Event': l.eventType,
-                    'Product': l.productNo || '',
-                    'Batch': l.batchNo || '',
-                    'Package': l.packageNo || '',
-                    'Member': l.memberId || '',
-                    'Role': l.role || '',
-                    'Signature': l.signature,
-                    'City': l.city || '',
-                    'IP': l.ipAddress || ''
-                  })), 'scan_logs')}
-                  disabled={!scanLogs.length}
-                >
-                  Export CSV
-                </Button>
-              </Box>
+          {activeTab === 'scan_logs' && (isMainAdmin || hasPermission('canViewScans')) && (() => {
+            // Compute filtered logs
+            const filteredLogs = scanLogs.filter(log => {
+              if (scanLogFilter && log.eventType !== scanLogFilter) return false;
+              if (scanLogSearch) {
+                const q = scanLogSearch.toLowerCase();
+                const bNo = (log.batchNo || '').toLowerCase();
+                const pNo = (log.productNo || '').toLowerCase();
+                const mId = (log.memberId || '').toLowerCase();
+                if (!bNo.includes(q) && !pNo.includes(q) && !mId.includes(q)) return false;
+              }
+              return true;
+            });
 
-              {scanLogsLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress />
+            // Compute donut chart data
+            const eventCounts = filteredLogs.reduce((acc, log) => {
+              acc[log.eventType] = (acc[log.eventType] || 0) + 1;
+              return acc;
+            }, {});
+            const donutData = Object.keys(eventCounts).map(key => ({
+              name: key === 'success' ? 'Success' : key === 'invalid_sig' ? 'Counterfeit' : key === 'legacy' ? 'Legacy' : key,
+              value: eventCounts[key],
+              color: key === 'success' ? '#4caf50' : key === 'invalid_sig' ? '#f44336' : '#9e9e9e'
+            }));
+
+            // Compute timeline data (last 7 days)
+            const timelineDataMap = {};
+            for (let i = 6; i >= 0; i--) {
+              const d = new Date();
+              d.setDate(d.getDate() - i);
+              const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              timelineDataMap[dateStr] = { date: dateStr, scans: 0 };
+            }
+            filteredLogs.forEach(log => {
+              if (log.timestamp) {
+                const dateStr = new Date(log.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                if (timelineDataMap[dateStr]) timelineDataMap[dateStr].scans++;
+              }
+            });
+            const timelineData = Object.values(timelineDataMap);
+
+            return (
+              <Box>
+                {/* Analytics Dashboard */}
+                <Grid container spacing={3} sx={{ mb: 3 }}>
+                  <Grid item xs={12} md={4}>
+                    <Card variant="outlined" sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" color="textSecondary" gutterBottom>Scan Distribution</Typography>
+                        <Box sx={{ height: 200 }}>
+                          {donutData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie data={donutData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70}>
+                                  {donutData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                                </Pie>
+                                <RechartsTooltip />
+                                <Legend />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <Box display="flex" alignItems="center" justifyContent="center" height="100%">
+                              <Typography color="textSecondary">No data</Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={8}>
+                    <Card variant="outlined" sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" color="textSecondary" gutterBottom>Scan Volume (7 Days)</Typography>
+                        <Box sx={{ height: 200 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={timelineData}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                              <XAxis dataKey="date" tick={{fontSize: 12}} />
+                              <YAxis tick={{fontSize: 12}} allowDecimals={false} />
+                              <RechartsTooltip />
+                              <Line type="monotone" dataKey="scans" stroke="#1976d2" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    <StyledTextField
+                      size="small"
+                      placeholder="Search batch, product, member..."
+                      value={scanLogSearch}
+                      onChange={(e) => setScanLogSearch(e.target.value)}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>
+                      }}
+                      sx={{ minWidth: 250 }}
+                    />
+                    <FormControl sx={{ minWidth: 180 }} size="small">
+                      <InputLabel>Filter by Event</InputLabel>
+                      <Select value={scanLogFilter} onChange={(e) => setScanLogFilter(e.target.value)} label="Filter by Event">
+                        <MenuItem value="">All Events</MenuItem>
+                        <MenuItem value="success">✅ Success</MenuItem>
+                        <MenuItem value="invalid_sig">🚨 Counterfeit / Invalid Sig</MenuItem>
+                        <MenuItem value="product_not_found">❓ Product Not Found</MenuItem>
+                        <MenuItem value="legacy">📜 Legacy (Unsigned)</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button variant="outlined" startIcon={<Refresh />} onClick={loadScanLogs} disabled={scanLogsLoading}>
+                      {scanLogsLoading ? <CircularProgress size={20} /> : 'Refresh'}
+                    </Button>
+                    <Button variant="outlined" startIcon={<Download />} onClick={() => exportCSV(filteredLogs.map(l => ({ 'Timestamp': new Date(l.timestamp).toLocaleString(), 'Event': l.eventType, 'Product': l.productNo || '', 'Batch': l.batchNo || '', 'Package': l.packageNo || '', 'Member': l.memberId || '', 'Role': l.role || '', 'Signature': l.signature, 'City': l.city || '', 'IP': l.ipAddress || '' })), 'scan_logs')} disabled={!filteredLogs.length}>Export CSV</Button>
+                  </Box>
                 </Box>
-              ) : (
-                <TableContainer sx={{ maxHeight: 400 }}>
-                  <Table size="small" stickyHeader>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell><strong>Time</strong></TableCell>
-                        <TableCell><strong>Event</strong></TableCell>
-                        <TableCell><strong>Product</strong></TableCell>
-                        <TableCell><strong>Batch</strong></TableCell>
-                        <TableCell><strong>Member</strong></TableCell>
-                        <TableCell><strong>Sig</strong></TableCell>
-                        <TableCell><strong>City</strong></TableCell>
-                        <TableCell><strong>IP</strong></TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {scanLogs.length === 0 ? (
+                {scanLogsLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+                ) : (
+                  <TableContainer sx={{ maxHeight: 600 }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
                         <TableRow>
-                          <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                            <Typography color="textSecondary">No scan logs yet. Click Refresh to load.</Typography>
-                          </TableCell>
+                          <TableCell sx={{ width: 40 }}></TableCell>
+                          <TableCell><strong>Time</strong></TableCell>
+                          <TableCell><strong>Event</strong></TableCell>
+                          <TableCell><strong>Product</strong></TableCell>
+                          <TableCell><strong>Batch</strong></TableCell>
+                          <TableCell><strong>Member</strong></TableCell>
+                          <TableCell><strong>City</strong></TableCell>
                         </TableRow>
-                      ) : (
-                        scanLogs.map((log, idx) => {
-                          const rowColor = log.eventType === 'success' ? 'rgba(76,175,80,0.06)'
-                            : log.eventType === 'invalid_sig' ? 'rgba(244,67,54,0.08)'
-                            : log.eventType === 'duplicate' ? 'rgba(255,152,0,0.07)'
-                            : 'transparent';
-                          const eventChip = log.eventType === 'success' ? <Chip label="✅ Success" size="small" color="success" />
-                            : log.eventType === 'invalid_sig' ? <Chip label="🚨 Counterfeit" size="small" color="error" />
-                            : log.eventType === 'duplicate' ? <Chip label="🔁 Duplicate" size="small" color="warning" />
-                            : log.eventType === 'legacy' ? <Chip label="📜 Legacy" size="small" />
-                            : <Chip label={log.eventType} size="small" />;
-                          return (
-                            <TableRow key={log._id || idx} sx={{ bgcolor: rowColor }}>
-                              <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
-                                {new Date(log.timestamp).toLocaleString()}
-                              </TableCell>
-                              <TableCell>{eventChip}</TableCell>
-                              <TableCell sx={{ fontSize: '0.75rem' }}>{log.productNo || '-'}</TableCell>
-                              <TableCell sx={{ fontSize: '0.75rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.batchNo || '-'}</TableCell>
-                              <TableCell sx={{ fontSize: '0.75rem' }}>{log.memberId || '-'}</TableCell>
-                              <TableCell>
-                                <Chip
-                                  label={log.signature}
-                                  size="small"
-                                  color={log.signature === 'valid' ? 'success' : log.signature === 'invalid' ? 'error' : 'default'}
-                                  variant="outlined"
-                                />
-                              </TableCell>
-                              <TableCell sx={{ fontSize: '0.75rem' }}>{log.city || '-'}</TableCell>
-                              <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{log.ipAddress || '-'}</TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </Box>
-          )}
+                      </TableHead>
+                      <TableBody>
+                        {filteredLogs.length === 0 ? (
+                          <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4 }}><Typography color="textSecondary">No scan logs match your criteria.</Typography></TableCell></TableRow>
+                        ) : (
+                          filteredLogs.map((log, idx) => {
+                            const isExpanded = expandedScanRows[log._id || idx];
+                            const rowColor = log.eventType === 'success' ? 'rgba(76,175,80,0.06)' : log.eventType === 'invalid_sig' ? 'rgba(244,67,54,0.08)' : 'transparent';
+                            const eventChip = log.eventType === 'success' ? <Chip label="✅ Success" size="small" color="success" /> : log.eventType === 'invalid_sig' ? <Chip label="🚨 Counterfeit" size="small" color="error" /> : log.eventType === 'legacy' ? <Chip label="📜 Legacy" size="small" /> : <Chip label={log.eventType} size="small" />;
+                            return (
+                              <React.Fragment key={log._id || idx}>
+                                <TableRow sx={{ bgcolor: rowColor, '& > *': { borderBottom: 'unset' }, cursor: 'pointer' }} hover onClick={() => setExpandedScanRows(p => ({...p, [log._id || idx]: !p[log._id || idx]}))}>
+                                  <TableCell>
+                                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); setExpandedScanRows(p => ({...p, [log._id || idx]: !p[log._id || idx]})); }}>
+                                      {isExpanded ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                                    </IconButton>
+                                  </TableCell>
+                                  <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                                  <TableCell>{eventChip}</TableCell>
+                                  <TableCell sx={{ fontSize: '0.8rem' }}>{log.productNo || '-'}</TableCell>
+                                  <TableCell sx={{ fontSize: '0.8rem' }}>{log.batchNo || '-'}</TableCell>
+                                  <TableCell sx={{ fontSize: '0.8rem' }}>{log.memberId || '-'}</TableCell>
+                                  <TableCell sx={{ fontSize: '0.8rem' }}>{log.city || '-'}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                                      <Box sx={{ margin: 2, p: 2, bgcolor: 'background.default', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                                        <Grid container spacing={2}>
+                                          <Grid item xs={12} sm={4}><Typography variant="caption" color="textSecondary">Package No:</Typography><Typography variant="body2">{log.packageNo || 'N/A'}</Typography></Grid>
+                                          <Grid item xs={12} sm={4}><Typography variant="caption" color="textSecondary">Signature:</Typography><Typography variant="body2" sx={{wordBreak: 'break-all', fontFamily: 'monospace'}}>{log.signature || 'N/A'}</Typography></Grid>
+                                          <Grid item xs={12} sm={4}><Typography variant="caption" color="textSecondary">IP Address:</Typography><Typography variant="body2">{log.ipAddress || 'N/A'}</Typography></Grid>
+                                          <Grid item xs={12} sm={4}><Typography variant="caption" color="textSecondary">User Role:</Typography><Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{log.role || 'N/A'}</Typography></Grid>
+                                          <Grid item xs={12} sm={8}>
+                                            {log.eventType === 'invalid_sig' && <Alert severity="error" sx={{ py: 0, mt: 1 }}>Possible counterfeit item. Signature verification failed on server.</Alert>}
+                                            {log.eventType === 'success' && <Alert severity="success" sx={{ py: 0, mt: 1 }}>Valid product scan verified.</Alert>}
+                                          </Grid>
+                                        </Grid>
+                                      </Box>
+                                    </Collapse>
+                                  </TableCell>
+                                </TableRow>
+                              </React.Fragment>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            );
+          })()}
 
           {/* Tab 2: Reprint Requests */}
           {activeTab === 'reprint_requests' && (isMainAdmin || hasPermission('canManageCoAdminRequests')) && (
