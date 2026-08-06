@@ -866,6 +866,11 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       resetForm();
       loadData();
       loadQRCodes();
+      
+      // Auto-print generated QR codes
+      if (response.data.qrCodes && response.data.qrCodes.length > 0) {
+        printQRLabels(response.data.qrCodes);
+      }
     } catch (error) {
       onShowNotification('Error: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
@@ -1427,7 +1432,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
           startIcon={<Add />}
           onClick={() => setOpenBulkDialog(true)}
         >
-          Bulk Generate
+          Print Bulk
         </Button>
         {hasPermission('canDelete') && (
           <Button
@@ -1648,7 +1653,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
       {/* Bulk Generate Dialog */}
       <Dialog open={openBulkDialog} onClose={() => setOpenBulkDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Bulk Generate QR Codes</DialogTitle>
+        <DialogTitle>Print QR Codes in Bulk</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <FormControl fullWidth margin="normal">
             <InputLabel>Select Product</InputLabel>
@@ -1776,7 +1781,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   <DialogActions>
             <Button onClick={() => setOpenBulkDialog(false)}>Cancel</Button>
             <Button onClick={handleGenerateClick} variant="contained" disabled={loading}>
-              {loading ? <CircularProgress size={24} /> : 'Generate Bulk'}
+              {loading ? <CircularProgress size={24} /> : 'Print Bulk'}
             </Button>
           </DialogActions>
         </Dialog>
