@@ -4,6 +4,7 @@ const QRCode = require('qrcode');
 const crypto = require('crypto');
 const QRCodeModel = require('../models/QRCode');
 const ScanLog = require('../models/ScanLog');
+const RecycleBin = require('../models/RecycleBin');
 const Product = require('../models/Product');
 const { protect, qrAdmin, hasPermission, admin } = require('../middleware/auth');
 const PrintLayoutConfig = require('../models/PrintLayoutConfig');
@@ -222,7 +223,11 @@ router.post('/generate', protect, qrAdmin, async (req, res) => {
       const formattedBatch = getFormattedBatch(product.productNo, batchNo, finalMfgDate, packageNo);
 
       // Check if a QR code for this specific package already exists
-      const existingQR = await QRCodeModel.findOne({ product: productId, batchNo: formattedBatch });
+      const existingQR = await QRCodeModel.findOne({ 
+        product: productId, 
+        batchNo: formattedBatch,
+        status: { $ne: 'archived' }
+      });
       if (existingQR) {
         return res.status(400).json({ error: `A QR code for package ${packageNo || 'STD'} in batch ${batchNo} already exists.` });
       }
@@ -345,6 +350,19 @@ router.delete('/batches/:batchNo/range', protect, qrAdmin, async (req, res) => {
 
     if (idsToDelete.length === 0) {
       return res.status(404).json({ error: 'No QR codes found in the specified range for this batch' });
+    }
+
+    const qrsToDelete = qrCodes.filter(qr => idsToDelete.includes(qr._id));
+    if (qrsToDelete.length > 0) {
+      const binItems = qrsToDelete.map(qr => ({
+        originalCollection: 'qrcodes',
+        documentId: qr._id,
+        documentData: qr.toObject(),
+        summary: `QR Code: ${qr.batchNo}`,
+        deletedBy: req.user._id,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      }));
+      await RecycleBin.insertMany(binItems);
     }
 
     const deleted = await QRCodeModel.deleteMany({ _id: { $in: idsToDelete } });
@@ -636,6 +654,18 @@ router.delete('/', protect, qrAdmin, hasPermission('canDelete'), async (req, res
 
     if (batchNo) {
       const escapedBatchNo = batchNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const qrsToDelete = await QRCodeModel.find({ batchNo: { $regex: new RegExp(`^${escapedBatchNo}`, 'i') } });
+      if (qrsToDelete.length > 0) {
+        const binItems = qrsToDelete.map(qr => ({
+          originalCollection: 'qrcodes',
+          documentId: qr._id,
+          documentData: qr.toObject(),
+          summary: `QR Code: ${qr.batchNo}`,
+          deletedBy: req.user._id,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        }));
+        await RecycleBin.insertMany(binItems);
+      }
       const deleted = await QRCodeModel.deleteMany({ batchNo: { $regex: new RegExp(`^${escapedBatchNo}`, 'i') } });
       await logAction(req, 'BULK_DELETE_QR_CODES', 'QR_CODES', { batchNo, deletedCount: deleted.deletedCount });
       
@@ -650,6 +680,19 @@ router.delete('/', protect, qrAdmin, hasPermission('canDelete'), async (req, res
 
     if (!qrIds || !Array.isArray(qrIds)) {
       return res.status(400).json({ error: 'QR IDs or batch number are required' });
+    }
+
+    const qrsToDelete = await QRCodeModel.find({ _id: { $in: qrIds } });
+    if (qrsToDelete.length > 0) {
+      const binItems = qrsToDelete.map(qr => ({
+        originalCollection: 'qrcodes',
+        documentId: qr._id,
+        documentData: qr.toObject(),
+        summary: `QR Code: ${qr.batchNo}`,
+        deletedBy: req.user._id,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      }));
+      await RecycleBin.insertMany(binItems);
     }
 
     const deleted = await QRCodeModel.deleteMany({ _id: { $in: qrIds } });
@@ -729,9 +772,14 @@ router.post('/bulk/generate', protect, qrAdmin, async (req, res) => {
     }
 
     // Check for duplicates in the database first
+    const baseFormattedBatch = getFormattedBatch(product.productNo, batchNo, finalMfgDate, '').trim();
+    
+    // We escape the baseFormattedBatch for regex to prevent regex injection
+    const escapedBaseBatch = baseFormattedBatch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
     const existingQRs = await QRCodeModel.find({
       product: productId,
-      batchNo: batchNo,
+      batchNo: { $regex: new RegExp(`^${escapedBaseBatch}`) },
       status: { $ne: 'archived' }
     });
 
