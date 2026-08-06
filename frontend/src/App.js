@@ -723,7 +723,7 @@ function App() {
   useEffect(() => {
     let socket;
     if (adminAuth) {
-      socket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
+      socket = io(process.env.REACT_APP_API_URL || (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', ''), {
         transports: ['websocket', 'polling']
       });
       socket.on('data_updated', (data) => {
@@ -1355,7 +1355,7 @@ function App() {
       
       idCardDebounceRef.current = setTimeout(() => {
         if (prev.previewMode === 'pdf') {
-          generateIDCard(prev.member, process.env.REACT_APP_API_URL || 'http://localhost:5000', newConfig)
+          generateIDCard(prev.member, process.env.REACT_APP_API_URL || (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', ''), newConfig)
             .then(result => {
               setIdCardPreviewDialog(p => ({ ...p, dataUri: result.dataUri, doc: result.doc }));
             });
@@ -4611,7 +4611,7 @@ function App() {
                         <Grid item xs={12} md={4.5} lg={3.5}>
                           <Box sx={{ textAlign: 'center', color: 'white' }}>
                             <Avatar 
-                              src={currentMember.photo ? (currentMember.photo.startsWith('data:image') || currentMember.photo.startsWith('http') ? currentMember.photo : `http://localhost:5000${currentMember.photo}`) : ''}
+                              src={currentMember.photo ? (currentMember.photo.startsWith('data:image') || currentMember.photo.startsWith('http') ? currentMember.photo : `${(process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', '')}${currentMember.photo}`) : ''}
                               sx={{ 
                               width: 120, 
                               height: 120, 
@@ -9349,7 +9349,7 @@ function App() {
                                 <>
                                   <TableCell>
                                     <Avatar 
-                              src={applicator.photo ? (applicator.photo.startsWith('data:image') || applicator.photo.startsWith('http') ? applicator.photo : `http://localhost:5000${applicator.photo}`) : ''} 
+                              src={applicator.photo ? (applicator.photo.startsWith('data:image') || applicator.photo.startsWith('http') ? applicator.photo : `${(process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', '')}${applicator.photo}`) : ''} 
                               alt={applicator.name}
                               sx={{ bgcolor: applicator.photo ? 'transparent' : 'secondary.main' }}
                             >
@@ -9446,7 +9446,7 @@ function App() {
                                               zone: { x: 51, y: 43, fontSize: 7.5, color: '#1E3264', visible: true },
                                               photo: { x: 5.6, y: 16.7, width: 26, height: 30.5, visible: true }
                                             };
-                                            const result = await generateIDCard(applicator, process.env.REACT_APP_API_URL || 'http://localhost:5000', config);
+                                            const result = await generateIDCard(applicator, process.env.REACT_APP_API_URL || (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', ''), config);
                                             setIdCardPreviewDialog({ 
                                               open: true, 
                                               dataUri: result.dataUri, 
@@ -12918,7 +12918,7 @@ function App() {
               ) : (
                 <>
                   <Avatar
-                    src={applicatorPhotoFile ? URL.createObjectURL(applicatorPhotoFile) : (applicatorFormData.photo ? (applicatorFormData.photo.startsWith('data:image') || applicatorFormData.photo.startsWith('http') ? applicatorFormData.photo : `http://localhost:5000${applicatorFormData.photo}`) : '')}
+                    src={applicatorPhotoFile ? URL.createObjectURL(applicatorPhotoFile) : (applicatorFormData.photo ? (applicatorFormData.photo.startsWith('data:image') || applicatorFormData.photo.startsWith('http') ? applicatorFormData.photo : `${(process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', '')}${applicatorFormData.photo}`) : '')}
                     sx={{ width: 100, height: 100, mb: 1 }}
                   />
                   <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 2 }}>
@@ -13631,7 +13631,7 @@ function App() {
               size="small" 
               onClick={() => {
                 if (idCardPreviewDialog.previewMode === 'interactive') {
-                  generateIDCard(idCardPreviewDialog.member, process.env.REACT_APP_API_URL || 'http://localhost:5000', idCardPreviewDialog.config)
+                  generateIDCard(idCardPreviewDialog.member, process.env.REACT_APP_API_URL || (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', ''), idCardPreviewDialog.config)
                     .then(result => {
                       setIdCardPreviewDialog(p => ({ ...p, previewMode: 'pdf', dataUri: result.dataUri, doc: result.doc }));
                     });
@@ -13653,7 +13653,7 @@ function App() {
               <IDCardInteractivePreview 
                 member={idCardPreviewDialog.member} 
                 config={idCardPreviewDialog.config} 
-                apiUrl={process.env.REACT_APP_API_URL || 'http://localhost:5000'}
+                apiUrl={process.env.REACT_APP_API_URL || (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', '')}
                 onChangeConfig={handleIDCardConfigChange}
               />
             ) : idCardPreviewDialog.dataUri ? (

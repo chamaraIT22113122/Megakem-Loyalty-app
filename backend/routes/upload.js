@@ -62,7 +62,8 @@ router.post('/', upload.single('image'), async (req, res) => {
     
     if (driveResult && driveResult.id) {
       // Use the direct viewing URL format for Google Drive images
-      imageUrl = `https://drive.google.com/uc?export=view&id=${driveResult.id}`;
+      // Wrapped in proxy to bypass Google Drive's 3rd party cookie blocking!
+      imageUrl = `/api/upload/proxy?url=${encodeURIComponent('https://drive.google.com/uc?export=view&id=' + driveResult.id)}`;
       isDriveUrl = true;
       
       // Delete the local file after successful upload to Drive
@@ -86,7 +87,14 @@ router.post('/', upload.single('image'), async (req, res) => {
         });
       } catch (sharpErr) {
         console.error('Error compressing image with sharp:', sharpErr);
-        // If sharp fails, we leave it as the local file URL so it doesn't break
+        // If sharp fails, use native Node fs to convert to base64 (no compression)
+        try {
+          const rawBuffer = fs.readFileSync(req.file.path);
+          imageUrl = `data:${req.file.mimetype};base64,${rawBuffer.toString('base64')}`;
+          fs.unlink(req.file.path, () => {});
+        } catch (fsErr) {
+          console.error('Error reading file natively:', fsErr);
+        }
       }
     }
     
