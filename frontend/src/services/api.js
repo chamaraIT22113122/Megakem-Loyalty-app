@@ -26,10 +26,14 @@ api.interceptors.request.use(
       '/change-requests',
       '/qr-codes/generate',
       '/qr-codes/bulk/generate',
-      '/qr-codes/reprint-requests',
-      '/members'
+      '/qr-codes/reprint-requests'
     ];
-    const isBypass = bypassUrls.some(url => config.url?.includes(url));
+    let isBypass = bypassUrls.some(url => config.url?.includes(url));
+
+    // Bypass updates to members/applicators, but require approval for deletes
+    if (config.url?.includes('/members') && config.method?.toLowerCase() !== 'delete') {
+      isBypass = true;
+    }
     
     let user = null;
     try {
