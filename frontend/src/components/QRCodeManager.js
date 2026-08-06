@@ -2526,10 +2526,10 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                           })()}
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">{batch.manufactureDate ? formatPerfectTime(batch.manufactureDate, 'N/A').split(',')[0] : 'N/A'}</Typography>
+                          <Typography variant="body2">{batch.manufactureDate ? new Date(batch.manufactureDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : 'N/A'}</Typography>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">{batch.minExpiryDate ? formatPerfectTime(batch.minExpiryDate, 'N/A').split(',')[0] : 'N/A'}</Typography>
+                          <Typography variant="body2">{batch.minExpiryDate ? new Date(batch.minExpiryDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : 'N/A'}</Typography>
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={batch.description || ''}>
