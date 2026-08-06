@@ -1436,16 +1436,6 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
         >
           Print Bulk
         </Button>
-        {hasPermission('canDelete') && (
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={() => setOpenBulkDeleteDialog(true)}
-          >
-            Bulk Delete
-          </Button>
-        )}
         {selectedForPrint.length > 0 && (
           <>
             <Button
