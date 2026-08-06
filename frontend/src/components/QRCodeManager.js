@@ -1418,20 +1418,24 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
       {/* Action Buttons */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setOpenGenerateDialog(true)}
-        >
-          Generate QR Codes
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<Add />}
-          onClick={() => setOpenBulkDialog(true)}
-        >
-          {isMainAdmin ? 'Bulk Generate' : 'Print Bulk'}
-        </Button>
+        {isMainAdmin && (
+          <>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setOpenGenerateDialog(true)}
+            >
+              Generate QR Codes
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<Add />}
+              onClick={() => setOpenBulkDialog(true)}
+            >
+              Bulk Generate
+            </Button>
+          </>
+        )}
         {hasPermission('canDelete') && (
           <Button
             variant="outlined"
@@ -2275,7 +2279,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   <TableRow key={qr._id}>
                     <TableCell padding="checkbox">
                       <Checkbox
-                        disabled={!isMainAdmin && qr.status !== 'generated' && !qr.reprintApproved}
+                        disabled={!isMainAdmin && !qr.reprintApproved}
                         checked={selectedForPrint.includes(qr._id)}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -2364,7 +2368,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                           <IconButton
                             size="small"
                             color="warning"
-                            disabled={qr.reprintPending}
+                            disabled={qr.reprintPending || (!isMainAdmin && qr.status === 'generated')}
                             onClick={() => {
                               if (!isMainAdmin && qr.status !== 'generated' && !qr.reprintApproved) {
                                 setSelectedQRForReprint(qr);
