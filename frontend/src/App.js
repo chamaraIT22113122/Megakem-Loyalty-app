@@ -4084,12 +4084,6 @@ function App() {
 
   // User Permissions Check
   const hasPermission = (permission) => {
-    // Restrict QR generation and printing for the production user
-    const currentEmail = adminEmail || user?.email;
-    if (currentEmail === 'production@megakemglobal.com' && (permission === 'canManageQRCodes' || permission === 'canPrintQRCodes')) {
-      return false;
-    }
-
     // Main admin has all permissions
     if (isMainAdmin()) {
       return true;
