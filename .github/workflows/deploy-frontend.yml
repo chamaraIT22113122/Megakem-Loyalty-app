@@ -12,6 +12,9 @@ jobs:
   web-deploy:
     name: Build and Deploy Frontend
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: 'true'
     
     defaults:
       run:
@@ -58,7 +61,8 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         protocol: ftps
         port: 21
-        timeout: 300000
+        security: false
+        timeout: 600000
         local-dir: ./frontend/build/
         server-dir: ./
         exclude: |
