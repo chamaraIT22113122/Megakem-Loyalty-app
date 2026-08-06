@@ -2541,18 +2541,17 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                         </TableCell>
                         <TableCell align="center">{batch.totalQRs}</TableCell>
                         <TableCell align="center">
-                          <Tooltip 
-                            title={batch.unprintedPackages && batch.unprintedPackages.length > 0 ? 
-                              `Unprinted Packages: ${batch.unprintedPackages.slice(0, 15).join(', ')}${batch.unprintedPackages.length > 15 ? ` ...and ${batch.unprintedPackages.length - 15} more` : ''}` 
-                              : ''} 
-                            arrow placement="top"
-                          >
                             <Chip 
                               label={`${isMainAdmin ? batch.printed : (batch.printed + batch.generated)}/${batch.totalQRs}`} 
                               size="small" 
                               color={(isMainAdmin ? batch.printed : (batch.printed + batch.generated)) === batch.totalQRs ? "success" : "warning"}
                             />
-                          </Tooltip>
+                            {batch.unprintedPackages && batch.unprintedPackages.length > 0 && (
+                              <Typography variant="caption" display="block" color="error" sx={{ mt: 0.5, fontSize: '0.7rem', fontWeight: 'bold' }}>
+                                Unprinted: {batch.unprintedPackages.slice(0, 10).join(', ')}
+                                {batch.unprintedPackages.length > 10 ? '...' : ''}
+                              </Typography>
+                            )}
                         </TableCell>
                         {isMainAdmin && (
                           <TableCell align="center">
