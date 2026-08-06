@@ -20,6 +20,7 @@ import IDCardInteractivePreview from './components/IDCardInteractivePreview';
 import ApplicatorProgramDashboard from './components/ApplicatorProgramDashboard';
 import MembersAndLoyaltyTab from './components/MembersAndLoyaltyTab';
 import DataManagement from './components/DataManagement';
+import RecycleBin from './components/RecycleBin';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
@@ -5631,6 +5632,7 @@ function App() {
               {hasPermission('canManageApplicatorProgram') && <Tab icon={<Star />} label='Applicator Program' value='applicator-program' />}
               {hasPermission('canViewAuditLogs') && <Tab icon={<Security />} label='Audit Logs' value='audit-logs' />}
               {hasPermission('canViewFeedbacks') && <Tab icon={<FeedbackIcon />} label='Feedbacks' value='feedbacks' />}
+              {isMainAdmin() && <Tab icon={<Delete />} label='Recycle Bin' value='recycle-bin' />}
               <Tab icon={<Settings />} label='Profile' value='profile' />
             </Tabs>
           </Paper>
@@ -9551,6 +9553,11 @@ function App() {
           {/* Feedbacks Tab */}
           {adminTab === 'feedbacks' && hasPermission('canViewFeedbacks') && <Box>
             <FeedbacksTab />
+          </Box>}
+
+          {/* Recycle Bin Tab */}
+          {adminTab === 'recycle-bin' && isMainAdmin() && <Box>
+            <RecycleBin />
           </Box>}
 
           {/* Profile Settings Tab */}
