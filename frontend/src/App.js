@@ -911,6 +911,9 @@ function App() {
   const [serverScanPage, setServerScanPage] = useState(0);
   const [serverScanRowsPerPage, setServerScanRowsPerPage] = useState(25);
   const [serverScanTotal, setServerScanTotal] = useState(0);
+  const [serverScanStats, setServerScanStats] = useState({ totalPoints: 0, totalValue: 0 });
+  const [scanRoleFilter, setScanRoleFilter] = useState('');
+  const [scanProductFilter, setScanProductFilter] = useState('');
   const [paginatedScans, setPaginatedScans] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [scansPerPage] = useState(10);
@@ -3226,16 +3229,21 @@ function App() {
       if (scanSearchQuery) params.search = scanSearchQuery;
       if (scanDateFilter.start) params.startDate = scanDateFilter.start;
       if (scanDateFilter.end) params.endDate = scanDateFilter.end;
+      if (scanRoleFilter) params.role = scanRoleFilter;
+      // We pass the product name/no to search since backend API doesn't have a direct 'product' param
+      if (scanProductFilter) params.search = scanProductFilter;
+      
       const res = await scansAPI.getAll(params);
       setPaginatedScans(res.data.data || []);
       if (res.data.pagination) setServerScanTotal(res.data.pagination.total);
+      if (res.data.stats) setServerScanStats(res.data.stats);
     } catch (e) { console.error('Error fetching paginated scans', e); }
   };
 
   useEffect(() => {
     fetchPaginatedScans();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverScanPage, serverScanRowsPerPage, scanSearchQuery, scanDateFilter, adminTab, adminAuth]);
+  }, [serverScanPage, serverScanRowsPerPage, scanSearchQuery, scanDateFilter, scanRoleFilter, scanProductFilter, adminTab, adminAuth]);
 
   // Auto-refresh dashboard data every 30 seconds when enabled
   useEffect(() => {
@@ -4076,6 +4084,12 @@ function App() {
 
   // User Permissions Check
   const hasPermission = (permission) => {
+    // Restrict QR generation and printing for the production user
+    const currentEmail = adminEmail || user?.email;
+    if (currentEmail === 'production@megakemglobal.com' && (permission === 'canManageQRCodes' || permission === 'canPrintQRCodes')) {
+      return false;
+    }
+
     // Main admin has all permissions
     if (isMainAdmin()) {
       return true;
@@ -7036,28 +7050,85 @@ function App() {
           })()}
 
           {adminTab === 'scans' && <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-            <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* 📊 Mini Insights Header */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', borderRadius: 2 }}>
+                  <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>Total Scans (Filtered)</Typography>
+                    <Typography variant="h4" fontWeight="bold">{serverScanTotal.toLocaleString()}</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'success.main', color: 'success.contrastText', borderRadius: 2 }}>
+                  <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>Total Points Awarded</Typography>
+                    <Typography variant="h4" fontWeight="bold">{serverScanStats.totalPoints.toLocaleString()}</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'info.main', color: 'info.contrastText', borderRadius: 2 }}>
+                  <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>Total Value (Rs.)</Typography>
+                    <Typography variant="h4" fontWeight="bold">Rs. {serverScanStats.totalValue.toLocaleString()}</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* 🎛️ Filters Section */}
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', p: 2, bgcolor: 'background.paper', borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
               <TextField 
                 size='small' 
-                placeholder='Search by member, product, batch...' 
+                placeholder='Search member, batch...' 
                 value={scanSearchQuery}
                 onChange={(e) => { 
                   setScanSearchQuery(e.target.value); 
                   setCurrentPage(1); 
+                  setServerScanPage(0);
                 }}
                 sx={{ flexGrow: 1, minWidth: 200 }}
                 InputProps={{
                   startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>,
                   endAdornment: scanSearchQuery && loading ? <CircularProgress size={20} /> : null
                 }}
-                helperText={scanSearchQuery && "Search results update automatically"}
               />
+              
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Role</InputLabel>
+                <Select
+                  value={scanRoleFilter}
+                  label="Role"
+                  onChange={(e) => { setScanRoleFilter(e.target.value); setServerScanPage(0); }}
+                >
+                  <MenuItem value="">All Roles</MenuItem>
+                  <MenuItem value="applicator">👷 Applicator</MenuItem>
+                  <MenuItem value="customer">🏢 Hardware/Customer</MenuItem>
+                </Select>
+              </FormControl>
+
+              <TextField 
+                size='small' 
+                placeholder='Filter by Product...' 
+                value={scanProductFilter}
+                onChange={(e) => { 
+                  setScanProductFilter(e.target.value); 
+                  setServerScanPage(0);
+                }}
+                sx={{ minWidth: 180 }}
+                InputProps={{
+                  startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>📦</Box>,
+                }}
+              />
+
               <TextField 
                 type='date'
                 size='small'
                 label='Start Date'
                 value={scanDateFilter.start}
-                onChange={(e) => { setScanDateFilter({ ...scanDateFilter, start: e.target.value }); setCurrentPage(1); }}
+                onChange={(e) => { setScanDateFilter({ ...scanDateFilter, start: e.target.value }); setServerScanPage(0); }}
                 InputLabelProps={{ shrink: true }}
                 sx={{ width: 150 }}
               />
@@ -7066,17 +7137,20 @@ function App() {
                 size='small'
                 label='End Date'
                 value={scanDateFilter.end}
-                onChange={(e) => { setScanDateFilter({ ...scanDateFilter, end: e.target.value }); setCurrentPage(1); }}
+                onChange={(e) => { setScanDateFilter({ ...scanDateFilter, end: e.target.value }); setServerScanPage(0); }}
                 InputLabelProps={{ shrink: true }}
                 sx={{ width: 150 }}
               />
-              {(scanSearchQuery || scanDateFilter.start || scanDateFilter.end) && (
+              {(scanSearchQuery || scanDateFilter.start || scanDateFilter.end || scanRoleFilter || scanProductFilter) && (
                 <Button 
                   size='small' 
+                  color='error'
                   onClick={() => { 
                     setScanSearchQuery(''); 
                     setScanDateFilter({ start: '', end: '' }); 
-                    setCurrentPage(1);
+                    setScanRoleFilter('');
+                    setScanProductFilter('');
+                    setServerScanPage(0);
                   }}
                   sx={{ whiteSpace: 'nowrap' }}
                 >
@@ -7410,147 +7484,213 @@ function App() {
                           Showing {currentScans.length} of {serverScanTotal} scans
                         </Typography>
                       </Box>
-                      {currentScans.map((item, i) => <Card key={item._id || i} sx={{ mb: 2, borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                    <Box>
-                      <Typography variant='subtitle1' fontWeight='bold'>{item.memberName || 'Unknown'}</Typography>
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <Chip label={item.memberId} size='small' sx={{ borderRadius: 1, height: 20, fontSize: '0.7rem' }} />
-                        {item.phone && <Chip label={`📱 ${item.phone}`} size='small' color='success' sx={{ borderRadius: 1, height: 20, fontSize: '0.7rem' }} />}
-                      </Box>
-                    </Box>
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      <Chip label={item.role} size='small' color={item.role === 'applicator' ? 'warning' : 'info'} sx={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 'bold' }} />
-                      <IconButton 
-                        size='small' 
-                        color='error' 
-                        onClick={() => setDeleteDialog({ 
-                          open: true, 
-                          scanId: item._id, 
-                          scanDetails: `${item.productName} (${item.batchNo} - ${item.bagNo}) by ${item.memberName}` 
-                        })}
-                        disabled={!hasPermission('canDelete')}
-                        sx={{ ml: 1 }}
-                      >
-                        <Delete fontSize='small' />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant='body2' color='text.secondary'>Product: <Box component='span' color='text.primary' fontWeight={600}>{item.productName}</Box></Typography>
-                  <Typography variant='body2' color='text.secondary'>PRODUCT: {item.productNo}</Typography>
-                  <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <Chip 
-                      label={`Batch: ${item.batchNo}`} 
-                      size='small' 
-                      sx={{ 
-                        borderRadius: '6px', 
-                        fontSize: '0.7rem', 
-                        bgcolor: 'background.paper', 
-                        border: '1px solid', 
-                        borderColor: 'divider', 
-                        color: 'text.secondary',
-                        height: 24,
-                        fontWeight: 500
-                      }} 
-                    />
-                    <Chip 
-                      label={`Bag: ${item.bagNo}`} 
-                      size='small' 
-                      sx={{ 
-                        borderRadius: '6px', 
-                        fontSize: '0.7rem', 
-                        bgcolor: 'background.paper', 
-                        border: '1px solid', 
-                        borderColor: 'divider', 
-                        color: 'text.secondary',
-                        height: 24,
-                        fontWeight: 500
-                      }} 
-                    />
-                    {item.qty && (
-                      <Chip 
-                        label={item.qty} 
-                        size='small' 
-                        sx={{ 
-                          borderRadius: '6px', 
-                          fontSize: '0.7rem', 
-                          bgcolor: '#10b981', 
-                          color: 'white', 
-                          fontWeight: 'bold',
-                          height: 24
-                        }} 
-                      />
-                    )}
-                    {item.price > 0 ? (
-                      <Chip 
-                        label={`Rs. ${item.price.toLocaleString()}`} 
-                        size='small' 
-                        sx={{ 
-                          borderRadius: '6px', 
-                          fontSize: '0.7rem', 
-                          bgcolor: '#2d6a8b', 
-                          color: 'white', 
-                          fontWeight: 'bold',
-                          height: 24
-                        }} 
-                      />
-                    ) : (
-                      <Chip 
-                        label="⚠️ Price Not Set" 
-                        size='small' 
-                        sx={{ 
-                          borderRadius: '6px', 
-                          fontSize: '0.7rem', 
-                          bgcolor: 'warning.light', 
-                          color: 'warning.dark', 
-                          fontWeight: 'bold',
-                          height: 24
-                        }} 
-                      />
-                    )}
-                    {item.points !== undefined && (
-                      <Chip 
-                        label={`✨ ${item.points} pts`} 
-                        size='small' 
-                        color='secondary' 
-                        sx={{ 
-                          borderRadius: '6px', 
-                          fontSize: '0.7rem', 
-                          fontWeight: 'bold',
-                          height: 24
-                        }} 
-                      />
-                    )}
-                  </Box>
-                  {item.price === 0 && (
-                    <Box sx={{ mt: 1, p: 1, bgcolor: 'warning.lighter', borderRadius: 1, border: '1px solid', borderColor: 'warning.light' }}>
-                      <Typography variant='caption' color='warning.dark' sx={{ fontSize: '0.7rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        ⚠️ Product with pack size "{item.qty}" not found in Products tab. Please add it to set the correct price.
-                      </Typography>
-                    </Box>
-                  )}
-                  {(() => {
-                    const batchInfo = parseBatchInfo(item.batchNo);
-                    if (batchInfo?.parsed) {
-                      return (
-                        <Box sx={{ mt: 1.5, p: 1.25, bgcolor: '#f1f5f9', borderRadius: 1.5, display: 'flex', alignItems: 'center' }}>
-                          <Typography variant='caption' color='text.secondary' sx={{ fontSize: '0.75rem', fontWeight: 500, letterSpacing: '0.2px' }}>
-                            📦 {batchInfo.productCode} • Batch {batchInfo.materialBatch} • {batchInfo.date} • Pack {batchInfo.packSize} #{batchInfo.packNo}
-                          </Typography>
-                        </Box>
-                      );
-                    }
-                    return null;
-                  })()}
-                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
-                    {item.location && <Typography variant='body2' color='text.secondary' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>📍 <Box component='span' fontWeight={500}>{item.location}</Box></Typography>}
-                    {item.role === 'applicator' && item.connectedHardware && <Typography variant='body2' color='text.secondary' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>🏬 <Box component='span' fontWeight={500}>{item.connectedHardware}</Box></Typography>}
-                  </Box>
-                  <Typography variant='caption' sx={{ display: 'block', textAlign: 'right', mt: 1, color: 'text.disabled' }}>{item.timestamp ? new Date(item.timestamp).toLocaleString() : 'Pending'}</Typography>
-                </CardContent>
-              </Card>)}
+                      {currentScans.map((item, i) => (
+                        <Card key={item._id || i} sx={{ 
+                          mb: 2, 
+                          borderLeft: '4px solid', 
+                          borderLeftColor: item.role === 'applicator' ? 'warning.main' : 'info.main',
+                          boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)',
+                          transition: 'transform 0.2s',
+                          '&:hover': { transform: 'translateY(-2px)' }
+                        }}>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                <Box sx={{ 
+                                  width: 40, 
+                                  height: 40, 
+                                  borderRadius: '50%', 
+                                  bgcolor: item.role === 'applicator' ? 'warning.lighter' : 'info.lighter',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: item.role === 'applicator' ? 'warning.dark' : 'info.dark',
+                                  fontSize: '1.2rem'
+                                }}>
+                                  {item.role === 'applicator' ? '👷' : '🏢'}
+                                </Box>
+                                <Box>
+                                  <Typography variant='subtitle1' fontWeight='bold'>{item.memberName || 'Unknown'}</Typography>
+                                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <Chip label={item.memberId} size='small' sx={{ borderRadius: 1, height: 20, fontSize: '0.7rem' }} />
+                                    {item.phone && <Chip label={`📱 ${item.phone}`} size='small' color='success' sx={{ borderRadius: 1, height: 20, fontSize: '0.7rem' }} />}
+                                  </Box>
+                                </Box>
+                              </Box>
+                              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                <Chip label={item.role} size='small' color={item.role === 'applicator' ? 'warning' : 'info'} sx={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 'bold' }} />
+                                <IconButton 
+                                  size='small' 
+                                  color='error' 
+                                  onClick={() => setDeleteDialog({ 
+                                    open: true, 
+                                    scanId: item._id, 
+                                    scanDetails: `${item.productName} (${item.batchNo} - ${item.bagNo}) by ${item.memberName}` 
+                                  })}
+                                  disabled={!hasPermission('canDelete')}
+                                  sx={{ ml: 1 }}
+                                >
+                                  <Delete fontSize='small' />
+                                </IconButton>
+                              </Box>
+                            </Box>
+                            <Divider sx={{ my: 1.5 }} />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Box sx={{ 
+                                width: 48, 
+                                height: 48, 
+                                borderRadius: 1.5, 
+                                bgcolor: 'grey.100',
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.5rem'
+                              }}>
+                                📦
+                              </Box>
+                              <Box>
+                                <Typography variant='body2' color='text.secondary'>Product: <Box component='span' color='text.primary' fontWeight={600}>{item.productName}</Box></Typography>
+                                <Typography variant='caption' color='text.secondary'>PRODUCT CODE: {item.productNo}</Typography>
+                              </Box>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                              <Chip 
+                                label={`Batch: ${item.batchNo}`} 
+                                size='small' 
+                                sx={{ 
+                                  borderRadius: '6px', 
+                                  fontSize: '0.75rem', 
+                                  bgcolor: 'background.paper', 
+                                  border: '1px solid', 
+                                  borderColor: 'divider', 
+                                  color: 'text.secondary',
+                                  height: 26,
+                                  fontWeight: 600
+                                }} 
+                              />
+                              <Chip 
+                                label={`Bag: ${item.bagNo}`} 
+                                size='small' 
+                                sx={{ 
+                                  borderRadius: '6px', 
+                                  fontSize: '0.75rem', 
+                                  bgcolor: 'background.paper', 
+                                  border: '1px solid', 
+                                  borderColor: 'divider', 
+                                  color: 'text.secondary',
+                                  height: 26,
+                                  fontWeight: 600
+                                }} 
+                              />
+                              {item.qty && (
+                                <Chip 
+                                  label={item.qty} 
+                                  size='small' 
+                                  sx={{ 
+                                    borderRadius: '6px', 
+                                    fontSize: '0.75rem', 
+                                    bgcolor: '#10b981', 
+                                    color: 'white', 
+                                    fontWeight: 'bold',
+                                    height: 26
+                                  }} 
+                                />
+                              )}
+                              {item.price > 0 ? (
+                                <Chip 
+                                  label={`Rs. ${item.price.toLocaleString()}`} 
+                                  size='small' 
+                                  sx={{ 
+                                    borderRadius: '6px', 
+                                    fontSize: '0.75rem', 
+                                    bgcolor: '#2d6a8b', 
+                                    color: 'white', 
+                                    fontWeight: 'bold',
+                                    height: 26
+                                  }} 
+                                />
+                              ) : (
+                                <Chip 
+                                  label="⚠️ Price Not Set" 
+                                  size='small' 
+                                  sx={{ 
+                                    borderRadius: '6px', 
+                                    fontSize: '0.75rem', 
+                                    bgcolor: 'warning.light', 
+                                    color: 'warning.dark', 
+                                    fontWeight: 'bold',
+                                    height: 26
+                                  }} 
+                                />
+                              )}
+                              {item.points !== undefined && (
+                                <Chip 
+                                  label={`✨ ${item.points} pts`} 
+                                  size='small' 
+                                  color='secondary' 
+                                  sx={{ 
+                                    borderRadius: '6px', 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: 'bold',
+                                    height: 26,
+                                    boxShadow: '0 2px 4px rgba(233,30,99,0.2)'
+                                  }} 
+                                />
+                              )}
+                            </Box>
+
+                            {item.price === 0 && (
+                              <Box sx={{ mt: 1, p: 1, bgcolor: 'warning.lighter', borderRadius: 1, border: '1px solid', borderColor: 'warning.light' }}>
+                                <Typography variant='caption' color='warning.dark' sx={{ fontSize: '0.7rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  ⚠️ Product with pack size "{item.qty}" not found in Products tab. Please add it to set the correct price.
+                                </Typography>
+                              </Box>
+                            )}
+
+                            {(() => {
+                              const batchInfo = parseBatchInfo(item.batchNo);
+                              if (batchInfo?.parsed) {
+                                return (
+                                  <Box sx={{ mt: 1.5, p: 1.25, bgcolor: '#f1f5f9', borderRadius: 1.5, display: 'flex', alignItems: 'center' }}>
+                                    <Typography variant='caption' color='text.secondary' sx={{ fontSize: '0.75rem', fontWeight: 500, letterSpacing: '0.2px' }}>
+                                      📦 {batchInfo.productCode} • Batch {batchInfo.materialBatch} • {batchInfo.date} • Pack {batchInfo.packSize} #{batchInfo.packNo}
+                                    </Typography>
+                                  </Box>
+                                );
+                              }
+                              return null;
+                            })()}
+
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
+                              {item.location && (
+                                <Typography variant='body2' color='text.secondary' sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: 'grey.100', px: 1, py: 0.5, borderRadius: 1 }}>
+                                  📍 <Box component='span' fontWeight={500}>{item.location}</Box>
+                                </Typography>
+                              )}
+                              
+                              {item.role === 'applicator' && item.connectedHardware && (
+                                <Box 
+                                  sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: 'info.lighter', px: 1, py: 0.5, borderRadius: 1, cursor: 'pointer', '&:hover': { bgcolor: 'info.light' }, border: '1px solid', borderColor: 'info.light' }}
+                                  onClick={() => {
+                                    setScanSearchQuery(item.connectedHardware);
+                                    setScanRoleFilter('customer');
+                                    setServerScanPage(0);
+                                  }}
+                                >
+                                  <Typography variant='body2' color='info.dark' sx={{ fontWeight: 600 }}>
+                                    🏬 Purchased From: {item.connectedHardware}
+                                  </Typography>
+                                  <Box component="span" sx={{ fontSize: '0.8rem', opacity: 0.7 }}>🔍</Box>
+                                </Box>
+                              )}
+                            </Box>
+                            <Typography variant='caption' sx={{ display: 'block', textAlign: 'right', mt: 1, color: 'text.disabled' }}>{item.timestamp ? new Date(item.timestamp).toLocaleString() : 'Pending'}</Typography>
+                          </CardContent>
+                        </Card>
+                      ))}
               
               <TablePagination
                 component="div"
