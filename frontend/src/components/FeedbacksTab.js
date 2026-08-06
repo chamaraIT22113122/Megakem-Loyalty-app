@@ -100,6 +100,7 @@ const FeedbacksTab = () => {
         return res.arrayBuffer();
       });
       const pdfDoc = await PDFDocument.load(templateBytes);
+      const cleanTemplateDoc = await PDFDocument.load(templateBytes);
       
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -221,9 +222,9 @@ const FeedbacksTab = () => {
             
             const imgDims = pdfImage.scaleToFit(width - marginX * 2, 250);
             
-            if (currentY - imgDims.height < 50) {
-              // Add new page using template
-              const [newPage] = await pdfDoc.copyPages(pdfDoc, [0]);
+            if (currentY - imgDims.height < 90) {
+              // Add clean page using templateDoc (without any drawn text/details)
+              const [newPage] = await pdfDoc.copyPages(cleanTemplateDoc, [0]);
               pdfDoc.addPage(newPage);
               page = newPage;
               currentY = height - 150; // reset Y for new page
