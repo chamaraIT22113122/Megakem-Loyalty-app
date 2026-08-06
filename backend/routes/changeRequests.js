@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ChangeRequest = require('../models/ChangeRequest');
+const RecycleBin = require('../models/RecycleBin');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const axios = require('axios');
@@ -189,7 +190,18 @@ router.delete('/:id', protect, async (req, res) => {
        return res.status(400).json({ success: false, error: 'Cannot delete processed requests' });
     }
 
-    await request.remove();
+    // Save to recycle bin
+    const binItem = new RecycleBin({
+      originalCollection: 'changerequests',
+      documentId: request._id,
+      documentData: request.toObject(),
+      summary: `Change Request: ${request.actionType || 'Action'} on ${request.entityType || 'Entity'}`,
+      deletedBy: req.user._id,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    await binItem.save();
+
+    await request.deleteOne();
     res.json({ success: true, message: 'Request deleted' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

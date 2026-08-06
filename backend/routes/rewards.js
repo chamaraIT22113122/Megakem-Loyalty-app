@@ -3,6 +3,7 @@ const router = express.Router();
 const Reward = require('../models/Reward');
 const { protect, authorize, hasPermission } = require('../middleware/auth');
 const { logAction } = require('../middleware/audit');
+const RecycleBin = require('../models/RecycleBin');
 
 // @route   GET /api/rewards
 // @desc    Get all active rewards for members
@@ -103,6 +104,17 @@ router.delete('/:id', protect, hasPermission('canManageProducts'), hasPermission
       rewardId: reward._id,
       name: reward.name
     };
+
+    // Save to recycle bin
+    const binItem = new RecycleBin({
+      originalCollection: 'rewards',
+      documentId: reward._id,
+      documentData: reward.toObject(),
+      summary: `Reward: ${reward.name} (${reward.pointsRequired} points)`,
+      deletedBy: req.user._id,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    await binItem.save();
 
     await reward.deleteOne();
 

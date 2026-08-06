@@ -6,6 +6,11 @@ const QRCodeModel = require('../models/QRCode');
 const Member = require('../models/Member');
 const Product = require('../models/Product');
 const User = require('../models/User');
+const ChangeRequest = require('../models/ChangeRequest');
+const Scan = require('../models/Scan');
+const Reward = require('../models/Reward');
+const ReprintRequest = require('../models/ReprintRequest');
+const Feedback = require('../models/Feedback');
 
 // @route   GET /api/recycle-bin
 // @desc    Get all items in recycle bin
@@ -45,6 +50,21 @@ router.post('/restore/:id', protect, admin, async (req, res) => {
         break;
       case 'users':
         Model = User;
+        break;
+      case 'changerequests':
+        Model = ChangeRequest;
+        break;
+      case 'scans':
+        Model = Scan;
+        break;
+      case 'rewards':
+        Model = Reward;
+        break;
+      case 'reprintrequests':
+        Model = ReprintRequest;
+        break;
+      case 'feedbacks':
+        Model = Feedback;
         break;
       default:
         return res.status(400).json({ msg: 'Unknown collection type' });

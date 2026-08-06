@@ -34,6 +34,7 @@ const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { optionalAuth, protect, authorize, hasPermission } = require('../middleware/auth');
 const QRCodeModel = require('../models/QRCode');
 const ScanLog = require('../models/ScanLog');
+const RecycleBin = require('../models/RecycleBin');
 
 // Helper for distance calculation (Haversine in miles)
 function getDistanceFromLatLonInMiles(lat1, lon1, lat2, lon2) {
@@ -582,6 +583,17 @@ router.delete('/:id', protect, hasPermission('canDelete'), async (req, res) => {
         message: 'Scan not found'
       });
     }
+
+    // Save to recycle bin
+    const binItem = new RecycleBin({
+      originalCollection: 'scans',
+      documentId: scan._id,
+      documentData: scan.toObject(),
+      summary: `Scan: ${scan.memberId} scanned ${scan.productNo} (Points: ${scan.pointsEarned || scan.points || 0})`,
+      deletedBy: req.user._id,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    await binItem.save();
 
     await scan.deleteOne();
 

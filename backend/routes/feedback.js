@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Feedback = require('../models/Feedback');
+const RecycleBin = require('../models/RecycleBin');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
 const nodemailer = require('nodemailer');
 const dns = require('dns');
@@ -265,6 +266,17 @@ router.delete('/:id', async (req, res) => {
     if (!feedback) {
       return res.status(404).json({ success: false, message: 'Feedback not found' });
     }
+
+    // Save to recycle bin
+    const binItem = new RecycleBin({
+      originalCollection: 'feedbacks',
+      documentId: feedback._id,
+      documentData: feedback.toObject(),
+      summary: `Feedback: From ${feedback.name || feedback.userType || 'User'} (${feedback.subject || 'No Subject'})`,
+      deletedBy: req.user ? req.user._id : null,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    await binItem.save();
 
     await feedback.deleteOne();
     res.status(200).json({ success: true, message: 'Feedback deleted' });

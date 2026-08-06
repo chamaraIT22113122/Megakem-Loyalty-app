@@ -1185,6 +1185,17 @@ router.delete('/reprint-requests/:id', protect, hasPermission('canManageCoAdminR
     if (!request) {
       return res.status(404).json({ error: 'Reprint request not found' });
     }
+    // Save to recycle bin
+    const binItem = new RecycleBin({
+      originalCollection: 'reprintrequests',
+      documentId: request._id,
+      documentData: request.toObject(),
+      summary: `Reprint Request: Batch ${request.batchNo || 'Unknown'}, Status: ${request.status || 'Pending'}`,
+      deletedBy: req.user._id,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    await binItem.save();
+
     await request.deleteOne();
 
     await logAction(req, 'DELETE_REPRINT_REQUEST', 'QR_CODES', { requestId: req.params.id });
