@@ -285,4 +285,11 @@ export const feedbackAPI = {
   updateSettings: (data) => api.post('/feedback/settings', data),
 };
 
+export const recycleBinAPI = {
+  getAll: () => api.get('/recycle-bin'),
+  restore: (id) => api.post(`/recycle-bin/restore/${id}`),
+  delete: (id) => api.delete(`/recycle-bin/${id}`),
+  empty: () => api.delete('/recycle-bin/empty'),
+};
+
 export default api;

@@ -211,6 +211,7 @@ app.use('/api/push', require('./routes/push'));
 app.use('/api/backup', require('./routes/backup'));
 app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/change-requests', require('./routes/changeRequests'));
+app.use('/api/recycle-bin', require('./routes/recycleBin'));
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 

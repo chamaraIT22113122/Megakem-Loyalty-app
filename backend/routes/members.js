@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const Member = require('../models/Member');
+const User = require('../models/User');
+const RecycleBin = require('../models/RecycleBin');
 const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { protect } = require('../middleware/auth');
 const { logAction } = require('../middleware/audit');
@@ -940,6 +942,16 @@ router.delete('/:id', protect, async (req, res) => {
         message: 'Access denied. You can only delete applicator and hardware accounts.'
       });
     }
+
+    const binItem = new RecycleBin({
+      originalCollection: 'members',
+      documentId: member._id,
+      documentData: member.toObject(),
+      summary: `Member: ${member.name} (${member.memberId || 'No ID'})`,
+      deletedBy: req.user._id,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    await binItem.save();
 
     await Member.deleteOne({ _id: req.params.id });
 

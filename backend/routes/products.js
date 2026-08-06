@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
+const RecycleBin = require('../models/RecycleBin');
 const { protect, authorize, hasPermission } = require('../middleware/auth');
 const { logAction } = require('../middleware/audit');
 const { getFromCache, setInCache, clearCache } = require('../utils/cache');
@@ -249,6 +250,16 @@ router.delete('/:id', protect, hasPermission('canManageProducts'), hasPermission
       productName: product.name,
       productNo: product.productNo 
     };
+
+    const binItem = new RecycleBin({
+      originalCollection: 'products',
+      documentId: product._id,
+      documentData: product.toObject(),
+      summary: `Product: ${product.name} (${product.productNo})`,
+      deletedBy: req.user._id,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    await binItem.save();
 
     await product.deleteOne();
 

@@ -952,6 +952,17 @@ router.delete('/users/:id', protect, async (req, res) => {
       });
     }
 
+    const RecycleBin = require('../models/RecycleBin');
+    const binItem = new RecycleBin({
+      originalCollection: 'users',
+      documentId: user._id,
+      documentData: user.toObject(),
+      summary: `User: ${user.name} (${user.email})`,
+      deletedBy: req.user._id,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    await binItem.save();
+
     await User.findByIdAndDelete(req.params.id);
 
     await logAction(req, 'DELETE_USER', 'USERS', { deletedUserEmail: user.email });
