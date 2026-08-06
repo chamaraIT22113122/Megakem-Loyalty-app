@@ -642,6 +642,7 @@ router.post('/users', protect, async (req, res) => {
       user.set('permissions.canViewScans', permissions.canViewScans === true);
       user.set('permissions.canManageCoAdmins', permissions.canManageCoAdmins === true);
       user.set('permissions.canDelete', permissions.canDelete === true);
+      user.set('permissions.canEdit', permissions.canEdit === true);
       user.set('permissions.canExport', permissions.canExport === true);
       user.set('permissions.canManageUsers', permissions.canManageUsers === true);
       user.set('permissions.canViewRewards', permissions.canViewRewards === true);
@@ -740,6 +741,7 @@ router.put('/users/:id', protect, async (req, res) => {
           'permissions.canViewScans': permissions.canViewScans === true,
           'permissions.canManageCoAdmins': permissions.canManageCoAdmins === true,
           'permissions.canDelete': permissions.canDelete === true,
+          'permissions.canEdit': permissions.canEdit === true,
           'permissions.canExport': permissions.canExport === true,
           'permissions.canManageUsers': permissions.canManageUsers === true,
           'permissions.canViewRewards': permissions.canViewRewards === true,

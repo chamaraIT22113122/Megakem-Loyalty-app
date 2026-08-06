@@ -66,6 +66,10 @@ const userSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    canEdit: {
+      type: Boolean,
+      default: false
+    },
     canExport: {
       type: Boolean,
       default: false

@@ -3627,6 +3627,7 @@ function App() {
           canViewScans: permissions?.canViewScans === true,
           canManageCoAdmins: permissions?.canManageCoAdmins === true,
           canDelete: permissions?.canDelete === true,
+          canEdit: permissions?.canEdit === true,
           canExport: permissions?.canExport === true,
           canManageUsers: permissions?.canManageUsers === true,
           canViewRewards: permissions?.canViewRewards === true,
@@ -7731,6 +7732,7 @@ function App() {
                       canViewScans: false,
                       canManageCoAdmins: false,
                       canDelete: false, 
+                      canEdit: false, 
                       canExport: false, 
                       canManageUsers: false, 
                       canViewRewards: false,
@@ -7825,6 +7827,7 @@ function App() {
                               canViewScans: u.permissions?.canViewScans === true,
                               canManageCoAdmins: u.permissions?.canManageCoAdmins === true,
                               canDelete: u.permissions?.canDelete === true,
+                              canEdit: u.permissions?.canEdit === true,
                               canExport: u.permissions?.canExport === true,
                               canManageUsers: u.permissions?.canManageUsers === true,
                               canViewRewards: u.permissions?.canViewRewards === true,
@@ -10473,6 +10476,28 @@ function App() {
                       }));
                     }} 
                     color='info' 
+                  />
+                </Box>
+
+                {/* Edit Records */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Edit Records</Typography>
+                    <Typography variant='caption' color='text.secondary'>Permission to edit records across tabs</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canEdit === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canEdit: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='warning' 
                   />
                 </Box>
 
