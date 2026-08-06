@@ -2260,7 +2260,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                   <TableCell><strong>Status</strong></TableCell>
                   <TableCell><strong>Generated</strong></TableCell>
                   <TableCell><strong>Printed</strong></TableCell>
-                  {(isMainAdmin || hasPermission('canViewScans')) && <TableCell><strong>Scan & Reprint Info</strong></TableCell>}
+                  <TableCell><strong>{isMainAdmin ? 'Scan & Reprint Info' : 'Reprint Info'}</strong></TableCell>
                   <TableCell><strong>Actions</strong></TableCell>
                 </TableRow>
               </TableHead>
@@ -2302,19 +2302,19 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     </TableCell>
                     <TableCell>{formatPerfectTime(qr.createdAt)}</TableCell>
                     <TableCell>{formatPerfectTime(qr.printedDate)}</TableCell>
-                    {(isMainAdmin || hasPermission('canViewScans')) && (
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          {qr.reprintCount > 0 && (
-                            <Chip 
-                              label={`Reprinted: ${qr.reprintCount}x`} 
-                              size="small" 
-                              color="warning" 
-                              variant="outlined" 
-                              sx={{ fontWeight: 'bold', alignSelf: 'flex-start' }}
-                            />
-                          )}
-                          {qr.status === 'scanned' ? (
+                    <TableCell>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        {qr.reprintCount > 0 && (
+                          <Chip 
+                            label={`Reprinted: ${qr.reprintCount}x`} 
+                            size="small" 
+                            color="warning" 
+                            variant="outlined" 
+                            sx={{ fontWeight: 'bold', alignSelf: 'flex-start' }}
+                          />
+                        )}
+                        {isMainAdmin ? (
+                          qr.status === 'scanned' ? (
                             <Box sx={{ pl: 0.5 }}>
                               <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: 'success.main' }}>
                                 Scanned by: {qr.scannedByMemberId || 'N/A'}
@@ -2337,10 +2337,12 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                             </Box>
                           ) : (
                             <Typography variant="caption" color="textSecondary">—</Typography>
-                          )}
-                        </Box>
-                      </TableCell>
-                    )}
+                          )
+                        ) : (
+                          (!qr.reprintCount || qr.reprintCount === 0) && <Typography variant="caption" color="textSecondary">—</Typography>
+                        )}
+                      </Box>
+                    </TableCell>
                     <TableCell>
                       {isMainAdmin && (
                         <Tooltip title="Download QR Image">
