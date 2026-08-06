@@ -2314,6 +2314,11 @@ function App() {
     if (!isValidEmail(adminEmail)) return showNotification('Please enter a valid email address', 'error');
     if (!isValidPassword(adminPassword)) return showNotification('Password must be at least 6 characters long', 'error');
     
+    // Prevent production user from logging in as admin
+    if (adminEmail === 'production@megakemglobal.com') {
+      return showNotification('Admin access for this user has been revoked', 'error');
+    }
+    
     setLoading(true);
     try {
       const response = await authAPI.adminLogin({ email: adminEmail, password: adminPassword });
@@ -4084,7 +4089,7 @@ function App() {
 
   // User Permissions Check
   const hasPermission = (permission) => {
-    // Restrict all permissions for the production user
+    // Restrict ALL admin access for the production user
     const currentEmail = adminEmail || user?.email;
     if (currentEmail === 'production@megakemglobal.com') {
       return false;
