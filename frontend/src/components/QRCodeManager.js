@@ -1113,21 +1113,27 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       
       setTimeout(() => {
         printWindow.print();
+        
+        setTimeout(async () => {
+          if (window.confirm("Did the QR codes print successfully?\n\nClick OK to mark them as printed.\nClick Cancel to leave them as generated.")) {
+            const printedIds = qrsToPrint.map(q => q._id);
+            try {
+              if (!isMainAdmin) {
+                await api.post('/qr-codes/reprint-requests/consume', { qrIds: printedIds });
+              }
+              await api.put('/qr-codes/mark-printed', { qrIds: printedIds, printerModel });
+              onShowNotification('Marked as printed successfully', 'success');
+              loadData();
+              loadQRCodes();
+            } catch (err) {
+              console.error('Error post-print updates:', err);
+              onShowNotification('Error marking as printed', 'error');
+            }
+          }
+        }, 1000);
       }, 250);
       
       onShowNotification('Print dialog opened', 'success');
-
-      // Consume reprint requests if any of the printed QRs had them
-      if (!isMainAdmin) {
-        const printedIds = qrsToPrint.map(q => q._id);
-        try {
-          await api.post('/qr-codes/reprint-requests/consume', { qrIds: printedIds });
-          await api.put('/qr-codes/mark-printed', { qrIds: printedIds, printerModel });
-          loadData();
-        } catch (err) {
-          console.error('Error post-print updates:', err);
-        }
-      }
     } catch (error) {
       onShowNotification('Error preparing print: ' + error.message, 'error');
     }
