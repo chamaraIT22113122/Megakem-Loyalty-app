@@ -174,12 +174,21 @@ const FeedbacksTab = () => {
       drawText(page, line, marginX, currentY, 11);
       currentY -= 30;
       
-      // Images
+      // Images (3 columns per row grid layout)
       const imagesToLoad = feedback.imageUrls && feedback.imageUrls.length > 0 ? feedback.imageUrls : (feedback.imageUrl ? [feedback.imageUrl] : []);
       
       if (imagesToLoad.length > 0) {
         drawText(page, 'Attached Images:', marginX, currentY, 12, true);
-        currentY -= lineHeight;
+        currentY -= (lineHeight + 5);
+
+        const maxCols = 3;
+        const gapX = 15;
+        const gapY = 15;
+        const colWidth = (width - marginX * 2 - (maxCols - 1) * gapX) / maxCols; // ~155px column width
+        const maxImgHeight = 180;
+
+        let colIndex = 0;
+        let rowMaxHeight = 0;
         
         for (const src of imagesToLoad) {
           const normalizedSrc = src.replace(/\\/g, '/');
@@ -220,29 +229,51 @@ const FeedbacksTab = () => {
               pdfImage = await pdfDoc.embedJpg(imgBytes);
             }
             
-            const imgDims = pdfImage.scaleToFit(width - marginX * 2, 250);
-            
-            if (currentY - imgDims.height < 90) {
-              // Add clean page using templateDoc (without any drawn text/details)
+            const imgDims = pdfImage.scaleToFit(colWidth, maxImgHeight);
+
+            // Check if starting a new row and if row fits on current page
+            if (colIndex === 0 && (currentY - maxImgHeight < 90)) {
+              // Add clean page using templateDoc
               const [newPage] = await pdfDoc.copyPages(cleanTemplateDoc, [0]);
               pdfDoc.addPage(newPage);
               page = newPage;
               currentY = height - 150; // reset Y for new page
+              colIndex = 0;
+              rowMaxHeight = 0;
             }
+
+            const posX = marginX + colIndex * (colWidth + gapX);
+            const posY = currentY - imgDims.height;
             
             page.drawImage(pdfImage, {
-              x: marginX,
-              y: currentY - imgDims.height,
+              x: posX,
+              y: posY,
               width: imgDims.width,
               height: imgDims.height,
             });
             
-            currentY -= (imgDims.height + 20);
+            rowMaxHeight = Math.max(rowMaxHeight, imgDims.height);
+            colIndex++;
+
+            if (colIndex === maxCols) {
+              currentY -= (rowMaxHeight + gapY);
+              colIndex = 0;
+              rowMaxHeight = 0;
+            }
           } catch (imgErr) {
             console.error('Failed to embed image in PDF:', imgErr);
-            drawText(page, '(Image could not be loaded)', marginX, currentY, 10);
-            currentY -= lineHeight;
+            drawText(page, '(Image error)', marginX + colIndex * (colWidth + gapX), currentY - 15, 10);
+            colIndex++;
+            if (colIndex === maxCols) {
+              currentY -= (30 + gapY);
+              colIndex = 0;
+              rowMaxHeight = 0;
+            }
           }
+        }
+
+        if (colIndex > 0) {
+          currentY -= (rowMaxHeight + gapY);
         }
       }
       
