@@ -493,12 +493,15 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
       const batchNo = item._id || '';
       let prefix = batchNo;
       
+      let packageNo = '';
       const parts = batchNo.trim().split(/[_\s]+/);
       if (parts.length >= 4) {
         const delimiter = batchNo.includes('_') ? '_' : ' ';
         prefix = parts.slice(0, 3).join(delimiter);
+        packageNo = parts.slice(3).join(delimiter);
       } else if (parts.length === 5) {
         prefix = parts.slice(0, 4).join(' ');
+        packageNo = parts[4];
       }
 
       if (!grouped[prefix]) {
@@ -514,8 +517,15 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
           manufactureDate: item.manufactureDate,
           description: item.description,
           product: item.product,
-          productNo: item.productNo
+          productNo: item.productNo,
+          unprintedPackages: []
         };
+      }
+
+      if (item.generated > 0 && item.printed === 0 && item.scanned === 0) {
+        if (packageNo) {
+          grouped[prefix].unprintedPackages.push(packageNo);
+        }
       }
 
       grouped[prefix].totalQRs += item.totalQRs;
@@ -545,12 +555,29 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
       }
     });
 
-    const batchSummary = Object.values(grouped).map(batch => {
-      const minExpiry = batch.minExpiryDate ? new Date(batch.minExpiryDate) : null;
+    const batchSummary = Object.values(grouped).map(group => {
+      const minExpiry = group.minExpiryDate ? new Date(group.minExpiryDate) : null;
+      let scanRate = 0;
+      if (group.totalQRs > 0) {
+        scanRate = Math.round((group.scanned / group.totalQRs) * 100);
+      }
+      
+      // Sort unprinted packages numerically if possible
+      if (group.unprintedPackages && group.unprintedPackages.length > 0) {
+        group.unprintedPackages.sort((a, b) => {
+          const numA = parseInt(a, 10);
+          const numB = parseInt(b, 10);
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB;
+          }
+          return a.localeCompare(b);
+        });
+      }
+
       return {
-        ...batch,
+        ...group,
         isExpired: minExpiry ? minExpiry < new Date() : false,
-        scanRate: batch.totalQRs > 0 ? Math.round((batch.scanned / batch.totalQRs) * 100 * 10) / 10 : 0
+        scanRate
       };
     });
 
