@@ -225,29 +225,32 @@ const AdminSystemPagesManager = ({
   return (
     <Box sx={{ animation: 'fadeIn 0.3s ease-in' }}>
       {/* HEADER TITLE */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h5" fontWeight="900" sx={{ color: '#003366', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Build sx={{ color: '#003366' }} /> Advanced Maintenance & Custom Pages Control Center
+          <Typography variant="h5" fontWeight="900" sx={{ color: '#003366', display: 'flex', alignItems: 'center', gap: 1, fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
+            <Build sx={{ color: '#003366', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /> Advanced Maintenance & Custom Pages
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Assign custom 403, 404, or maintenance screens to specific pages, tabs & features on demand
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+            Assign custom 403, 404, or maintenance screens to specific pages on demand
           </Typography>
         </Box>
 
         <Button
           variant="contained"
-          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
+          startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Save />}
           onClick={handleSaveAll}
           disabled={loading}
+          fullWidth={false}
           sx={{
             borderRadius: 2.5,
-            px: 3.5,
-            py: 1.2,
+            px: { xs: 2.5, sm: 3.5 },
+            py: { xs: 1, sm: 1.2 },
             fontWeight: 800,
+            fontSize: { xs: '0.85rem', sm: '0.95rem' },
             background: 'linear-gradient(135deg, #003366 0%, #005F73 100%)',
             color: 'white',
             boxShadow: '0 4px 15px rgba(0,51,102,0.3)',
+            alignSelf: { xs: 'stretch', sm: 'auto' },
             '&:hover': { background: 'linear-gradient(135deg, #002244 0%, #004d5c 100%)' }
           }}
         >
@@ -256,29 +259,39 @@ const AdminSystemPagesManager = ({
       </Box>
 
       {/* TABS */}
-      <Paper sx={{ mb: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ mb: 3, borderRadius: 3, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <Tabs 
           value={activeTab} 
           onChange={(e, val) => setActiveTab(val)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{ 
-            px: 2, 
+            px: { xs: 0.5, sm: 2 }, 
             pt: 1,
-            '& .MuiTab-root': { fontWeight: 800, textTransform: 'none', fontSize: '0.9rem' } 
+            '& .MuiTab-root': { 
+              fontWeight: 700, 
+              textTransform: 'none', 
+              fontSize: { xs: '0.78rem', sm: '0.9rem' },
+              minWidth: { xs: 'auto', sm: 160 },
+              px: { xs: 1.5, sm: 2 }
+            },
+            '& .MuiTab-iconWrapper': { fontSize: { xs: '0.9rem', sm: '1rem' } }
           }}
         >
-          <Tab icon={<Build fontSize="small" />} iconPosition="start" label="📢 Maintenance & Broadcast Banner" />
-          <Tab icon={<Security fontSize="small" />} iconPosition="start" label="🔒 Custom 403 Forbidden Page" />
-          <Tab icon={<SearchOff fontSize="small" />} iconPosition="start" label="🔍 Custom 404 Not Found Page" />
-          <Tab icon={<RocketLaunch fontSize="small" />} iconPosition="start" label="🚀 Custom Coming Soon Page" />
+          <Tab icon={<Build fontSize="small" />} iconPosition="start" label="📢 Maintenance" />
+          <Tab icon={<Security fontSize="small" />} iconPosition="start" label="🔒 Custom 403" />
+          <Tab icon={<SearchOff fontSize="small" />} iconPosition="start" label="🔍 Custom 404" />
+          <Tab icon={<RocketLaunch fontSize="small" />} iconPosition="start" label="🚀 Coming Soon" />
         </Tabs>
       </Paper>
 
       {/* TAB 0: MAINTENANCE & BANNER */}
       {activeTab === 0 && (
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, md: 3 }}>
           <Grid item xs={12} md={7}>
-            <Paper sx={{ p: 3, borderRadius: 3.5, border: '1px solid #e2e8f0' }}>
-              <Typography variant="h6" fontWeight="800" sx={{ color: '#003366', mb: 2 }}>
+            <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3.5, border: '1px solid #e2e8f0' }}>
+              <Typography variant="h6" fontWeight="800" sx={{ color: '#003366', mb: 2, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                 System Maintenance & Broadcast Banner Settings
               </Typography>
 
@@ -549,8 +562,8 @@ const AdminSystemPagesManager = ({
 
           {/* LIVE PREVIEW COLUMN */}
           <Grid item xs={12} md={5}>
-            <Paper sx={{ p: 3, borderRadius: 3.5, border: '1px solid #e2e8f0', bgcolor: '#fafafa' }}>
-              <Typography variant="subtitle1" fontWeight="800" sx={{ color: '#003366', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3.5, border: '1px solid #e2e8f0', bgcolor: '#fafafa' }}>
+              <Typography variant="subtitle1" fontWeight="800" sx={{ color: '#003366', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                 <Visibility color="primary" /> Live Banner Preview
               </Typography>
               
@@ -564,10 +577,10 @@ const AdminSystemPagesManager = ({
 
       {/* TAB 1: CUSTOM 403 FORBIDDEN PAGE */}
       {activeTab === 1 && (
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, md: 3 }}>
           <Grid item xs={12} md={7}>
-            <Paper sx={{ p: 3, borderRadius: 3.5, border: '1px solid #e2e8f0' }}>
-              <Typography variant="h6" fontWeight="800" sx={{ color: '#003366', mb: 2 }}>
+            <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3.5, border: '1px solid #e2e8f0' }}>
+              <Typography variant="h6" fontWeight="800" sx={{ color: '#003366', mb: 2, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                 Custom 403 Access Denied Page Settings
               </Typography>
 
@@ -673,8 +686,8 @@ const AdminSystemPagesManager = ({
           </Grid>
 
           <Grid item xs={12} md={5}>
-            <Paper sx={{ p: 3, borderRadius: 3.5, border: '1px solid #e2e8f0', bgcolor: '#fafafa' }}>
-              <Typography variant="subtitle1" fontWeight="800" sx={{ color: '#003366', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3.5, border: '1px solid #e2e8f0', bgcolor: '#fafafa' }}>
+              <Typography variant="subtitle1" fontWeight="800" sx={{ color: '#003366', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                 <Visibility color="primary" /> 403 Page Quick Preview
               </Typography>
 
@@ -686,10 +699,10 @@ const AdminSystemPagesManager = ({
 
       {/* TAB 2: CUSTOM 404 NOT FOUND PAGE */}
       {activeTab === 2 && (
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, md: 3 }}>
           <Grid item xs={12} md={7}>
-            <Paper sx={{ p: 3, borderRadius: 3.5, border: '1px solid #e2e8f0' }}>
-              <Typography variant="h6" fontWeight="800" sx={{ color: '#003366', mb: 2 }}>
+            <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3.5, border: '1px solid #e2e8f0' }}>
+              <Typography variant="h6" fontWeight="800" sx={{ color: '#003366', mb: 2, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                 Custom 404 Not Found Page Settings
               </Typography>
 
@@ -771,10 +784,10 @@ const AdminSystemPagesManager = ({
 
       {/* TAB 3: CUSTOM COMING SOON PAGE */}
       {activeTab === 3 && (
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, md: 3 }}>
           <Grid item xs={12} md={7}>
-            <Paper sx={{ p: 3, borderRadius: 3.5, border: '1px solid #e2e8f0' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3.5, border: '1px solid #e2e8f0' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 1, mb: 2 }}>
                 <Typography variant="h6" fontWeight="800" sx={{ color: '#003366' }}>
                   🚀 Custom Coming Soon Page Settings
                 </Typography>
@@ -946,11 +959,11 @@ const AdminSystemPagesManager = ({
           </Grid>
 
           <Grid item xs={12} md={5}>
-            <Paper sx={{ p: 2, borderRadius: 3.5, border: '1px solid #e2e8f0', bgcolor: '#0b1329', color: 'white' }}>
-              <Typography variant="subtitle1" fontWeight="800" sx={{ color: '#00B4D8', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Paper sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3.5, border: '1px solid #e2e8f0', bgcolor: '#0b1329', color: 'white' }}>
+              <Typography variant="subtitle1" fontWeight="800" sx={{ color: '#00B4D8', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                 <Visibility style={{ color: '#00B4D8' }} /> Live Coming Soon Preview
               </Typography>
-              <Box sx={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden', height: 440 }}>
+              <Box sx={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden', height: { xs: 360, sm: 440 } }}>
                 <PageComingSoon config={configComingSoon} isPreview={true} />
               </Box>
             </Paper>
