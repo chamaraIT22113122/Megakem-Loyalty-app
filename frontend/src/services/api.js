@@ -27,7 +27,8 @@ api.interceptors.request.use(
       '/qr-codes/generate',
       '/qr-codes/bulk/generate',
       '/qr-codes/reprint-requests',
-      '/qr-codes/mark-printed'
+      '/qr-codes/mark-printed',
+      '/products'
     ];
     let isBypass = bypassUrls.some(url => config.url?.includes(url));
 
@@ -208,6 +209,7 @@ export const membersAPI = {
 
 // Loyalty Configuration API
 export const loyaltyAPI = {
+  getPublicConfig: () => api.get('/loyalty/public-config'),
   getConfig: () => api.get('/loyalty/config'),
   updateConfig: (config) => api.put('/loyalty/config', config),
   updateProductPoints: (productId, pointsConfig) => api.put(`/loyalty/products/${productId}/points`, pointsConfig),

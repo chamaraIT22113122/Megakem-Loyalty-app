@@ -15,6 +15,22 @@ const productSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  imageUrl: {
+    type: String,
+    default: ''
+  },
+  tdsUrl: {
+    type: String,
+    default: ''
+  },
+  buyUrl: {
+    type: String,
+    default: ''
+  },
+  showInCatalog: {
+    type: Boolean,
+    default: true
+  },
   category: {
     type: String,
     trim: true

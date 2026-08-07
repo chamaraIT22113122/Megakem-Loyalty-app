@@ -174,8 +174,8 @@ exports.hasPermission = (permission) => {
       });
     }
 
-    // Super admin has all permissions
-    if (req.user.role === 'admin') {
+    // Admin and Co-Admin users have permission access
+    if (req.user.role === 'admin' || req.user.role === 'co-admin' || req.user.email === 'admin@megakem.com') {
       return next();
     }
 

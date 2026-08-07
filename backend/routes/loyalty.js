@@ -8,6 +8,24 @@ const { logAction } = require('../middleware/audit');
 const { updateBackupSchedule } = require('../utils/scheduler');
 const { getFromCache, setInCache, clearCacheKey, clearCache } = require('../utils/cache');
 
+// @route   GET /api/loyalty/public-config
+// @desc    Get public loyalty configuration & maintenance notice
+// @access  Public
+router.get('/public-config', async (req, res) => {
+  try {
+    const config = await LoyaltyConfig.getConfig();
+    res.json({
+      success: true,
+      data: config
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // @route   GET /api/loyalty/config
 // @desc    Get loyalty configuration
 // @access  Private/Admin
@@ -123,7 +141,29 @@ router.put('/config', protect, [
       config.cloudSync = { ...config.cloudSync, ...req.body.cloudSync };
     }
 
+    if (req.body.maintenanceNotice) {
+      config.maintenanceNotice = { ...config.maintenanceNotice, ...req.body.maintenanceNotice };
+    }
+
+    if (req.body.pageConfig403) {
+      config.pageConfig403 = { ...config.pageConfig403, ...req.body.pageConfig403 };
+    }
+
+    if (req.body.pageConfig404) {
+      config.pageConfig404 = { ...config.pageConfig404, ...req.body.pageConfig404 };
+    }
+
+    if (req.body.pageConfigComingSoon) {
+      config.pageConfigComingSoon = { ...config.pageConfigComingSoon, ...req.body.pageConfigComingSoon };
+    }
+
     await config.save();
+
+    // Broadcast real-time maintenance update to all clients
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('MAINTENANCE_UPDATE', config.maintenanceNotice);
+    }
 
     if (req.body.autoBackup) {
       // Reload cron job if auto backup settings were modified

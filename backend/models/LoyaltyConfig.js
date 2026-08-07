@@ -188,6 +188,53 @@ const loyaltyConfigSchema = new mongoose.Schema({
   feedbackRedirectEmail: {
     type: String,
     default: ''
+  },
+  // Advanced System Maintenance Configuration
+  maintenanceNotice: {
+    enabled: { type: Boolean, default: false },
+    type: { type: String, enum: ['maintenance', 'warning', 'info', 'emergency'], default: 'maintenance' },
+    targetAudience: { type: String, enum: ['all', 'applicator', 'hardware', 'guest'], default: 'all' },
+    displayMode: { type: String, enum: ['top_banner', 'floating_bottom', 'fullscreen_overlay'], default: 'top_banner' },
+    title: { type: String, default: 'System Maintenance Notice' },
+    message: { type: String, default: 'The system is undergoing scheduled maintenance. Some features may be temporarily limited.' },
+    blockScanning: { type: Boolean, default: false },
+    blockLogins: { type: Boolean, default: false },
+    scheduledEndTime: { type: String, default: '' },
+    actionButtonText: { type: String, default: '' },
+    actionButtonUrl: { type: String, default: '' },
+    assignedPages: { type: [String], default: [] }
+  },
+  // Advanced Custom 403 Page Configuration
+  pageConfig403: {
+    title: { type: String, default: '403 — Access Restricted' },
+    message: { type: String, default: 'You do not have permission to access this page or feature. Contact your administrator if you require access.' },
+    supportEmail: { type: String, default: 'support@megakem.lk' },
+    supportPhone: { type: String, default: '+94 11 234 5678' },
+    iconType: { type: String, enum: ['lock', 'shield', 'key', 'security'], default: 'lock' },
+    showRequestButton: { type: Boolean, default: true },
+    showRoleGuide: { type: Boolean, default: true },
+    assignedPages: { type: [String], default: [] }
+  },
+  // Advanced Custom 404 Page Configuration
+  pageConfig404: {
+    title: { type: String, default: '404 — Page Not Found' },
+    message: { type: String, default: 'The page or QR code link you visited could not be found or has moved.' },
+    buttonText: { type: String, default: 'Return to Homepage' },
+    redirectTarget: { type: String, default: 'welcome' },
+    showSearchBar: { type: Boolean, default: true },
+    showQuickLinks: { type: Boolean, default: true },
+    assignedPages: { type: [String], default: [] }
+  },
+  // Advanced Custom Coming Soon Page Configuration
+  pageConfigComingSoon: {
+    enabled: { type: Boolean, default: false },
+    title: { type: String, default: 'Exciting Feature Coming Soon!' },
+    subtitle: { type: String, default: 'We are working hard to build something amazing. This feature will be available shortly.' },
+    launchDate: { type: String, default: '' },
+    badgeText: { type: String, default: 'UNDER DEVELOPMENT' },
+    buttonText: { type: String, default: 'Return to Home' },
+    featuresList: { type: [String], default: [] },
+    assignedPages: { type: [String], default: [] }
   }
 }, {
   timestamps: true

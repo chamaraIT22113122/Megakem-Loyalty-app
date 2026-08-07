@@ -109,11 +109,11 @@ const initializeApp = async () => {
         Scan.updateMany(  { memberId: { $regex: '^MA', $options: 'i' }, role: { $ne: 'applicator' } }, { $set: { role: 'applicator' } }),
         Scan.updateMany(  { memberId: { $regex: '^MH', $options: 'i' }, role: { $ne: 'customer'   } }, { $set: { role: 'customer'   } }),
         Scan.updateMany(  { memberId: { $regex: '^CUS-', $options: 'i' }, role: { $ne: 'customer' } }, { $set: { role: 'customer'   } }),
-        // Ensure all MH members have equipment:'Hardware' so the Hardwares tab filter works
-        Member.updateMany(
-          { memberId: { $regex: '^MH', $options: 'i' }, equipment: { $in: [null, '', undefined] } },
-          { $set: { equipment: 'Hardware' } }
-        ),
+        // Ensure all admin/co-admin users have product management permissions enabled
+        User.updateMany(
+          { role: { $in: ['admin', 'co-admin'] } },
+          { $set: { 'permissions.canManageProducts': true, 'permissions.canEdit': true } }
+        )
       ]);
 
       const membersFixed = (mApp.modifiedCount || 0) + (mCustMH.modifiedCount || 0) + (mCustCUS.modifiedCount || 0);

@@ -11,6 +11,7 @@ const { getFromCache, setInCache, clearCache } = require('../utils/cache');
 // @access  Public
 router.get('/', async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     console.log('📦 GET /api/products - Request received');
     const { search, category, isActive } = req.query;
     
@@ -170,17 +171,23 @@ router.put('/:id', protect, hasPermission('canManageProducts'), async (req, res)
       });
     }
 
+    // Sanitize promotion if present
+    if (req.body.promotion) {
+      if (!req.body.promotion.multiplier || req.body.promotion.multiplier < 1) {
+        req.body.promotion.multiplier = 2;
+      }
+    }
+
     const newPrice = req.body.price !== undefined ? Number(req.body.price) : undefined;
     const oldPrice = oldProduct.price || 0;
 
-    // RBAC: Only admins can alter prices
-    if (newPrice !== undefined && newPrice !== oldPrice) {
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied. Only administrators can alter prices.'
-        });
-      }
+    // RBAC: Only block price changes if user is not an admin/co-admin
+    const isPriceChanged = newPrice !== undefined && oldProduct.price !== undefined && Math.abs(newPrice - (oldProduct.price || 0)) > 0.001;
+    if (isPriceChanged && req.user.role !== 'admin' && req.user.role !== 'co-admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only administrators can alter prices.'
+      });
     }
 
     const product = await Product.findByIdAndUpdate(

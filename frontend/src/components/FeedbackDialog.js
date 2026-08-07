@@ -73,11 +73,19 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
           }
           
           if (scannerRef.current) {
-            scannerRef.current.stop().then(() => {
-              scannerRef.current.clear();
-              scannerRef.current = null;
-              setScanning(false);
-            }).catch(console.error);
+            const instance = scannerRef.current;
+            scannerRef.current = null;
+            try {
+              if (instance.isScanning) {
+                instance.stop().then(() => {
+                  try { instance.clear(); } catch(e) {}
+                  setScanning(false);
+                }).catch(() => { setScanning(false); });
+              } else {
+                try { instance.clear(); } catch(e) {}
+                setScanning(false);
+              }
+            } catch(e) { setScanning(false); }
           } else {
              setScanning(false);
           }
@@ -94,10 +102,17 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
 
     return () => {
       if (scannerRef.current) {
-        scannerRef.current.stop().then(() => {
-          scannerRef.current.clear();
-          scannerRef.current = null;
-        }).catch(console.error);
+        const instance = scannerRef.current;
+        scannerRef.current = null;
+        try {
+          if (instance.isScanning) {
+            instance.stop().then(() => {
+              try { instance.clear(); } catch(e) {}
+            }).catch(() => {});
+          } else {
+            try { instance.clear(); } catch(e) {}
+          }
+        } catch (e) {}
       }
     };
   }, [scanning]);

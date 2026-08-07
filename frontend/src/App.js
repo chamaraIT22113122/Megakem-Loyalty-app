@@ -1,8 +1,8 @@
 /* eslint-disable no-unused-vars, no-loop-func */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, Menu, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider, Collapse, Drawer } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay, KeyboardArrowDown, KeyboardArrowUp, Feedback as FeedbackIcon } from '@mui/icons-material';
+import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, CardActions, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, Menu, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider, Collapse, Drawer } from '@mui/material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay, KeyboardArrowDown, KeyboardArrowUp, Feedback as FeedbackIcon, Search, CloudDownload, PhotoCamera, CloudUpload, ShoppingCart, Launch } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import ChangeRequestDialog from './components/ChangeRequestDialog';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
@@ -21,6 +21,12 @@ import ApplicatorProgramDashboard from './components/ApplicatorProgramDashboard'
 import MembersAndLoyaltyTab from './components/MembersAndLoyaltyTab';
 import DataManagement from './components/DataManagement';
 import RecycleBin from './components/RecycleBin';
+import MaintenanceNoticeBanner from './components/MaintenanceNoticeBanner';
+import Page403Forbidden from './components/Page403Forbidden';
+import Page404NotFound from './components/Page404NotFound';
+import PageComingSoon from './components/PageComingSoon';
+import AdminSystemPagesManager from './components/AdminSystemPagesManager';
+import RichTextEditor from './components/RichTextEditor';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
@@ -230,6 +236,15 @@ const ProductRow = ({ p, setProductDialog, setProductPointsDialog, handleDeleteP
         </TableCell>
         <TableCell>
           {p.name}
+          {p.showInCatalog === false && (
+            <Chip 
+              label="Hidden from Catalog" 
+              size="small" 
+              color="default" 
+              variant="outlined" 
+              sx={{ ml: 1, fontSize: '0.68rem', height: '20px' }} 
+            />
+          )}
           {isActivePromo && (
             <Chip 
               label={`Promo: ${p.promotion.multiplier}x Points`} 
@@ -251,7 +266,16 @@ const ProductRow = ({ p, setProductDialog, setProductPointsDialog, handleDeleteP
           />
         </TableCell>
         <TableCell>
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+            {p.tdsUrl ? (
+              <Tooltip title="Download TDS File">
+                <IconButton size='small' color='info' href={p.tdsUrl} target='_blank' rel='noopener noreferrer'><CloudDownload /></IconButton>
+              </Tooltip>
+            ) : (
+              <Tooltip title="Upload TDS File">
+                <IconButton size='small' color='default' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')}><CloudUpload /></IconButton>
+              </Tooltip>
+            )}
             <IconButton size='small' onClick={() => setProductDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Edit Product'><Edit /></IconButton>
             <IconButton size='small' color='primary' onClick={() => setProductPointsDialog({ open: true, product: p })} disabled={!hasPermission('canManageProducts')} title='Configure Points'><EmojiEvents /></IconButton>
             <IconButton size='small' color='error' onClick={() => handleDeleteProduct(p._id)} disabled={!hasPermission('canManageProducts') || !hasPermission('canDelete')} title='Delete Product'><Delete /></IconButton>
@@ -729,6 +753,14 @@ function App() {
       socket.on('data_updated', (data) => {
         console.log('Socket update received for:', data?.entity);
         if (data && ['products', 'qr_codes', 'reprint_requests', 'users', 'scans', 'feedbacks'].includes(data.entity)) {
+          if (data.entity === 'products') {
+            productsAPI.getAll().then(res => {
+              const prods = res.data?.data || res.data || [];
+              if (Array.isArray(prods)) {
+                setProducts(prods);
+              }
+            }).catch(console.error);
+          }
           // Re-fetch the required data
           if (data.entity !== 'feedbacks') {
             loadAdminData();
@@ -901,6 +933,9 @@ function App() {
   const [profileData, setProfileData] = useState({ username: '', email: '' });
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [productDialog, setProductDialog] = useState({ open: false, product: null });
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogCategory, setCatalogCategory] = useState('all');
+  const [selectedProductCatalogDialog, setSelectedProductCatalogDialog] = useState({ open: false, product: null });
   const [userDialog, setUserDialog] = useState({ open: false, user: null });
   const [rewardBreakdownDialog, setRewardBreakdownDialog] = useState({ open: false, member: null, breakdown: [], history: [] });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, scanId: null, scanDetails: null });
@@ -919,6 +954,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [scansPerPage] = useState(10);
   const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [productPackSizeFilter, setProductPackSizeFilter] = useState('ALL');
   const [lastUpdateTime, setLastUpdateTime] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [userStats, setUserStats] = useState(null);
@@ -927,6 +963,18 @@ function App() {
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
   const [memberTierFilter, setMemberTierFilter] = useState('all');
   const [memberSortKey, setMemberSortKey] = useState('points-desc');
+
+  // Load public loyalty config (maintenance banner, tier names, page configs) on startup
+  useEffect(() => {
+    loyaltyAPI.getPublicConfig()
+      .then(res => {
+        if (res.data && res.data.data) {
+          setLoyaltyConfig(res.data.data);
+        }
+      })
+      .catch(err => console.error('Failed to fetch loyalty config:', err));
+  }, []);
+
 
   // Auto-generate batch number from manual scan form inputs
   useEffect(() => {
@@ -1437,6 +1485,37 @@ function App() {
   const [scanCount, setScanCount] = useState(0);
   const html5QrCodeRef = useRef(null); // Raw Html5Qrcode instance for torch access
   const stopPromiseRef = useRef(null); // Track camera stop promise to prevent race conditions
+  const [catalogMobileCols, setCatalogMobileCols] = useState(2); // Responsive mobile grid columns (default 2 per row)
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [bypassComingSoonPages, setBypassComingSoonPages] = useState({});
+
+  const isPageLockedByComingSoon = useCallback((pageKey) => {
+    if (!loyaltyConfig?.pageConfigComingSoon?.enabled) return false;
+    const assigned = loyaltyConfig?.pageConfigComingSoon?.assignedPages || [];
+    if (!assigned.includes(pageKey)) return false;
+    // If admin has dev bypass enabled for this page, do NOT lock it
+    if (bypassComingSoonPages[pageKey]) return false;
+    return true; // Locked for regular users
+  }, [loyaltyConfig, bypassComingSoonPages]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 250) {
+        setShowBackToTop(true);
+      } else {
+        setShowBackToTop(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  };
 
 
   // Load applicator info from database when user session is available
@@ -1854,12 +1933,17 @@ function App() {
           } else {
             // One-shot mode: stop camera and go to cart
             if (html5QrCodeRef.current) {
-              stopPromiseRef.current = html5QrCodeRef.current.stop().then(() => {
-                stopPromiseRef.current = null;
-              }).catch(() => {
-                stopPromiseRef.current = null;
-              });
+              const instance = html5QrCodeRef.current;
               html5QrCodeRef.current = null;
+              try {
+                if (instance.isScanning) {
+                  stopPromiseRef.current = instance.stop().catch(() => {}).finally(() => {
+                    stopPromiseRef.current = null;
+                  });
+                }
+              } catch (e) {
+                stopPromiseRef.current = null;
+              }
             }
             await handleScan(decodedText);
           }
@@ -1894,12 +1978,17 @@ function App() {
     }
     return () => {
       if (html5QrCodeRef.current) {
-        stopPromiseRef.current = html5QrCodeRef.current.stop().then(() => {
-          stopPromiseRef.current = null;
-        }).catch(() => {
-          stopPromiseRef.current = null;
-        });
+        const instance = html5QrCodeRef.current;
         html5QrCodeRef.current = null;
+        try {
+          if (instance.isScanning) {
+            stopPromiseRef.current = instance.stop().catch(() => {}).finally(() => {
+              stopPromiseRef.current = null;
+            });
+          }
+        } catch (e) {
+          stopPromiseRef.current = null;
+        }
       }
       if (scannerRef.current) {
         scannerRef.current = null;
@@ -3508,17 +3597,39 @@ function App() {
         return;
       }
 
-      if (productDialog.product._id) {
-        await productsAPI.update(productDialog.product._id, productDialog.product);
-        setProducts(products.map(p => p._id === productDialog.product._id ? productDialog.product : p));
+      const payload = { ...productDialog.product };
+      if (payload.promotion) {
+        payload.promotion = {
+          ...payload.promotion,
+          multiplier: Math.max(1, payload.promotion.multiplier || 2)
+        };
+      }
+
+      if (payload._id) {
+        const res = await productsAPI.update(payload._id, payload);
+        const updatedProduct = res.data?.data || payload;
+        setProducts(prev => prev.map(p => p._id === updatedProduct._id ? updatedProduct : p));
         showNotification('Product updated!', 'success');
       } else {
-        const res = await productsAPI.create(productDialog.product);
-        setProducts([...products, res.data.data]);
+        const res = await productsAPI.create(payload);
+        const createdProduct = res.data?.data || payload;
+        setProducts(prev => [...prev, createdProduct]);
         showNotification('Product created!', 'success');
       }
       setProductDialog({ open: false, product: null });
+
+      // Immediately refetch latest products list to guarantee real-time UI sync
+      try {
+        const refreshRes = await productsAPI.getAll();
+        const prods = refreshRes.data?.data || refreshRes.data || [];
+        if (Array.isArray(prods) && prods.length > 0) {
+          setProducts(prods);
+        }
+      } catch (err) {
+        console.error("Failed to refresh products after save:", err);
+      }
     } catch (error) {
+      console.error("Save product error:", error);
       showNotification(error.response?.data?.message || 'Failed to save product', 'error');
     } finally {
       setLoading(false);
@@ -3728,22 +3839,26 @@ function App() {
     }
   };
 
-  const handleUpdateLoyaltyConfig = async () => {
-    if (!loyaltyConfig) return;
+  const handleUpdateLoyaltyConfig = async (customPayload) => {
+    if (!loyaltyConfig && !customPayload) return;
     
     setLoading(true);
     try {
-      const response = await loyaltyAPI.updateConfig({
+      const payloadToSave = customPayload || {
         tierThresholds: loyaltyConfig.tierThresholds,
         tierNames: loyaltyConfig.tierNames,
         pointsCalculation: loyaltyConfig.pointsCalculation,
         annualTiers: loyaltyConfig.annualTiers,
         pointsReset: loyaltyConfig.pointsReset
-      });
+      };
+
+      const response = await loyaltyAPI.updateConfig(payloadToSave);
       
-      setLoyaltyConfig(response.data.data);
-      showNotification('Loyalty and Tier configurations updated successfully!', 'success');
-      addToActivityLog('Loyalty Config Updated', 'Updated all tier names, thresholds & reward rules', 'info');
+      if (response.data && response.data.data) {
+        setLoyaltyConfig(response.data.data);
+      }
+      showNotification('Configuration updated successfully!', 'success');
+      addToActivityLog('Loyalty Config Updated', 'Updated system configuration settings', 'info');
       setLoyaltyConfigDialog({ open: false });
     } catch (error) {
       showNotification(error.response?.data?.message || 'Failed to update configuration', 'error');
@@ -4199,6 +4314,16 @@ function App() {
         {adminAuth && view === 'admin' && (
           <Button color='inherit' onClick={handleAdminLogout} sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>Logout</Button>
         )}
+        {!['welcome', 'products-catalog'].includes(view) && (
+          <Button 
+            color='inherit' 
+            onClick={() => setView('products-catalog')}
+            startIcon={<Category />}
+            sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}
+          >
+            Products Catalog
+          </Button>
+        )}
         <Button 
           color='inherit' 
           onClick={() => {
@@ -4216,7 +4341,10 @@ function App() {
           {view === 'admin' ? 'App' : 'Admin'}
         </Button>
       </Toolbar></AppBar>
-      <Container maxWidth={['admin', 'profile'].includes(view) ? 'xl' : 'sm'} sx={{ flexGrow: 1, py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column' }}>
+      <Container maxWidth="xl" sx={{ pt: 2, pb: 0 }}>
+        <MaintenanceNoticeBanner maintenanceNotice={loyaltyConfig?.maintenanceNotice} currentView={view} />
+      </Container>
+      <Container maxWidth={['admin', 'profile', 'products-catalog', '403', '404'].includes(view) ? 'xl' : 'sm'} sx={{ flexGrow: 1, py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column' }}>
         {view === 'welcome' && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', animation: 'fadeIn 0.6s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
           <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 5 } }}>
             <Box sx={{ mb: { xs: 2, sm: 4 }, display: 'flex', justifyContent: 'center', animation: 'logoFloat 3s ease-in-out infinite', '@keyframes logoFloat': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-15px)' } } }}>
@@ -4277,6 +4405,23 @@ function App() {
               }}
             >
               Submit Feedback
+            </Button>
+            <Button 
+              variant='contained' 
+              size='large' 
+              startIcon={<Category />}
+              onClick={() => setView('products-catalog')}
+              sx={{ 
+                borderRadius: '12px', 
+                px: 4, 
+                py: 1.5,
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)',
+                color: 'white',
+                boxShadow: '0 4px 15px rgba(0, 51, 102, 0.3)'
+              }}
+            >
+              Explore Products Catalog
             </Button>
           </Box>
           <FeedbackDialog 
@@ -4555,7 +4700,461 @@ function App() {
           })()}
         </Box>}
 
-        {view === 'profile' && (() => {
+        {/* Custom 403 Access Denied View */}
+        {(view === '403' || (!adminAuth && (loyaltyConfig?.pageConfig403?.assignedPages || []).includes(view))) && (
+          <Page403Forbidden 
+            pageConfig={loyaltyConfig?.pageConfig403 || {}} 
+            currentUserRole={adminAuth ? 'Admin' : (role ? (role.charAt(0).toUpperCase() + role.slice(1)) : 'Guest')} 
+            onNavigateHome={() => setView(adminAuth ? 'admin' : (role ? 'cart' : 'welcome'))}
+            onNavigateAdminLogin={() => setView('welcome')}
+            onRequestPermission={() => setFeedbackDialogOpen(true)}
+          />
+        )}
+
+        {/* Custom 404 Not Found View */}
+        {(view === '404' || ((loyaltyConfig?.pageConfig404?.assignedPages || []).includes(view))) && (
+          <Page404NotFound 
+            pageConfig={loyaltyConfig?.pageConfig404 || {}} 
+            onNavigateHome={() => setView(adminAuth ? 'admin' : (role ? 'cart' : 'welcome'))}
+            onNavigateCatalog={() => setView('products-catalog')}
+            onScanQRCode={() => setView('scan')}
+          />
+        )}
+
+        {/* Custom Coming Soon View (Direct Navigation) */}
+        {view === 'coming-soon' && (
+          <PageComingSoon 
+            config={loyaltyConfig?.pageConfigComingSoon || {}}
+            onBack={() => setView(adminAuth ? 'admin' : (role ? 'cart' : 'welcome'))}
+          />
+        )}
+
+        {view === 'products-catalog' && (
+          isPageLockedByComingSoon('products-catalog') ? (
+            <PageComingSoon 
+              config={loyaltyConfig?.pageConfigComingSoon || {}}
+              onBack={() => setView('welcome')}
+            />
+          ) : (
+          <Box sx={{ py: { xs: 2, sm: 4 }, animation: 'fadeIn 0.5s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
+            {/* Header */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <IconButton 
+                  onClick={() => setView('welcome')} 
+                  sx={{ 
+                    bgcolor: 'primary.lighter',
+                    '&:hover': { bgcolor: 'primary.light', transform: 'translateX(-4px)' },
+                    transition: 'all 0.3s'
+                  }}
+                >
+                  <ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main' }} />
+                </IconButton>
+                <Box>
+                  <Typography variant='h4' fontWeight='800' sx={{ color: 'primary.main', fontSize: { xs: '1.4rem', sm: '2rem' } }}>
+                    Megakem Product Info & Catalog
+                  </Typography>
+                  <Typography variant='body2' color='text.secondary'>
+                    Explore all official company products, technical specifications & loyalty point highlights
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Search Bar */}
+            <Paper sx={{ p: 2, mb: 4, borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', bgcolor: 'background.paper' }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search product by name, code (e.g. MKL46), or category..."
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Paper>
+
+            {/* CATALOG PRODUCTS SECTIONS */}
+            <Box sx={{ mb: 4 }}>
+              {(() => {
+                const filteredProducts = products.filter(p => {
+                  const isHidden = p.showInCatalog === false || p.showInCatalog === 'false' || p.showInCatalog === 0;
+                  if (isHidden) return false;
+                  const matchesSearch = !catalogSearch || 
+                    p.name?.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+                    p.productNo?.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+                    (p.category && p.category.toLowerCase().includes(catalogSearch.toLowerCase())) ||
+                    (p.description && p.description.toLowerCase().includes(catalogSearch.toLowerCase()));
+                  
+                  return matchesSearch;
+                });
+
+                const loyaltyActiveProducts = filteredProducts.filter(p => p.isLoyaltyEnabled !== false && p.isLoyaltyEnabled !== 'false');
+                const otherProducts = filteredProducts.filter(p => p.isLoyaltyEnabled === false || p.isLoyaltyEnabled === 'false');
+
+                if (filteredProducts.length === 0) {
+                  return (
+                    <Paper sx={{ p: 5, textAlign: 'center', borderRadius: 3 }}>
+                      <Typography color="text.secondary">No products match your search query.</Typography>
+                    </Paper>
+                  );
+                }
+
+                const renderProductCard = (p, isLoyalty) => {
+                  let configuredPts = p.pointsPerProduct;
+                  if (!configuredPts && p.points) configuredPts = p.points;
+                  if (!configuredPts && p.pointsPerPackSize && p.pointsPerPackSize.length > 0) {
+                    configuredPts = p.pointsPerPackSize[0].points;
+                  }
+
+                  const pointsDisplay = isLoyalty ? 'Loyalty Active' : null;
+
+                  return (
+                    <Card key={p._id} sx={{ 
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      borderRadius: { xs: 2, sm: 3.5 },
+                      border: isLoyalty ? '2px solid #00C853' : '1px solid #e0e6ed',
+                      boxShadow: isLoyalty ? '0 8px 25px rgba(0, 200, 83, 0.15)' : '0 4px 15px rgba(0,0,0,0.04)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': { transform: 'translateY(-6px)', boxShadow: isLoyalty ? '0 14px 35px rgba(0, 200, 83, 0.25)' : '0 10px 25px rgba(0,0,0,0.1)' }
+                    }}>
+                      {/* Top Loyalty Chip */}
+                      {pointsDisplay && (
+                        <Box sx={{ position: 'absolute', top: { xs: 4, sm: 10 }, right: { xs: 4, sm: 10 }, zIndex: 2 }}>
+                          <Chip 
+                            icon={<EmojiEvents style={{ color: '#003366', fontSize: catalogMobileCols >= 3 ? 10 : 14 }} />} 
+                            label={catalogMobileCols >= 3 ? "Active" : "Loyalty Active"} 
+                            size="small"
+                            sx={{ 
+                              background: 'linear-gradient(135deg, #00C853 0%, #00E676 100%)', 
+                              color: '#003366', 
+                              fontWeight: 900, 
+                              fontSize: { xs: catalogMobileCols >= 3 ? '0.55rem' : '0.65rem', sm: '0.7rem' }, 
+                              height: { xs: 18, sm: 24 }, 
+                              px: { xs: 0.3, sm: 1 },
+                              boxShadow: '0 4px 12px rgba(0,230,118,0.4)',
+                              border: '1px solid rgba(255,255,255,0.8)'
+                            }}
+                          />
+                        </Box>
+                      )}
+
+                      {p.imageUrl ? (
+                        <Box sx={{ height: { xs: catalogMobileCols >= 4 ? 65 : catalogMobileCols === 3 ? 85 : 110, sm: 140 }, p: { xs: 0.8, sm: 1.5 }, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%)' }}>
+                          <img src={p.imageUrl} alt={p.name} style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))' }} />
+                        </Box>
+                      ) : (
+                        <Box sx={{ height: { xs: catalogMobileCols >= 4 ? 65 : catalogMobileCols === 3 ? 85 : 110, sm: 130 }, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: isLoyalty ? 'linear-gradient(180deg, #e0f2f1 0%, #ffffff 100%)' : 'linear-gradient(180deg, #f0f4f8 0%, #ffffff 100%)', color: isLoyalty ? '#004d40' : 'primary.main' }}>
+                          <Inventory2 sx={{ fontSize: { xs: catalogMobileCols >= 3 ? 24 : 35, sm: 45 }, opacity: 0.7 }} />
+                          <Typography variant="caption" fontWeight={700} sx={{ mt: 0.2, fontSize: { xs: '0.55rem', sm: '0.75rem' } }}>{p.productNo}</Typography>
+                        </Box>
+                      )}
+
+                      <CardContent sx={{ flexGrow: 1, p: { xs: 1, sm: 2 }, pt: { xs: 1, sm: 1.5 } }}>
+                        <Box sx={{ mb: 0.5 }}>
+                          <Chip label={p.productNo} size="small" color="primary" variant="outlined" sx={{ fontWeight: 800, fontSize: { xs: '0.58rem', sm: '0.68rem' }, height: { xs: 16, sm: 20 }, borderRadius: '4px' }} />
+                        </Box>
+                        <Typography variant="subtitle1" fontWeight="800" sx={{ color: 'primary.main', mb: 0.5, lineHeight: 1.2, fontSize: { xs: catalogMobileCols >= 4 ? '0.68rem' : catalogMobileCols === 3 ? '0.75rem' : '0.88rem', sm: '0.95rem' } }}>
+                          {p.name}
+                        </Typography>
+                        {p.category && (
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5, fontWeight: 500, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
+                            Pack Size: <span style={{ fontWeight: 700, color: '#003366' }}>{p.category}</span>
+                          </Typography>
+                        )}
+                        <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                          {p.price > 0 && (
+                            <Typography variant="subtitle2" fontWeight={800} sx={{ color: '#2e7d32', fontSize: { xs: '0.72rem', sm: '1rem' } }}>
+                              Rs. {p.price.toLocaleString()}
+                            </Typography>
+                          )}
+                          {isLoyalty && (
+                            configuredPts && configuredPts > 0 ? (
+                              <Chip 
+                                label={`🏆 +${configuredPts} pts`} 
+                                size="small" 
+                                sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 900, fontSize: { xs: '0.6rem', sm: '0.72rem' }, height: { xs: 18, sm: 22 }, px: 0.2, border: '1px solid #a7f3d0' }} 
+                              />
+                            ) : (
+                              <Chip 
+                                label="Not Set" 
+                                size="small" 
+                                color="default"
+                                sx={{ fontWeight: 700, fontSize: { xs: '0.58rem', sm: '0.68rem' }, height: { xs: 16, sm: 20 } }} 
+                              />
+                            )
+                          )}
+                        </Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: '-webkit-box', WebkitLineClamp: catalogMobileCols >= 3 ? 1 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.3, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
+                          {p.description ? p.description.replace(/<[^>]*>?/gm, '') : 'Official Megakem product.'}
+                        </Typography>
+                      </CardContent>
+
+                      <Divider />
+                      <CardActions sx={{ p: { xs: 0.8, sm: 1.5 }, pt: { xs: 0.8, sm: 1.2 }, flexDirection: 'column', gap: 0.6, bgcolor: '#fbfcfd' }}>
+                        <Box sx={{ display: 'flex', width: '100%', gap: 0.5 }}>
+                          <Button size="small" variant="outlined" color="primary" onClick={() => setSelectedProductCatalogDialog({ open: true, product: p })} sx={{ flex: 1, borderRadius: '6px', fontSize: { xs: '0.62rem', sm: '0.7rem' }, fontWeight: 700, textTransform: 'none', py: { xs: 0.3, sm: 0.6 }, px: 0.5 }}>
+                            Details
+                          </Button>
+                        </Box>
+
+                        <Button 
+                          fullWidth
+                          size="small" 
+                          variant="contained" 
+                          startIcon={<ShoppingCart sx={{ fontSize: { xs: '0.85rem !important', sm: '1rem !important' } }} />} 
+                          href={p.buyUrl || "https://megakem.lk"} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          sx={{ borderRadius: '6px', fontWeight: 800, fontSize: { xs: '0.65rem', sm: '0.75rem' }, textTransform: 'none', py: { xs: 0.4, sm: 0.8 }, background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0, 51, 102, 0.25)', '&:hover': { background: 'linear-gradient(135deg, #002244 0%, #0096B8 100%)' } }}
+                        >
+                          Buy
+                        </Button>
+                      </CardActions>
+                    </Card>
+                  );
+                };
+
+                return (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {/* SECTION 1: LOYALTY ACTIVE PRODUCTS AT TOP */}
+                    {loyaltyActiveProducts.length > 0 && (
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                          <Box sx={{ p: 1, borderRadius: '12px', background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', color: 'white', display: 'flex', boxShadow: '0 4px 15px rgba(56,239,125,0.4)' }}>
+                            <EmojiEvents fontSize="medium" />
+                          </Box>
+                          <Box>
+                            <Typography variant="h5" fontWeight="800" sx={{ color: '#004d40' }}>
+                              🏆 Loyalty Active Products ({loyaltyActiveProducts.length})
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              High-priority products with reward points and QR code scanning active
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: { xs: `repeat(${catalogMobileCols}, 1fr)`, sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)', lg: 'repeat(5, 1fr)' }, 
+                          gap: { xs: 1.2, sm: 2.5 } 
+                        }}>
+                          {loyaltyActiveProducts.map(p => renderProductCard(p, true))}
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* SECTION 2: OTHER COMPANY PRODUCTS */}
+                    {otherProducts.length > 0 && (
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                          <Box sx={{ p: 1, borderRadius: '12px', bgcolor: 'primary.main', color: 'white', display: 'flex' }}>
+                            <Inventory2 fontSize="medium" />
+                          </Box>
+                          <Box>
+                            <Typography variant="h5" fontWeight="800" sx={{ color: 'primary.main' }}>
+                              📦 Other Company Products ({otherProducts.length})
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Standard waterproofing, sealers and tile adhesive product range
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: { xs: `repeat(${catalogMobileCols}, 1fr)`, sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)', lg: 'repeat(5, 1fr)' }, 
+                          gap: { xs: 1.2, sm: 2.5 } 
+                        }}>
+                          {otherProducts.map(p => renderProductCard(p, false))}
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })()}
+            </Box>
+
+            {/* Product Full Details Modal */}
+            <Dialog open={selectedProductCatalogDialog.open} onClose={() => setSelectedProductCatalogDialog({ open: false, product: null })} maxWidth="md" fullWidth>
+              {selectedProductCatalogDialog.product && (
+                <React.Fragment>
+                  <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="h5" fontWeight="800" color="primary">{selectedProductCatalogDialog.product.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">Product Code: {selectedProductCatalogDialog.product.productNo}</Typography>
+                    </Box>
+                    <IconButton onClick={() => setSelectedProductCatalogDialog({ open: false, product: null })}>
+                      <Close />
+                    </IconButton>
+                  </DialogTitle>
+                  <DialogContent dividers>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} md={5}>
+                        {selectedProductCatalogDialog.product.imageUrl ? (
+                          <Box sx={{ p: 2, border: '1px solid #eee', borderRadius: 3, textAlign: 'center', bgcolor: '#fafafa' }}>
+                            <img src={selectedProductCatalogDialog.product.imageUrl} alt={selectedProductCatalogDialog.product.name} style={{ width: '100%', maxHeight: 260, objectFit: 'contain' }} />
+                          </Box>
+                        ) : (
+                          <Box sx={{ p: 4, border: '1px solid #eee', borderRadius: 3, textAlign: 'center', bgcolor: '#f0f4f8', color: 'primary.main' }}>
+                            <Inventory2 sx={{ fontSize: 80, opacity: 0.5 }} />
+                            <Typography variant="caption" display="block">No Image Provided</Typography>
+                          </Box>
+                        )}
+                      </Grid>
+                      <Grid item xs={12} md={7}>
+                        <Typography variant="subtitle1" fontWeight="700" color="primary" gutterBottom>Product Information</Typography>
+                        <Table size="small" sx={{ mb: 2 }}>
+                          <TableBody>
+                            <TableRow><TableCell fontWeight={700}>Product Name</TableCell><TableCell>{selectedProductCatalogDialog.product.name}</TableCell></TableRow>
+                            <TableRow><TableCell fontWeight={700}>Product Code</TableCell><TableCell><Chip label={selectedProductCatalogDialog.product.productNo} size="small" color="primary" /></TableCell></TableRow>
+                            <TableRow><TableCell fontWeight={700}>Pack Size</TableCell><TableCell>{selectedProductCatalogDialog.product.category || 'N/A'}</TableCell></TableRow>
+                            <TableRow><TableCell fontWeight={700}>Price (LKR)</TableCell><TableCell><strong>Rs. {selectedProductCatalogDialog.product.price ? selectedProductCatalogDialog.product.price.toLocaleString() : 'N/A'}</strong></TableCell></TableRow>
+                            <TableRow>
+                              <TableCell fontWeight={700}>Loyalty Points</TableCell>
+                              <TableCell>
+                                {selectedProductCatalogDialog.product.isLoyaltyEnabled !== false ? (
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                    <Chip icon={<EmojiEvents />} label="Loyalty Active" color="success" size="small" sx={{ fontWeight: 800 }} />
+                                    {(() => {
+                                      const prod = selectedProductCatalogDialog.product;
+                                      let pointsVal = prod.pointsPerProduct;
+                                      if (!pointsVal && prod.points) pointsVal = prod.points;
+                                      if (!pointsVal && prod.pointsPerPackSize && prod.pointsPerPackSize.length > 0) {
+                                        pointsVal = prod.pointsPerPackSize[0].points;
+                                      }
+                                      if (pointsVal && pointsVal > 0) {
+                                        return (
+                                          <Chip 
+                                            label={`🏆 +${pointsVal} Points per Scan`} 
+                                            size="small" 
+                                            sx={{ 
+                                              bgcolor: '#e6f4ea', 
+                                              color: '#1b5e20', 
+                                              fontWeight: 900, 
+                                              border: '1px solid #a7f3d0' 
+                                            }}
+                                          />
+                                        );
+                                      }
+                                      return (
+                                        <Chip 
+                                          label="Not Configured" 
+                                          size="small" 
+                                          color="default" 
+                                          sx={{ fontWeight: 700 }}
+                                        />
+                                      );
+                                    })()}
+                                  </Box>
+                                ) : (
+                                  <Chip label="Disabled" color="default" size="small" />
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+
+                        <Box sx={{ mt: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                          {selectedProductCatalogDialog.product.buyUrl ? (
+                            <Button 
+                              variant="contained" 
+                              size="large" 
+                              startIcon={<ShoppingCart />} 
+                              href={selectedProductCatalogDialog.product.buyUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              sx={{ borderRadius: 2, fontWeight: 800, px: 3, py: 1.2, background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', color: 'white', boxShadow: '0 4px 15px rgba(56, 239, 125, 0.4)' }}
+                            >
+                              Buy Now / Order Online
+                            </Button>
+                          ) : (
+                            <Button 
+                              variant="contained" 
+                              color="secondary"
+                              size="large" 
+                              startIcon={<ShoppingCart />} 
+                              href="https://megakem.lk" 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              sx={{ borderRadius: 2, fontWeight: 800, px: 3, py: 1.2 }}
+                            >
+                              Buy on Megakem Shop
+                            </Button>
+                          )}
+
+                          {selectedProductCatalogDialog.product.tdsUrl && (
+                            <Button variant="outlined" color="info" size="large" startIcon={<CloudDownload />} href={selectedProductCatalogDialog.product.tdsUrl} target="_blank" rel="noopener noreferrer" sx={{ borderRadius: 2, fontWeight: 700, px: 2, py: 1.2 }}>
+                              Download TDS
+                            </Button>
+                          )}
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Full Description placed AFTER image and product info (Full Width) */}
+                    <Box sx={{ mt: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                        <Box sx={{ width: 4, height: 20, bgcolor: 'primary.main', borderRadius: 1 }} />
+                        <Typography variant="subtitle1" fontWeight="800" color="primary">
+                          Full Description & Specifications
+                        </Typography>
+                      </Box>
+                      
+                      <Paper 
+                        elevation={0}
+                        sx={{ 
+                          bgcolor: '#f8fafc', 
+                          p: 3, 
+                          borderRadius: 3, 
+                          border: '1px solid #e2e8f0',
+                          borderLeft: '4px solid #003366',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+                          fontSize: '0.94rem', 
+                          lineHeight: 1.75,
+                          color: '#1e293b',
+                          '& p': { mb: 1.5, mt: 0, '&:last-child': { mb: 0 } },
+                          '& strong, & b': { color: '#003366', fontWeight: 800 },
+                          '& h1, & h2, & h3': { color: '#003366', fontWeight: 800, mt: 1.8, mb: 0.8 },
+                          '& ul, & ol': { pl: 3, mb: 1.5, '& li': { mb: 0.5 } },
+                          '& blockquote': { borderLeft: '3px solid #00B4D8', pl: 2, ml: 0, color: '#475569', fontStyle: 'italic' },
+                          '& a': { color: '#00B4D8', fontWeight: 700, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }
+                        }}
+                      >
+                        <div 
+                          dangerouslySetInnerHTML={{ 
+                            __html: (() => {
+                              const desc = selectedProductCatalogDialog.product.description;
+                              if (!desc) return 'Official high-quality Megakem product.';
+                              if (/<[a-z][\s\S]*>/i.test(desc)) return desc;
+                              return desc.split(/\n+/).filter(p => p.trim()).map(p => `<p>${p.trim()}</p>`).join('');
+                            })()
+                          }} 
+                        />
+                      </Paper>
+                    </Box>
+                  </DialogContent>
+                </React.Fragment>
+              )}
+            </Dialog>
+          </Box>
+          )
+        )}
+
+        {view === 'profile' && (
+          isPageLockedByComingSoon('profile') ? (
+            <PageComingSoon 
+              config={loyaltyConfig?.pageConfigComingSoon || {}}
+              onBack={() => setView('welcome')}
+            />
+          ) : (() => {
           const currentMember = members.find(m => m.memberId === memberId?.toUpperCase());
           const memberScans = scanHistory.filter(s => s.memberId === currentMember?.memberId) || [];
           const totalScans = memberScans.length;
@@ -5187,8 +5786,14 @@ function App() {
               )}
             </Box>
           );
-        })()}
+        })())}
         {view === 'leaderboard' && (
+          isPageLockedByComingSoon('leaderboard') ? (
+            <PageComingSoon 
+              config={loyaltyConfig?.pageConfigComingSoon || {}}
+              onBack={() => setView('welcome')}
+            />
+          ) : (
           <Box sx={{ py: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
               <IconButton onClick={() => setView('welcome')} sx={{ mr: 2 }}>
@@ -5320,8 +5925,15 @@ function App() {
               );
             })()}
           </Box>
+          )
         )}
-        {view === 'scanner' && <Paper sx={{ flexGrow: 1, bgcolor: '#000', color: 'white', overflow: 'hidden', position: 'relative', borderRadius: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        {view === 'scanner' && (
+          isPageLockedByComingSoon('scan') ? (
+            <PageComingSoon 
+              config={loyaltyConfig?.pageConfigComingSoon || {}}
+              onBack={() => setView('welcome')}
+            />
+          ) : <Paper sx={{ flexGrow: 1, bgcolor: '#000', color: 'white', overflow: 'hidden', position: 'relative', borderRadius: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
           <Box sx={{ position: 'absolute', top: { xs: 60, sm: 80 }, left: 0, right: 0, zIndex: 5, px: 2 }}>
             <Paper elevation={3} sx={{ bgcolor: 'rgba(255,255,255,0.95)', p: { xs: 1.5, sm: 2 }, borderRadius: 2, backdropFilter: 'blur(10px)' }}>
               <Typography variant='subtitle2' fontWeight='bold' color='primary' gutterBottom sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
@@ -5460,8 +6072,15 @@ function App() {
             </Box>
           </Box>
 
-        </Paper>}
-        {view === 'cart' && <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', animation: 'slideIn 0.4s ease-out', '@keyframes slideIn': { from: { opacity: 0, transform: 'translateX(100px)' }, to: { opacity: 1, transform: 'translateX(0)' } } }}>
+        </Paper>
+        )}
+        {view === 'cart' && (
+          isPageLockedByComingSoon('cart') ? (
+            <PageComingSoon 
+              config={loyaltyConfig?.pageConfigComingSoon || {}}
+              onBack={() => setView('welcome')}
+            />
+          ) : <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', animation: 'slideIn 0.4s ease-out', '@keyframes slideIn': { from: { opacity: 0, transform: 'translateX(100px)' }, to: { opacity: 1, transform: 'translateX(0)' } } }}>
           <Box sx={{ mb: { xs: 2, sm: 3 }, display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
             <IconButton onClick={() => setView('scanner')} sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0,51,102,0.3)', transition: 'all 0.3s', '&:hover': { transform: 'scale(1.1) rotate(-10deg)', boxShadow: '0 6px 16px rgba(0,51,102,0.4)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
             <Box><Typography variant='h4' fontWeight='800' sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>Scanned Items</Typography><Typography variant='body1' color='text.secondary' fontWeight={500} sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>{cart.length} items ready for submission</Typography></Box>
@@ -5532,7 +6151,8 @@ function App() {
               <Grid item xs={12}><Button fullWidth variant='contained' size='large' disabled={loading || cart.length === 0 || (role === 'applicator' && !connectedHardware)} onClick={handleSubmitAll} startIcon={loading ? <CircularProgress size={22} color='inherit' /> : <CheckCircle />} sx={{ py: { xs: 1.5, sm: 2 }, fontSize: { xs: '0.95rem', sm: '1.1rem' }, fontWeight: 800, background: loading ? undefined : 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', boxShadow: '0 8px 20px rgba(164,210,51,0.4)', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(164,210,51,0.5)' }, '&:disabled': { opacity: 0.6 } }}>{loading ? 'Submitting...' : `Submit ${cart.length} Items`}</Button></Grid>
             </Grid>
           </Paper>
-        </Box>}
+        </Box>
+        )}
         {view === 'admin' && !adminAuth && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', px: 2, animation: 'fadeIn 0.5s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
           <Card sx={{ maxWidth: 440, width: '100%', overflow: 'hidden', boxShadow: '0 20px 60px -12px rgba(0,51,102,0.25)' }}>
             <Box sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', p: 4, textAlign: 'center', color: 'white' }}>
@@ -5636,12 +6256,30 @@ function App() {
               {hasPermission('canManageApplicatorProgram') && <Tab icon={<Star />} label='Applicator Program' value='applicator-program' />}
               {hasPermission('canViewAuditLogs') && <Tab icon={<Security />} label='Audit Logs' value='audit-logs' />}
               {hasPermission('canViewFeedbacks') && <Tab icon={<FeedbackIcon />} label='Feedbacks' value='feedbacks' />}
+              {isMainAdmin() && <Tab icon={<Build />} label='Maintenance & Pages' value='system-pages' />}
               {isMainAdmin() && <Tab icon={<Delete />} label='Recycle Bin' value='recycle-bin' />}
               <Tab icon={<Settings />} label='Profile' value='profile' />
             </Tabs>
           </Paper>
 
-          {adminTab === 'dashboard' && stats && (() => {
+          {(loyaltyConfig?.pageConfig404?.assignedPages || []).includes(adminTab) && (
+            <Page404NotFound 
+              pageConfig={loyaltyConfig?.pageConfig404 || {}} 
+              onNavigateHome={() => setAdminTab('dashboard')}
+              onNavigateCatalog={() => setAdminTab('products')}
+              onScanQRCode={() => setView('scan')}
+            />
+          )}
+
+          {!adminAuth && (loyaltyConfig?.pageConfig403?.assignedPages || []).includes(adminTab) && (
+            <Page403Forbidden 
+              pageConfig={loyaltyConfig?.pageConfig403 || {}} 
+              currentUserRole="Co-Admin" 
+              onNavigateHome={() => setAdminTab('dashboard')}
+              onRequestPermission={() => setFeedbackDialogOpen(true)}
+            />
+          )}
+              {adminTab === 'dashboard' && stats && (() => {
             const filteredDashboardScans = scanHistory.filter(scan => {
               if (!dashboardStartDate && !dashboardEndDate) return true;
               const scanDate = new Date(scan.timestamp);
@@ -7732,12 +8370,12 @@ function App() {
                       canViewScans: false,
                       canManageCoAdmins: false,
                       canDelete: false, 
-                      canEdit: false, 
+                      canEdit: true, 
                       canExport: false, 
                       canManageUsers: false, 
                       canViewRewards: false,
                       canViewLeaderboard: false,
-                      canManageProducts: false,
+                      canManageProducts: true,
                       canManageQRCodes: false,
                       canManageCoAdminRequests: false,
                       canManageApplicators: false,
@@ -8573,7 +9211,7 @@ function App() {
           )}
 
           {/* Audit Logs Tab */}
-          {adminTab === 'audit-logs' && hasPermission('canViewAuditLogs') && (
+          {adminTab === 'audit-logs' && !(loyaltyConfig?.pageConfig404?.assignedPages || []).includes('audit-logs') && hasPermission('canViewAuditLogs') && (
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h5"><Security sx={{ mr: 1, verticalAlign: 'middle' }}/> System Audit Logs</Typography>
@@ -8869,7 +9507,7 @@ function App() {
                 <Button 
                   variant='contained' 
                   startIcon={<Add />} 
-                  onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0, isLoyaltyEnabled: true } })}
+                  onClick={() => setProductDialog({ open: true, product: { name: '', productNo: '', description: '', category: '', price: 0, isLoyaltyEnabled: true, imageUrl: '', tdsUrl: '', buyUrl: '', showInCatalog: true } })}
                   disabled={!hasPermission('canManageProducts')}
                 >
                   Add Product
@@ -8880,25 +9518,51 @@ function App() {
                 placeholder='Search products...' 
                 value={productSearchQuery}
                 onChange={(e) => setProductSearchQuery(e.target.value)}
-                sx={{ flexGrow: 1 }}
+                sx={{ flexGrow: 1, minWidth: 200 }}
                 InputProps={{
                   startAdornment: <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'action.active' }}>🔍</Box>
                 }}
               />
-              {productSearchQuery && (
-                <Button size='small' onClick={() => setProductSearchQuery('')}>Clear</Button>
+
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel id="admin-pack-size-filter-label">Pack Size</InputLabel>
+                <Select
+                  labelId="admin-pack-size-filter-label"
+                  value={productPackSizeFilter}
+                  label="Pack Size"
+                  onChange={(e) => setProductPackSizeFilter(e.target.value)}
+                  sx={{ fontWeight: 600 }}
+                >
+                  <MenuItem value="ALL">All Pack Sizes</MenuItem>
+                  {Array.from(new Set(products.map(p => p.category).filter(Boolean)))
+                    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+                    .map(ps => (
+                      <MenuItem key={ps} value={ps}>
+                        {ps}
+                      </MenuItem>
+                    ))
+                  }
+                </Select>
+              </FormControl>
+
+              {(productSearchQuery || productPackSizeFilter !== 'ALL') && (
+                <Button size='small' onClick={() => { setProductSearchQuery(''); setProductPackSizeFilter('ALL'); }}>Clear</Button>
               )}
             </Box>
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table><TableHead><TableRow><TableCell sx={{ width: 40 }} /><TableCell>Product Name</TableCell><TableCell>Product Code</TableCell><TableCell>Pack Size</TableCell><TableCell>Price (LKR)</TableCell><TableCell>Loyalty Points</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
                 <TableBody>
                   {(() => {
-                    const filteredProducts = products.filter(p => 
-                      !productSearchQuery ||
-                      p.name?.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
-                      p.productNo?.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
-                      p.category?.toLowerCase().includes(productSearchQuery.toLowerCase())
-                    );
+                    const filteredProducts = products.filter(p => {
+                      const matchesSearch = !productSearchQuery ||
+                        p.name?.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
+                        p.productNo?.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
+                        p.category?.toLowerCase().includes(productSearchQuery.toLowerCase());
+
+                      const matchesPackSize = productPackSizeFilter === 'ALL' || p.category === productPackSizeFilter;
+
+                      return matchesSearch && matchesPackSize;
+                    });
                     
                     if (filteredProducts.length === 0) {
                       return (
@@ -8906,10 +9570,10 @@ function App() {
                           <TableCell colSpan={7} align="center">
                             <Box sx={{ py: 4 }}>
                               <Typography variant='body1' color='text.secondary'>
-                                {products.length === 0 ? 'No products found. Click "Add Product" to create one.' : 'No products match your search.'}
+                                {products.length === 0 ? 'No products found. Click "Add Product" to create one.' : 'No products match your search/filter.'}
                               </Typography>
-                              {products.length > 0 && (
-                                <Button onClick={() => setProductSearchQuery('')} sx={{ mt: 2 }}>Clear Search</Button>
+                              {(products.length > 0) && (
+                                <Button onClick={() => { setProductSearchQuery(''); setProductPackSizeFilter('ALL'); }} sx={{ mt: 2 }}>Clear Filters</Button>
                               )}
                             </Box>
                           </TableCell>
@@ -8932,6 +9596,31 @@ function App() {
               </Table>
             </TableContainer>
           </Box>}
+
+          {/* System Maintenance & Custom Error Pages Tab */}
+          {(adminTab === 'system-pages' && isMainAdmin()) && (
+            <Box sx={{ mb: 3 }}>
+              <AdminSystemPagesManager 
+                loyaltyConfig={loyaltyConfig}
+                onSaveConfig={handleUpdateLoyaltyConfig}
+                loading={loading}
+                showNotification={showNotification}
+                bypassComingSoonPages={bypassComingSoonPages}
+                onToggleDevAccess={(pageId) => {
+                  setBypassComingSoonPages(prev => ({ ...prev, [pageId]: !prev[pageId] }));
+                }}
+                onNavigatePage={(pageId) => {
+                  const customerPages = ['scan', 'cart', 'profile', 'products-catalog', 'leaderboard'];
+                  if (customerPages.includes(pageId)) {
+                    setView(pageId);
+                  } else {
+                    setView('admin');
+                    setAdminTab(pageId);
+                  }
+                }}
+              />
+            </Box>
+          )}
 
           {/* Applicator Program Summary Tab */}
           {(adminTab === 'applicator-program' && applicatorProgramSubTab === 'summary') && (
@@ -9773,6 +10462,7 @@ function App() {
             )}
           </Grid>}
 
+
           <Dialog open={backupPasswordDialog.open} onClose={() => setBackupPasswordDialog({ open: false, password: '' })} maxWidth='xs' fullWidth>
             <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Security color='primary' />
@@ -9927,14 +10617,143 @@ function App() {
                 sx={{ mb: 2 }} 
                 InputProps={{ startAdornment: 'Rs.' }} 
               />
-              <TextField 
-                fullWidth 
-                label='Description' 
-                multiline 
-                rows={3} 
-                value={productDialog.product?.description || ''} 
-                onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, description: e.target.value } })} 
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Product Description (Rich Text)</Typography>
+                <RichTextEditor 
+                  value={productDialog.product?.description || ''} 
+                  onChange={(html) => setProductDialog({ ...productDialog, product: { ...productDialog.product, description: html } })} 
+                />
+              </Box>
+
+              {/* Product Image Upload / URL */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Product Image</Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <TextField 
+                    fullWidth 
+                    size="small"
+                    label='Product Image URL' 
+                    value={productDialog.product?.imageUrl || ''} 
+                    onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, imageUrl: e.target.value } })} 
+                    placeholder="https://... or upload photo"
+                  />
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<PhotoCamera />}
+                    sx={{ whitespace: 'nowrap' }}
+                  >
+                    Upload
+                    <input 
+                      type="file" 
+                      hidden 
+                      accept="image/*" 
+                      onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          try {
+                            const formData = new FormData();
+                            formData.append('image', file);
+                            const res = await uploadAPI.uploadImage(formData);
+                            const url = res.data?.url || res.data?.data?.url;
+                            if (url) {
+                              setProductDialog(prev => ({ ...prev, product: { ...prev.product, imageUrl: url } }));
+                              showNotification('Product image uploaded!', 'success');
+                            }
+                          } catch (err) {
+                            showNotification('Failed to upload image', 'error');
+                          }
+                        }
+                      }}
+                    />
+                  </Button>
+                </Box>
+                {productDialog.product?.imageUrl && (
+                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <img 
+                      src={productDialog.product.imageUrl} 
+                      alt="Product Preview" 
+                      style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #ccc' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                    <Typography variant="caption" color="text.secondary">Image Preview</Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Technical Data Sheet (TDS) */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Technical Data Sheet (TDS)</Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <TextField 
+                    fullWidth 
+                    size="small"
+                    label='TDS Document / PDF URL' 
+                    value={productDialog.product?.tdsUrl || ''} 
+                    onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, tdsUrl: e.target.value } })} 
+                    placeholder="https://... or upload TDS document"
+                  />
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<CloudUpload />}
+                    sx={{ whitespace: 'nowrap' }}
+                  >
+                    Upload TDS
+                    <input 
+                      type="file" 
+                      hidden 
+                      accept=".pdf,.doc,.docx,image/*" 
+                      onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          try {
+                            const formData = new FormData();
+                            formData.append('image', file);
+                            const res = await uploadAPI.uploadImage(formData);
+                            const url = res.data?.url || res.data?.data?.url;
+                            if (url) {
+                              setProductDialog(prev => ({ ...prev, product: { ...prev.product, tdsUrl: url } }));
+                              showNotification('TDS document uploaded!', 'success');
+                            }
+                          } catch (err) {
+                            showNotification('Failed to upload TDS document', 'error');
+                          }
+                        }
+                      }}
+                    />
+                  </Button>
+                </Box>
+              </Box>
+
+              {/* Product Buying Site Link / Purchase URL */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Buying Site Link / Purchase URL</Typography>
+                <TextField 
+                  fullWidth 
+                  size="small"
+                  label='Buying Site URL' 
+                  value={productDialog.product?.buyUrl || ''} 
+                  onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, buyUrl: e.target.value } })} 
+                  placeholder="https://megakem.lk/product/... or e-commerce shop link"
+                  helperText="URL to redirect customers when they click the Buy button"
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start"><Launch color="primary" fontSize="small" /></InputAdornment>
+                  }}
+                />
+              </Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={productDialog.product?.showInCatalog !== false}
+                    onChange={(e) => setProductDialog({ ...productDialog, product: { ...productDialog.product, showInCatalog: e.target.checked } })}
+                    color="primary"
+                  />
+                }
+                label="Show in Product Catalog Page"
+                sx={{ mt: 1, display: 'block' }}
               />
+
               <FormControlLabel
                 control={
                   <Switch
@@ -9944,7 +10763,7 @@ function App() {
                   />
                 }
                 label="Loyalty Program / QR Code Enabled"
-                sx={{ mt: 2 }}
+                sx={{ mt: 1, display: 'block' }}
               />
 
 
@@ -11018,11 +11837,30 @@ function App() {
                       }
                     })}
                     inputProps={{ min: 0 }}
-                    helperText='Set fixed points for this product (leave empty to use price-based or pack-size specific points)'
-                    sx={{ mb: 3 }}
+                    helperText='Set fixed points for this product (e.g. 50, 100, 200 pts per scan)'
+                    sx={{ mb: 2.5 }}
                   />
-                  
 
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant='caption' fontWeight={700} color='text.secondary' display='block' sx={{ mb: 1 }}>
+                      ⚡ Quick Preset Point Values (Click to Select):
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {[25, 50, 100, 150, 200, 300, 500].map(val => (
+                        <Chip 
+                          key={val}
+                          label={`+${val} Pts`}
+                          onClick={() => setProductPointsDialog({
+                            ...productPointsDialog,
+                            product: { ...productPointsDialog.product, pointsPerProduct: val }
+                          })}
+                          color={productPointsDialog.product.pointsPerProduct === val ? 'success' : 'default'}
+                          variant={productPointsDialog.product.pointsPerProduct === val ? 'filled' : 'outlined'}
+                          sx={{ fontWeight: 800, cursor: 'pointer', '&:hover': { bgcolor: '#e6f4ea' } }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
                 </>
               )}
             </DialogContent>
@@ -11160,6 +11998,32 @@ function App() {
       >
         <Alert onClose={handleCloseSnackbar} severity={snackbar.type} variant='filled' sx={{ width: '100%' }}>{snackbar.msg}</Alert>
       </Snackbar>
+      {/* Floating Back to Top Button */}
+      {showBackToTop && (
+        <Fab
+          color="primary"
+          size="medium"
+          onClick={scrollToTop}
+          aria-label="scroll back to top"
+          sx={{
+            position: 'fixed',
+            bottom: { xs: 20, sm: 28 },
+            right: { xs: 16, sm: 28 },
+            zIndex: 9999,
+            boxShadow: '0 8px 25px rgba(0, 51, 102, 0.4)',
+            background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)',
+            color: 'white',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #002244 0%, #0096B8 100%)',
+              transform: 'scale(1.12)',
+            },
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+        >
+          <KeyboardArrowUp fontSize="medium" />
+        </Fab>
+      )}
+
       <Box sx={{ position: 'fixed', bottom: 8, right: 16, opacity: 0.3, transition: 'opacity 0.3s', '&:hover': { opacity: 0.8 }, zIndex: 1, pointerEvents: 'none' }}>
         <Typography variant='caption' sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 400, textShadow: '0 1px 2px rgba(255,255,255,0.8)' }}>
           © Developed by Eflash24
