@@ -5,7 +5,7 @@ import {
 import { 
   AutoAwesome, ArrowBack, CheckCircle, AccessTime, Build
 } from '@mui/icons-material';
-import megakemBrandLogo from '../assets/Megakem  Rewards logo .png';
+import megakemBrandLogo from '../assets/MegakemBrandLogo.png';
 
 const PageComingSoon = ({ 
   config = {}, 
