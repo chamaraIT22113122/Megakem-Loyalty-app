@@ -5,7 +5,7 @@ import {
 import { 
   AutoAwesome, ArrowBack, CheckCircle, AccessTime, Build
 } from '@mui/icons-material';
-import megakemLogo from '../assets/MegakemLogo.png';
+import megakemBrandLogo from '../assets/Megakem  Rewards logo .png';
 
 const PageComingSoon = ({ 
   config = {}, 
@@ -104,7 +104,7 @@ const PageComingSoon = ({
             backdropFilter: 'blur(12px)'
           }}>
             <img 
-              src={megakemLogo} 
+              src={megakemBrandLogo} 
               alt="Megakem Logo" 
               style={{ 
                 height: isPreview ? 44 : 60, 
@@ -251,7 +251,7 @@ const PageComingSoon = ({
           mx: 'auto'
         }}>
           <img 
-            src={megakemLogo} 
+            src={megakemBrandLogo} 
             alt="Megakem" 
             style={{ height: 22, width: 'auto', opacity: 0.9 }} 
           />
