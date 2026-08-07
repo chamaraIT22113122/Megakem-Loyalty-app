@@ -12026,7 +12026,7 @@ function App() {
 
       <Box sx={{ position: 'fixed', bottom: 8, right: 16, opacity: 0.3, transition: 'opacity 0.3s', '&:hover': { opacity: 0.8 }, zIndex: 1, pointerEvents: 'none' }}>
         <Typography variant='caption' sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 400, textShadow: '0 1px 2px rgba(255,255,255,0.8)' }}>
-          © Developed by Eflash24
+          © Developed by Megakem
         </Typography>
       </Box>
 
