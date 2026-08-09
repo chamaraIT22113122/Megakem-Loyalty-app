@@ -5,8 +5,8 @@ const dns = require('dns');
 // This fixes querySrv ECONNREFUSED errors caused by local DNS blocking SRV lookups
 try {
   dns.setDefaultResultOrder('ipv4first');
-  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
-  console.log('🌐 DNS configured (8.8.8.8, 8.8.4.4, 1.1.1.1)');
+  // dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+  // console.log('🌐 DNS configured (8.8.8.8, 8.8.4.4, 1.1.1.1)');
 } catch (err) {
   console.warn('⚠️  Could not set custom DNS servers:', err.message);
 }

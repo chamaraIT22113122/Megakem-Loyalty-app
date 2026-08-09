@@ -4315,14 +4315,27 @@ function App() {
           <Button color='inherit' onClick={handleAdminLogout} sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>Logout</Button>
         )}
         {!['welcome', 'products-catalog'].includes(view) && (
-          <Button 
-            color='inherit' 
-            onClick={() => setView('products-catalog')}
-            startIcon={<Category />}
-            sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}
-          >
-            Products Catalog
-          </Button>
+          <>
+            {/* Mobile: icon-only button */}
+            <Tooltip title="Products Catalog">
+              <IconButton
+                color='inherit'
+                onClick={() => setView('products-catalog')}
+                sx={{ display: { xs: 'inline-flex', sm: 'none' }, mr: 0.5, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+              >
+                <Category />
+              </IconButton>
+            </Tooltip>
+            {/* Desktop: full button with text */}
+            <Button 
+              color='inherit' 
+              onClick={() => setView('products-catalog')}
+              startIcon={<Category />}
+              sx={{ display: { xs: 'none', sm: 'inline-flex' }, mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: '0.875rem', px: 2 }}
+            >
+              Products Catalog
+            </Button>
+          </>
         )}
         <Button 
           color='inherit' 
