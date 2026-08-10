@@ -2922,19 +2922,24 @@ function App() {
   const loadAdvancedInsights = async () => {
     try {
       setLoadingInsights(true);
-      const [salesRes, geoRes, churnRes, intentsRes, trafficRes] = await Promise.all([
-        api.get('/analytics/sales-forecasting', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
-        api.get('/analytics/geographic-heatmap', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
-        api.get('/analytics/churn-detection', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
-        api.get('/analytics/purchase-intents', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
-        api.get('/analytics/traffic-stats', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } })
+      const token = localStorage.getItem('adminToken');
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // Use allSettled so one failing API doesn't block the others
+      const [salesRes, geoRes, churnRes, intentsRes, trafficRes] = await Promise.allSettled([
+        api.get('/analytics/sales-forecasting', { headers }),
+        api.get('/analytics/geographic-heatmap', { headers }),
+        api.get('/analytics/churn-detection', { headers }),
+        api.get('/analytics/purchase-intents', { headers }),
+        api.get('/analytics/traffic-stats', { headers })
       ]);
+
       setAdvancedInsights({
-        salesForecast: salesRes.data.success ? salesRes.data.data : [],
-        geographicHeatmap: geoRes.data.success ? geoRes.data.data : [],
-        churnDetection: churnRes.data.success ? churnRes.data.data : [],
-        purchaseIntents: intentsRes.data.success ? intentsRes.data.data : [],
-        trafficStats: trafficRes.data.success ? trafficRes.data.data : null
+        salesForecast: salesRes.status === 'fulfilled' && salesRes.value.data.success ? salesRes.value.data.data : [],
+        geographicHeatmap: geoRes.status === 'fulfilled' && geoRes.value.data.success ? geoRes.value.data.data : [],
+        churnDetection: churnRes.status === 'fulfilled' && churnRes.value.data.success ? churnRes.value.data.data : [],
+        purchaseIntents: intentsRes.status === 'fulfilled' && intentsRes.value.data.success ? intentsRes.value.data.data : [],
+        trafficStats: trafficRes.status === 'fulfilled' && trafficRes.value.data.success ? trafficRes.value.data.data : null
       });
     } catch (error) {
       console.error('Error loading advanced insights:', error);

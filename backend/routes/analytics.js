@@ -419,7 +419,7 @@ router.get('/export', protect, requireAdmin, async (req, res) => {
 // @route   GET /api/analytics/sales-forecasting
 // @desc    Get sales forecasting based on historical scans
 // @access  Private/Admin
-router.get('/sales-forecasting', protect, hasPermission('canViewDashboard'), async (req, res) => {
+router.get('/sales-forecasting', protect, hasPermission('canViewAdvancedInsights'), async (req, res) => {
   try {
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
@@ -475,7 +475,7 @@ router.get('/sales-forecasting', protect, hasPermission('canViewDashboard'), asy
 // @route   GET /api/analytics/geographic-heatmap
 // @desc    Get scan distribution by location
 // @access  Private/Admin
-router.get('/geographic-heatmap', protect, hasPermission('canViewDashboard'), async (req, res) => {
+router.get('/geographic-heatmap', protect, hasPermission('canViewAdvancedInsights'), async (req, res) => {
   try {
     const locationData = await Scan.aggregate([
       { $match: { location: { $exists: true, $ne: '' } } },
@@ -503,7 +503,7 @@ router.get('/geographic-heatmap', protect, hasPermission('canViewDashboard'), as
 // @route   GET /api/analytics/churn-detection
 // @desc    Get list of applicators at risk of churning
 // @access  Private/Admin
-router.get('/churn-detection', protect, hasPermission('canViewDashboard'), async (req, res) => {
+router.get('/churn-detection', protect, hasPermission('canViewAdvancedInsights'), async (req, res) => {
   try {
     const Member = require('../models/Member');
     const thirtyDaysAgo = new Date();
@@ -662,7 +662,7 @@ router.post('/purchase-intent', async (req, res) => {
 // @route   GET /api/analytics/purchase-intents
 // @desc    Get all purchase intents (leads/clicks)
 // @access  Private/Admin
-router.get('/purchase-intents', protect, hasPermission('canViewDashboard'), async (req, res) => {
+router.get('/purchase-intents', protect, hasPermission('canViewAdvancedInsights'), async (req, res) => {
   try {
     const PurchaseIntent = require('../models/PurchaseIntent');
     const intents = await PurchaseIntent.find()
