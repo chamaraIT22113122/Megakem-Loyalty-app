@@ -709,8 +709,13 @@ function App() {
   const [view, setView] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const hasParams = params.get('b') || params.get('batch') || params.get('batchNo') || params.get('p') || params.get('product') || params.get('code');
+    const urlView = params.get('view');
     const savedRole = localStorage.getItem('user_role');
     const savedMemberId = localStorage.getItem('user_member_id');
+    
+    if (urlView) {
+      return urlView;
+    }
     
     if (hasParams) {
       if (savedRole && savedMemberId) {
