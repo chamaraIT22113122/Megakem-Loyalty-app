@@ -3,6 +3,7 @@ const router = express.Router();
 const XLSX = require('xlsx');
 const Scan = require('../models/Scan');
 const User = require('../models/User');
+const Counter = require('../models/Counter');
 const { protect, admin, hasPermission } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/rbac');
 
@@ -615,12 +616,12 @@ router.post('/purchase-intent', async (req, res) => {
       }
     }
 
-    let inquiryNumber = 'INQ-' + Math.floor(100000 + Math.random() * 900000);
-    let exists = await PurchaseIntent.findOne({ inquiryNumber });
-    while (exists) {
-      inquiryNumber = 'INQ-' + Math.floor(100000 + Math.random() * 900000);
-      exists = await PurchaseIntent.findOne({ inquiryNumber });
-    }
+    const counter = await Counter.findByIdAndUpdate(
+      'inquiryNumber',
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    const inquiryNumber = `INQ-${String(counter.seq).padStart(6, '0')}`;
 
     const intent = await PurchaseIntent.create({
       inquiryNumber,
