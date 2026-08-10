@@ -121,6 +121,10 @@ const userSchema = new mongoose.Schema({
     canViewFeedbacks: {
       type: Boolean,
       default: false
+    },
+    canManageLeads: {
+      type: Boolean,
+      default: false
     }
   },
   adminType: {

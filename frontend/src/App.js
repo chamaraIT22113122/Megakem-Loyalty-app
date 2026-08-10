@@ -2,10 +2,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { Box, Checkbox, Button, TextField, Typography, AppBar, Toolbar, Card, CardContent, CardActionArea, CardActions, List, ListItem, ListItemText, Chip, Container, CircularProgress, Snackbar, Alert, Grid, Paper, Fab, Divider, ThemeProvider, createTheme, CssBaseline, Select, Menu, MenuItem, FormControl, FormControlLabel, InputLabel, Avatar, Tooltip, Skeleton, LinearProgress, InputAdornment, Badge, ButtonBase, ToggleButton, ToggleButtonGroup, Autocomplete, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab, Switch, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Accordion, AccordionSummary, AccordionDetails, Slider, Collapse, Drawer } from '@mui/material';
-import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay, KeyboardArrowDown, KeyboardArrowUp, Feedback as FeedbackIcon, Search, CloudDownload, PhotoCamera, CloudUpload, ShoppingCart, Launch } from '@mui/icons-material';
+import { QrCodeScanner, Person, Inventory2, AdminPanelSettings, ArrowForward, Delete, Add, CheckCircle, History as HistoryIcon, Dashboard as DashboardIcon, People, Category, Settings, TrendingUp, Edit, Save, Cancel, EmojiEvents, CardGiftcard, Star, GetApp, Refresh, Notifications, NotificationsOff, Security, Assessment, Visibility, VisibilityOff, FileDownload, Calculate, CalendarMonth, NavigateBefore, NavigateNext, TrendingDown, TrendingFlat, FilterList, Loop, Speed, ShowChart, Timeline, Build, Hardware, PictureAsPdf, Sync, Insights, CardMembership, Close, ExpandMore as ExpandMoreIcon, Cameraswitch, AutoFixHigh, Replay, KeyboardArrowDown, KeyboardArrowUp, Feedback as FeedbackIcon, Search, CloudDownload, PhotoCamera, CloudUpload, ShoppingCart, Launch, Assignment, WhatsApp } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import ChangeRequestDialog from './components/ChangeRequestDialog';
 import ReprintRequestsPanel from './components/ReprintRequestsPanel';
+import TrafficTracker from './components/TrafficTracker';
+import TrafficDashboard from './components/TrafficDashboard';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as faceapi from '@vladmandic/face-api';
@@ -25,8 +27,10 @@ import MaintenanceNoticeBanner from './components/MaintenanceNoticeBanner';
 import Page403Forbidden from './components/Page403Forbidden';
 import Page404NotFound from './components/Page404NotFound';
 import PageComingSoon from './components/PageComingSoon';
+import LeadsManagementTab from './components/LeadsManagementTab';
 import AdminSystemPagesManager from './components/AdminSystemPagesManager';
 import RichTextEditor from './components/RichTextEditor';
+import LeadCaptureDialog from './components/LeadCaptureDialog';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
@@ -235,24 +239,35 @@ const ProductRow = ({ p, setProductDialog, setProductPointsDialog, handleDeleteP
           </IconButton>
         </TableCell>
         <TableCell>
-          {p.name}
-          {p.showInCatalog === false && (
-            <Chip 
-              label="Hidden from Catalog" 
-              size="small" 
-              color="default" 
-              variant="outlined" 
-              sx={{ ml: 1, fontSize: '0.68rem', height: '20px' }} 
-            />
-          )}
-          {isActivePromo && (
-            <Chip 
-              label={`Promo: ${p.promotion.multiplier}x Points`} 
-              size="small" 
-              color="warning" 
-              sx={{ ml: 1, fontSize: '0.7rem', height: '20px' }} 
-            />
-          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {p.imageUrl ? (
+              <img src={p.imageUrl} alt={p.name} style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, border: '1px solid #e0e0e0', backgroundColor: '#fff' }} />
+            ) : (
+              <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f5f5', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                <Inventory2 sx={{ color: 'text.secondary', fontSize: 20 }} />
+              </Box>
+            )}
+            <Box>
+              {p.name}
+              {p.showInCatalog === false && (
+                <Chip 
+                  label="Hidden from Catalog" 
+                  size="small" 
+                  color="default" 
+                  variant="outlined" 
+                  sx={{ ml: 1, fontSize: '0.68rem', height: '20px' }} 
+                />
+              )}
+              {isActivePromo && (
+                <Chip 
+                  label={`Promo: ${p.promotion.multiplier}x Points`} 
+                  size="small" 
+                  color="warning" 
+                  sx={{ ml: 1, fontSize: '0.7rem', height: '20px' }} 
+                />
+              )}
+            </Box>
+          </Box>
         </TableCell>
         <TableCell>{p.productNo}</TableCell>
         <TableCell>{p.category}</TableCell>
@@ -672,7 +687,7 @@ const ZoneSLMap = ({ members }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function App() {
-
+  const [leadDialog, setLeadDialog] = useState({ open: false, product: null, loading: false });
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('user');
     return stored ? JSON.parse(stored) : null;
@@ -891,7 +906,8 @@ function App() {
   const [advancedInsights, setAdvancedInsights] = useState({
     salesForecast: [],
     geographicHeatmap: [],
-    churnDetection: []
+    churnDetection: [],
+    trafficStats: null,
   });
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [auditLogTotal, setAuditLogTotal] = useState(0);
@@ -1198,6 +1214,7 @@ function App() {
   const [expandedCardDialog, setExpandedCardDialog] = useState({ open: false, type: null, data: [] });
   const [notificationPrefs, setNotificationPrefs] = useState({ email: true, push: true, autoRefresh: true, soundEnabled: false });
   const [activityLog, setActivityLog] = useState([]);
+  const [activityStreamDialog, setActivityStreamDialog] = useState(false);
   const [userPermissions, setUserPermissions] = useState({
     canViewDashboard: true,
     canViewAdvancedInsights: false,
@@ -1212,6 +1229,7 @@ function App() {
     canManageApplicators: true,
     canViewAuditLogs: true,
     canViewFeedbacks: true,
+    canManageLeads: true,
     canDelete: true,
     canExport: true
   });
@@ -1220,7 +1238,7 @@ function App() {
   
   // Advanced Dashboard States
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [dateFilter, setDateFilter] = useState('today'); // 'today', '7days', '30days', 'custom'
+  const [dateFilter, setDateFilter] = useState('30days'); // 'today', '7days', '30days', 'custom'
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [comparisonData, setComparisonData] = useState(null);
   const [performanceMetrics, setPerformanceMetrics] = useState(null);
@@ -2899,15 +2917,19 @@ function App() {
   const loadAdvancedInsights = async () => {
     try {
       setLoadingInsights(true);
-      const [salesRes, geoRes, churnRes] = await Promise.all([
+      const [salesRes, geoRes, churnRes, intentsRes, trafficRes] = await Promise.all([
         api.get('/analytics/sales-forecasting', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
         api.get('/analytics/geographic-heatmap', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
-        api.get('/analytics/churn-detection', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } })
+        api.get('/analytics/churn-detection', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
+        api.get('/analytics/purchase-intents', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }),
+        api.get('/analytics/traffic-stats', { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } })
       ]);
       setAdvancedInsights({
         salesForecast: salesRes.data.success ? salesRes.data.data : [],
         geographicHeatmap: geoRes.data.success ? geoRes.data.data : [],
-        churnDetection: churnRes.data.success ? churnRes.data.data : []
+        churnDetection: churnRes.data.success ? churnRes.data.data : [],
+        purchaseIntents: intentsRes.data.success ? intentsRes.data.data : [],
+        trafficStats: trafficRes.data.success ? trafficRes.data.data : null
       });
     } catch (error) {
       console.error('Error loading advanced insights:', error);
@@ -2938,9 +2960,25 @@ function App() {
       if (start) params.startDate = start;
       if (end) params.endDate = end;
 
-      const res = await analyticsAPI.getDashboard(params);
+      const [res, auditRes] = await Promise.all([
+        analyticsAPI.getDashboard(params),
+        isMainAdmin() ? auditLogsAPI.getAll({ limit: 50 }) : Promise.resolve({ data: { data: [] } })
+      ]);
+      
       setDashboardData(res.data?.data);
       setStats(res.data?.data?.summary || {});
+      
+      if (auditRes.data?.data && auditRes.data.data.length > 0) {
+        // Map backend audit log format to the frontend activityLog format
+        const mappedLogs = auditRes.data.data.map(log => ({
+          timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
+          action: log.action,
+          details: `${log.module} - ${typeof log.details === 'object' ? JSON.stringify(log.details) : (log.details || '')}`,
+          severity: log.action.includes('Delete') ? 'error' : log.action.includes('Update') ? 'warning' : 'info',
+          user: log.performedBy?.username || log.performedBy?.email || 'System'
+        }));
+        setActivityLog(mappedLogs);
+      }
     } catch (e) {
       console.error('Error loading dashboard data', e);
     }
@@ -3751,7 +3789,8 @@ function App() {
           canPrintQRCodes: permissions?.canPrintQRCodes === true,
           canViewQRAnalytics: permissions?.canViewQRAnalytics === true,
           canViewAuditLogs: permissions?.canViewAuditLogs === true,
-          canViewFeedbacks: permissions?.canViewFeedbacks === true
+          canViewFeedbacks: permissions?.canViewFeedbacks === true,
+          canManageLeads: permissions?.canManageLeads === true
         }
       };
 
@@ -4920,18 +4959,31 @@ function App() {
                           </Button>
                         </Box>
 
-                        <Button 
-                          fullWidth
-                          size="small" 
-                          variant="contained" 
-                          startIcon={<ShoppingCart sx={{ fontSize: { xs: '0.85rem !important', sm: '1rem !important' } }} />} 
-                          href={p.buyUrl || "https://megakem.lk"} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          sx={{ borderRadius: '6px', fontWeight: 800, fontSize: { xs: '0.65rem', sm: '0.75rem' }, textTransform: 'none', py: { xs: 0.4, sm: 0.8 }, background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0, 51, 102, 0.25)', '&:hover': { background: 'linear-gradient(135deg, #002244 0%, #0096B8 100%)' } }}
-                        >
-                          Buy
-                        </Button>
+                        {p.buyUrl ? (
+                          <Button 
+                            fullWidth
+                            size="small" 
+                            variant="contained" 
+                            startIcon={<ShoppingCart sx={{ fontSize: { xs: '0.85rem !important', sm: '1rem !important' } }} />} 
+                            href={p.buyUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ borderRadius: '6px', fontWeight: 800, fontSize: { xs: '0.65rem', sm: '0.75rem' }, textTransform: 'none', py: { xs: 0.4, sm: 0.8 }, background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0, 51, 102, 0.25)', '&:hover': { background: 'linear-gradient(135deg, #002244 0%, #0096B8 100%)' } }}
+                          >
+                            Buy Online
+                          </Button>
+                        ) : (
+                          <Button 
+                            fullWidth
+                            size="small" 
+                            variant="contained" 
+                            startIcon={<WhatsApp sx={{ fontSize: { xs: '0.85rem !important', sm: '1rem !important' } }} />} 
+                            onClick={() => window.open(`https://wa.me/94760241288?text=Hello%20Dinithi,%20I%20am%20interested%20in%20your%20product:%20${encodeURIComponent(p.name)}`, '_blank')}
+                            sx={{ borderRadius: '6px', fontWeight: 800, fontSize: { xs: '0.65rem', sm: '0.75rem' }, textTransform: 'none', py: { xs: 0.4, sm: 0.8 }, background: 'linear-gradient(135deg, #128C7E 0%, #25D366 100%)', color: 'white', boxShadow: '0 4px 12px rgba(37, 211, 102, 0.25)', '&:hover': { background: 'linear-gradient(135deg, #075E54 0%, #128C7E 100%)' } }}
+                          >
+                            Order via WhatsApp
+                          </Button>
+                        )}
                       </CardActions>
                     </Card>
                   );
@@ -5081,9 +5133,9 @@ function App() {
                               variant="contained" 
                               size="large" 
                               startIcon={<ShoppingCart />} 
-                              href={selectedProductCatalogDialog.product.buyUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
+                              href={selectedProductCatalogDialog.product.buyUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               sx={{ borderRadius: 2, fontWeight: 800, px: 3, py: 1.2, background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', color: 'white', boxShadow: '0 4px 15px rgba(56, 239, 125, 0.4)' }}
                             >
                               Buy Now / Order Online
@@ -5093,13 +5145,11 @@ function App() {
                               variant="contained" 
                               color="secondary"
                               size="large" 
-                              startIcon={<ShoppingCart />} 
-                              href="https://megakem.lk" 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              sx={{ borderRadius: 2, fontWeight: 800, px: 3, py: 1.2 }}
+                              startIcon={<WhatsApp />} 
+                              onClick={() => window.open(`https://wa.me/94760241288?text=Hello%20Dinithi,%20I%20am%20interested%20in%20your%20product:%20${encodeURIComponent(selectedProductCatalogDialog.product.name)}`, '_blank')}
+                              sx={{ borderRadius: 2, fontWeight: 800, px: 3, py: 1.2, background: 'linear-gradient(135deg, #128C7E 0%, #25D366 100%)', color: 'white', boxShadow: '0 4px 15px rgba(37, 211, 102, 0.4)', '&:hover': { background: 'linear-gradient(135deg, #075E54 0%, #128C7E 100%)' } }}
                             >
-                              Buy on Megakem Shop
+                              Order via WhatsApp
                             </Button>
                           )}
 
@@ -6251,7 +6301,7 @@ function App() {
               {hasPermission('canManageCoAdmins') && <Tab icon={<People />} label='Co-Admins' value='co-admins' />}
 
               {/* {hasPermission('canManageProducts') && <Tab icon={<Star />} label='Rewards Catalog' value='catalog' />} HIDDEN FOR NOW */}
-              {hasPermission('canViewAdvancedInsights') && <Tab icon={<Insights />} label='Advanced Insights' value='advanced-insights' />}
+              {hasPermission('canViewAdvancedInsights') && <Tab icon={<Insights />} label='Insights & Leads' value='advanced-insights' />}
               {hasPermission('canManageProducts') && <Tab icon={<Category />} label='Products' value='products' />}
               {hasPermission('canManageQRCodes') && <Tab icon={<QrCodeScanner />} label='QR Codes' value='qr-codes' />}
               {hasPermission('canManageCoAdminRequests') && (
@@ -6301,6 +6351,7 @@ function App() {
               return true;
             });
             return (
+              <>
               <Grid container spacing={{ xs: 1.5, sm: 2 }}>
             {/* Dashboard Header with Controls */}
             <Grid item xs={12}>
@@ -7686,17 +7737,55 @@ function App() {
                 ));
             })()}</TableBody></Table></TableContainer></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography><List dense>{activityLog.slice(0, 8).map((log, i) => (
-              <ListItem key={log.id} sx={{ borderLeft: '3px solid', borderLeftColor: log.severity === 'error' ? 'error.main' : log.severity === 'warning' ? 'warning.main' : log.severity === 'success' ? 'success.main' : 'info.main', mb: 0.5, bgcolor: 'grey.50', borderRadius: 1, flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 0.5 }}>
-                  <Typography variant='body2' fontWeight={600}>{log.action}</Typography>
-                  <Typography variant='caption' color='text.secondary'>{new Date(log.timestamp).toLocaleTimeString()}</Typography>
-                </Box>
-                <Typography variant='caption' color='text.secondary'>{log.details}</Typography>
-                <Chip label={log.user} size='small' sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />
-              </ListItem>
-            ))}{activityLog.length === 0 && <Box sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}><Typography variant='h3' sx={{ mb: 1 }}>📭</Typography><Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center' }}>No recent activity to show</Typography></Box>}</List></CardContent></Card></Grid>
+            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}>
+              <CardContent>
+                <Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography>
+                <List dense>
+                  {activityLog.slice(0, 5).map((log, i) => (
+                    <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: log.severity === 'error' ? 'error.main' : log.severity === 'warning' ? 'warning.main' : log.severity === 'success' ? 'success.main' : 'info.main', mb: 0.5, bgcolor: 'grey.50', borderRadius: 1, flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 0.5 }}>
+                        <Typography variant='body2' fontWeight={600}>{log.action}</Typography>
+                        <Typography variant='caption' color='text.secondary'>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
+                      </Box>
+                      <Typography variant='caption' color='text.secondary' sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{log.details}</Typography>
+                      <Chip label={log.user} size='small' sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />
+                    </ListItem>
+                  ))}
+                  {activityLog.length === 0 && <Box sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}><Typography variant='h3' sx={{ mb: 1 }}>📭</Typography><Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center' }}>No recent activity to show</Typography></Box>}
+                </List>
+                {activityLog.length > 5 && (
+                  <Button fullWidth variant="outlined" size="small" onClick={() => setActivityStreamDialog(true)} sx={{ mt: 1 }}>
+                    View All Recent Activity
+                  </Button>
+                )}
+              </CardContent>
+            </Card></Grid>
           </Grid>
+          
+          {/* Full Activity Stream Dialog */}
+          <Dialog open={activityStreamDialog} onClose={() => setActivityStreamDialog(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>All Recent Activity</DialogTitle>
+            <DialogContent dividers>
+              <List dense>
+                {activityLog.map((log, i) => (
+                  <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: log.severity === 'error' ? 'error.main' : log.severity === 'warning' ? 'warning.main' : log.severity === 'success' ? 'success.main' : 'info.main', mb: 1, bgcolor: 'grey.50', borderRadius: 1, flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 0.5 }}>
+                      <Typography variant='body2' fontWeight={600}>{log.action}</Typography>
+                      <Typography variant='caption' color='text.secondary'>
+                        {new Date(log.timestamp).toLocaleDateString()} {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Typography>
+                    </Box>
+                    <Typography variant='caption' color='text.secondary' sx={{ wordBreak: 'break-all' }}>{log.details}</Typography>
+                    <Chip label={log.user} size='small' sx={{ mt: 1, height: 20, fontSize: '0.75rem' }} />
+                  </ListItem>
+                ))}
+              </List>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setActivityStreamDialog(false)}>Close</Button>
+            </DialogActions>
+          </Dialog>
+              </>
             );
           })()}
 
@@ -8396,7 +8485,8 @@ function App() {
                       canPrintQRCodes: false,
                       canViewQRAnalytics: false,
                       canViewAuditLogs: false,
-                      canViewFeedbacks: false
+                      canViewFeedbacks: false,
+                      canManageLeads: false
                     } 
                   } 
                 })}
@@ -8491,7 +8581,8 @@ function App() {
                               canPrintQRCodes: u.permissions?.canPrintQRCodes === true,
                               canViewQRAnalytics: u.permissions?.canViewQRAnalytics === true,
                               canViewAuditLogs: u.permissions?.canViewAuditLogs === true,
-                              canViewFeedbacks: u.permissions?.canViewFeedbacks === true
+                              canViewFeedbacks: u.permissions?.canViewFeedbacks === true,
+                              canManageLeads: u.permissions?.canManageLeads === true
                             }
                           } 
                         })} 
@@ -10288,6 +10379,9 @@ function App() {
                   Refresh Data
                 </Button>
               </Box>
+              <Box sx={{ mb: 4 }}>
+                <TrafficDashboard data={advancedInsights.trafficStats} />
+              </Box>
 
               <Grid container spacing={3}>
                 {/* Sales Forecasting */}
@@ -10404,7 +10498,7 @@ function App() {
                                   <TableCell>{member.memberName}</TableCell>
                                   <TableCell>
                                     <Chip 
-                                      label={getTierDisplayName(member.tier)} 
+                                      label={member.tier ? member.tier.toUpperCase() : 'UNKNOWN'} 
                                       size="small"
                                       sx={{ 
                                         bgcolor: member.tier === 'platinum' ? '#e5e4e2' : member.tier === 'gold' ? '#ffd700' : member.tier === 'silver' ? '#c0c0c0' : '#cd7f32',
@@ -10436,6 +10530,14 @@ function App() {
                     </CardContent>
                   </Card>
                 </Grid>
+
+                {/* CRM Leads Block inside Advanced Insights */}
+                {(isMainAdmin() || hasPermission('canManageLeads')) && (
+                  <Grid item xs={12}>
+                    <LeadsManagementTab onShowNotification={showNotification} />
+                  </Grid>
+                )}
+
               </Grid>
             </Box>
           )}
@@ -11304,6 +11406,28 @@ function App() {
                         user: { 
                           ...prev.user, 
                           permissions: { ...(prev.user?.permissions || {}), canViewFeedbacks: checked } 
+                        } 
+                      }));
+                    }} 
+                    color='info' 
+                  />
+                </Box>
+
+                {/* Manage Leads */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant='body2' fontWeight={600}>Can Manage Leads</Typography>
+                    <Typography variant='caption' color='text.secondary'>Manage purchase intents and CRM</Typography>
+                  </Box>
+                  <Switch 
+                    checked={userDialog.user?.permissions?.canManageLeads === true} 
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUserDialog(prev => ({ 
+                        ...prev, 
+                        user: { 
+                          ...prev.user, 
+                          permissions: { ...(prev.user?.permissions || {}), canManageLeads: checked } 
                         } 
                       }));
                     }} 
@@ -14792,6 +14916,43 @@ function App() {
       {/* Global Change Request Dialog */}
       <ChangeRequestDialog showNotification={showNotification} />
 
+      <LeadCaptureDialog
+        open={leadDialog.open}
+        loading={leadDialog.loading}
+        product={leadDialog.product}
+        onClose={() => setLeadDialog({ ...leadDialog, open: false })}
+        onSubmit={async (data) => {
+          setLeadDialog({ ...leadDialog, loading: true });
+          
+          let visitorId = localStorage.getItem('megakem_visitor_id');
+          if (!visitorId) {
+            visitorId = 'visitor_' + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('megakem_visitor_id', visitorId);
+          }
+          
+          try {
+            await api.post('/analytics/purchase-intent', {
+              productId: leadDialog.product._id,
+              name: data.name,
+              mobile: data.mobile,
+              memberId: data.memberId || (user ? user.id : ''),
+              visitorId
+            });
+          } catch(e) {
+            console.error('Error logging purchase intent:', e);
+          }
+          
+          setLeadDialog({ open: false, product: null, loading: false });
+          
+          const url = leadDialog.product.buyUrl?.trim() || 'https://megakem.lk';
+          const trackingUrl = url.includes('?') 
+            ? `${url}&utm_source=megakem_loyalty_app&utm_medium=button&utm_campaign=product_catalog` 
+            : `${url}?utm_source=megakem_loyalty_app&utm_medium=button&utm_campaign=product_catalog`;
+            
+          window.open(trackingUrl, '_blank');
+        }}
+      />
+      <TrafficTracker view={view} subView={view === 'admin' ? adminTab : ''} />
     </Box></ThemeProvider>
   );
 }

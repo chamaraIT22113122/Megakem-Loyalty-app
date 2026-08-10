@@ -191,6 +191,11 @@ export const analyticsAPI = {
   export: (params) => api.get('/analytics/export', { params, responseType: 'blob' }),
   getDailyReport: (date) => api.get('/analytics/daily-report', { params: { date } }),
   getCalendarData: (year, month) => api.get('/analytics/calendar-data', { params: { year, month } }),
+  getPurchaseIntents: () => api.get('/analytics/purchase-intents'),
+  updatePurchaseIntent: (id, data) => api.put(`/analytics/purchase-intent/${id}`, data),
+  deletePurchaseIntent: (id) => api.delete(`/analytics/purchase-intent/${id}`),
+  trackPageView: (data) => api.post('/analytics/track', data),
+  getTrafficStats: () => api.get('/analytics/traffic-stats'),
 };
 
 // Members API (Customers & Applicators)

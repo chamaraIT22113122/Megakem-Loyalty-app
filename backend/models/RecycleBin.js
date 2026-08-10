@@ -4,7 +4,7 @@ const recycleBinSchema = new mongoose.Schema({
   originalCollection: {
     type: String,
     required: true,
-    enum: ['qrcodes', 'members', 'products', 'users', 'changerequests', 'scans', 'rewards', 'reprintrequests', 'feedbacks']
+    enum: ['qrcodes', 'members', 'products', 'users', 'changerequests', 'scans', 'rewards', 'reprintrequests', 'feedbacks', 'purchaseintents']
   },
   documentId: {
     type: mongoose.Schema.Types.Mixed,

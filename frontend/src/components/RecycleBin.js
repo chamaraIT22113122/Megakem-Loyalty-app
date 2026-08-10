@@ -142,7 +142,18 @@ const RecycleBin = () => {
                       <Chip label={item.originalCollection.toUpperCase()} size="small" color={getCollectionColor(item.originalCollection)} />
                     </TableCell>
                     <TableCell>{item.summary}</TableCell>
-                    <TableCell>{item.deletedBy ? item.deletedBy.name : 'Unknown'}</TableCell>
+                    <TableCell>
+                      {item.deletedBy ? (
+                        <Box>
+                          <Typography variant="body2">{item.deletedBy.username || 'Admin'}</Typography>
+                          {item.deletedBy.email && (
+                            <Typography variant="caption" color="textSecondary">{item.deletedBy.email}</Typography>
+                          )}
+                        </Box>
+                      ) : (
+                        'Unknown'
+                      )}
+                    </TableCell>
                     <TableCell>{new Date(item.deletedAt).toLocaleString()}</TableCell>
                     <TableCell>
                       <Typography color={daysLeft <= 3 ? 'error' : 'textSecondary'}>

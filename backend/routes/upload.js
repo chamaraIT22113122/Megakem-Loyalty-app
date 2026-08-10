@@ -21,12 +21,17 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter for images
+// File filter for images and documents
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) {
+  if (
+    file.mimetype.startsWith('image/') ||
+    file.mimetype === 'application/pdf' ||
+    file.mimetype === 'application/msword' ||
+    file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
     cb(null, true);
   } else {
-    cb(new Error('Not an image! Please upload an image.'), false);
+    cb(new Error('Invalid file type! Only images and documents (PDF, DOC) are allowed.'), false);
   }
 };
 

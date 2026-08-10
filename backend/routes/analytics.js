@@ -590,4 +590,206 @@ router.get('/price-estimation', protect, hasPermission('canViewDashboard'), asyn
   }
 });
 
+// @route   POST /api/analytics/purchase-intent
+// @desc    Record a click on "Buy Now / Order Online"
+// @access  Public
+router.post('/purchase-intent', async (req, res) => {
+  try {
+    const PurchaseIntent = require('../models/PurchaseIntent');
+    const { productId, name, mobile, memberId, visitorId } = req.body;
+    
+    const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+    const mongoose = require('mongoose');
+    const Member = require('../models/Member');
+    
+    let memberRef = null;
+    if (memberId) {
+      if (mongoose.Types.ObjectId.isValid(memberId)) {
+        const memberById = await Member.findById(memberId);
+        if (memberById) memberRef = memberById._id;
+      }
+      if (!memberRef) {
+        const memberByStr = await Member.findOne({ memberId: memberId.toUpperCase() });
+        if (memberByStr) memberRef = memberByStr._id;
+      }
+    }
+
+    const intent = await PurchaseIntent.create({
+      product: productId,
+      name,
+      mobile,
+      memberId,
+      member: memberRef,
+      visitorId,
+      ipAddress
+    });
+
+    const AdminNotification = require('../models/AdminNotification');
+    const Product = require('../models/Product');
+    const prod = await Product.findById(productId);
+    await AdminNotification.create({
+      type: 'lead',
+      message: `New Purchase Lead received for ${prod ? prod.name : 'a product'}.`,
+      relatedId: intent._id,
+      onModel: 'PurchaseIntent',
+      status: 'info'
+    });
+
+    res.status(201).json({ success: true, data: intent });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/analytics/purchase-intents
+// @desc    Get all purchase intents (leads/clicks)
+// @access  Private/Admin
+router.get('/purchase-intents', protect, hasPermission('canViewDashboard'), async (req, res) => {
+  try {
+    const PurchaseIntent = require('../models/PurchaseIntent');
+    const intents = await PurchaseIntent.find()
+      .populate('product', 'name productNo imageUrl price')
+      .populate('member', 'memberName phone whatsappNumber')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: intents });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/analytics/purchase-intent/:id
+// @desc    Update purchase intent status/notes
+// @access  Private/Admin
+router.put('/purchase-intent/:id', protect, hasPermission('canManageLeads'), async (req, res) => {
+  try {
+    const PurchaseIntent = require('../models/PurchaseIntent');
+    const { status, notes } = req.body;
+    
+    const intent = await PurchaseIntent.findByIdAndUpdate(
+      req.params.id,
+      { status, notes },
+      { new: true, runValidators: true }
+    );
+    
+    if (!intent) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+    
+    res.status(200).json({ success: true, data: intent });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   DELETE /api/analytics/purchase-intent/:id
+// @desc    Delete a purchase intent (lead)
+// @access  Private/Admin
+router.delete('/purchase-intent/:id', protect, hasPermission('canManageLeads'), async (req, res) => {
+  try {
+    const PurchaseIntent = require('../models/PurchaseIntent');
+    const intent = await PurchaseIntent.findById(req.params.id).populate('member');
+    
+    if (!intent) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+    
+    const RecycleBin = require('../models/RecycleBin');
+    const binItem = new RecycleBin({
+      originalCollection: 'purchaseintents',
+      documentId: intent._id,
+      documentData: intent.toObject(),
+      summary: `Lead: ${intent.name || intent.member?.memberName || intent.member?.username || 'Unknown'} - ${intent.mobile || intent.member?.phone || intent.member?.whatsappNumber || 'No Mobile'}`,
+      deletedBy: req.user._id,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    await binItem.save();
+    
+    await intent.deleteOne();
+    
+    res.status(200).json({ success: true, data: {} });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+// @route   POST /api/analytics/track
+// @desc    Track page view
+// @access  Public
+router.post('/track', async (req, res) => {
+  try {
+    const PageView = require('../models/PageView');
+    const { path, url, referrer, userAgent, deviceType, memberId } = req.body;
+    
+    if (userAgent && userAgent.toLowerCase().includes('bot')) {
+      return res.status(200).json({ success: true, message: 'Ignored bot' });
+    }
+
+    const pageView = new PageView({
+      path,
+      url,
+      referrer,
+      userAgent,
+      deviceType,
+      memberId: memberId || null
+    });
+    
+    await pageView.save();
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Error tracking page view:', err);
+    res.status(500).json({ success: false });
+  }
+});
+
+// @route   GET /api/analytics/traffic-stats
+// @desc    Get website traffic statistics
+// @access  Private/Admin
+router.get('/traffic-stats', protect, hasPermission('canViewAdvancedInsights'), async (req, res) => {
+  try {
+    const PageView = require('../models/PageView');
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const dailyTraffic = await PageView.aggregate([
+      { $match: { timestamp: { $gte: thirtyDaysAgo } } },
+      { 
+        $group: { 
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+          visits: { $sum: 1 },
+          uniqueUsers: { $addToSet: "$userAgent" }
+        } 
+      },
+      { $project: { date: "$_id", visits: 1, uniqueUsers: { $size: "$uniqueUsers" }, _id: 0 } },
+      { $sort: { date: 1 } }
+    ]);
+
+    const topPages = await PageView.aggregate([
+      { $match: { timestamp: { $gte: thirtyDaysAgo } } },
+      { $group: { _id: "$path", views: { $sum: 1 } } },
+      { $sort: { views: -1 } },
+      { $limit: 10 },
+      { $project: { path: "$_id", views: 1, _id: 0 } }
+    ]);
+
+    const deviceStats = await PageView.aggregate([
+      { $match: { timestamp: { $gte: thirtyDaysAgo } } },
+      { $group: { _id: "$deviceType", count: { $sum: 1 } } },
+      { $project: { name: "$_id", value: "$count", _id: 0 } }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        dailyTraffic,
+        topPages,
+        deviceStats
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching traffic stats:', err);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
 module.exports = router;

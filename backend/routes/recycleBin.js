@@ -11,13 +11,14 @@ const Scan = require('../models/Scan');
 const Reward = require('../models/Reward');
 const ReprintRequest = require('../models/ReprintRequest');
 const Feedback = require('../models/Feedback');
+const PurchaseIntent = require('../models/PurchaseIntent');
 
 // @route   GET /api/recycle-bin
 // @desc    Get all items in recycle bin
 // @access  Private/Admin
 router.get('/', protect, admin, async (req, res) => {
   try {
-    const items = await RecycleBin.find({}).sort({ deletedAt: -1 }).populate('deletedBy', 'name email role');
+    const items = await RecycleBin.find({}).sort({ deletedAt: -1 }).populate('deletedBy', 'username email role');
     res.json(items);
   } catch (err) {
     console.error('Error fetching recycle bin items:', err.message);
@@ -65,6 +66,9 @@ router.post('/restore/:id', protect, admin, async (req, res) => {
         break;
       case 'feedbacks':
         Model = Feedback;
+        break;
+      case 'purchaseintents':
+        Model = PurchaseIntent;
         break;
       default:
         return res.status(400).json({ msg: 'Unknown collection type' });

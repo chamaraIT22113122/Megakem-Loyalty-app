@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const adminNotificationSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['payment', 'general'],
+    enum: ['payment', 'general', 'lead'],
     default: 'general'
   },
   message: {
@@ -21,7 +21,7 @@ const adminNotificationSchema = new mongoose.Schema({
   },
   onModel: {
     type: String,
-    enum: ['Member', 'User']
+    enum: ['Member', 'User', 'PurchaseIntent']
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
