@@ -64,7 +64,20 @@ const FeedbacksTab = () => {
     }
   };
 
+  const isMainAdmin = () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user'));
+      return u && u.email === 'admin@megakem.com';
+    } catch {
+      return false;
+    }
+  };
+
   const handleDelete = async (id) => {
+    if (!isMainAdmin()) {
+      setSnackbar({ open: true, msg: 'Only the main admin can delete feedbacks', type: 'error' });
+      return;
+    }
     if (window.confirm('Are you sure you want to delete this feedback?')) {
       try {
         await feedbackAPI.delete(id);
@@ -409,11 +422,13 @@ const FeedbacksTab = () => {
                         <PictureAsPdf />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton color="error" onClick={() => handleDelete(fb._id)}>
-                        <Delete />
-                      </IconButton>
-                    </Tooltip>
+                    {isMainAdmin() && (
+                      <Tooltip title="Delete">
+                        <IconButton color="error" onClick={() => handleDelete(fb._id)}>
+                          <Delete />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

@@ -60,7 +60,21 @@ function LeadsManagementTab({ onShowNotification }) {
     }
   };
 
+  const isMainAdmin = () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user'));
+      return u && u.email === 'admin@megakem.com';
+    } catch {
+      return false;
+    }
+  };
+
   const handleDelete = async () => {
+    if (!isMainAdmin()) {
+      if (onShowNotification) onShowNotification('Only the main admin can delete leads', 'error');
+      setDeleteDialog({ open: false, id: null });
+      return;
+    }
     try {
       await analyticsAPI.deletePurchaseIntent(deleteDialog.id);
       if (onShowNotification) onShowNotification('Lead deleted successfully', 'success');
@@ -258,11 +272,13 @@ function LeadsManagementTab({ onShowNotification }) {
                           <Edit fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Delete Lead">
-                        <IconButton size="small" color="error" onClick={() => setDeleteDialog({ open: true, id: lead._id })}>
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {isMainAdmin() && (
+                        <Tooltip title="Delete Lead">
+                          <IconButton size="small" color="error" onClick={() => setDeleteDialog({ open: true, id: lead._id })}>
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
