@@ -8582,7 +8582,29 @@ function App() {
                       {u.email === 'admin@megakem.com' ? (
                         <Chip label='All Permissions (Main Admin)' size='small' color='success' sx={{ fontWeight: 600 }} />
                       ) : (() => {
-                        const activePerms = Object.entries(u.permissions || {}).filter(([k, v]) => v).map(([k]) => k.replace('canView', '').replace('canManage', '').replace('can', ''));
+                        const PERM_LABELS = {
+                          canViewDashboard: '📊 View Dashboard',
+                          canViewAdvancedInsights: '📈 Advanced Insights',
+                          canViewScans: '🔍 View Scans',
+                          canManageCoAdmins: '👥 Manage Co-Admins',
+                          canManageUsers: '🧑 Members & Loyalty',
+                          canViewRewards: '🎁 Cash Rewards',
+                          canViewLeaderboard: '🏆 View Leaderboard',
+                          canManageProducts: '📦 Manage Products',
+                          canManageQRCodes: '🔲 Manage QR Codes',
+                          canPrintQRCodes: '🖨️ Print QR Codes',
+                          canViewQRAnalytics: '📉 QR Analytics',
+                          canManageCoAdminRequests: '📋 Reprint Requests',
+                          canManageApplicators: '🔧 Applicator & Hardware',
+                          canManageApplicatorProgram: '⭐ Applicator Program',
+                          canViewAuditLogs: '🔐 Audit Logs',
+                          canViewFeedbacks: '💬 View Feedbacks',
+                          canManageLeads: '🎯 Manage Leads',
+                          canEdit: '✏️ Edit Records',
+                          canDelete: '🗑️ Delete Records',
+                          canExport: '📤 Export Data',
+                        };
+                        const activePerms = Object.entries(u.permissions || {}).filter(([k, v]) => v).map(([k]) => PERM_LABELS[k] || k);
                         return (
                           <Tooltip title={
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
