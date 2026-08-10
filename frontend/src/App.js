@@ -2971,7 +2971,16 @@ function App() {
       ]);
       
       setDashboardData(res.data?.data);
-      setStats(res.data?.data?.summary || {});
+      setStats({
+        ...(res.data?.data?.summary || {}),
+        topProducts: res.data?.data?.topProducts || [],
+        topMembers: res.data?.data?.topMembers || [],
+        tierDistribution: res.data?.data?.tierDistribution || [],
+        dailyTrends: res.data?.data?.dailyTrends || [],
+        roleDistribution: res.data?.data?.roleDistribution || [],
+        hourlyDistribution: res.data?.data?.hourlyDistribution || [],
+        recentScans: res.data?.data?.recentScans || [],
+      });
       
       if (auditRes.data?.data && auditRes.data.data.length > 0) {
         // Map backend audit log format to the frontend activityLog format
