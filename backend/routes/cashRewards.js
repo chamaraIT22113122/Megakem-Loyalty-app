@@ -661,7 +661,11 @@ router.post('/unpay/:memberId', protect, hasPermission('canViewRewards'), async 
 // @route   GET /api/cash-rewards/admin-notifications
 // @desc    Get admin notifications (like payment notifications)
 // @access  Private/Admin
-router.get('/admin-notifications', protect, hasPermission('canManageCoAdminRequests'), async (req, res) => {
+router.get('/admin-notifications', protect, async (req, res) => {
+  // Allow main admin or those with co-admin request management permissions
+  if (!req.user || (req.user.role !== 'admin' && !req.user.permissions?.canManageCoAdminRequests && !req.user.permissions?.canViewDashboard)) {
+    return res.status(403).json({ success: false, message: 'Access denied' });
+  }
   try {
     const notifications = await AdminNotification.find()
       .populate('createdBy', 'username')
