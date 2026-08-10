@@ -160,6 +160,9 @@ export const authAPI = {
   resetUserPassword: (id, newPassword) => api.put(`/auth/users/${id}/reset-password`, { newPassword }),
   deleteUser: (id) => api.delete(`/auth/users/${id}`),
   getAuthStats: () => api.get('/auth/stats'),
+  bulkUpdatePermissions: (userIds, template) => api.post('/auth/users/bulk-permissions', { userIds, template }),
+  bulkUpdate: (userIds, updates) => api.post('/auth/users/bulk-update', { userIds, updates }),
+  bulkDelete: (userIds) => api.post('/auth/users/bulk-delete', { userIds }),
 };
 
 // Scans API

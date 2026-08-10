@@ -638,25 +638,11 @@ router.post('/users', protect, async (req, res) => {
     
     // Set permissions using set() for reliability
     if (permissions) {
-      user.set('permissions.canViewDashboard', permissions.canViewDashboard === true);
-      user.set('permissions.canViewScans', permissions.canViewScans === true);
-      user.set('permissions.canManageCoAdmins', permissions.canManageCoAdmins === true);
-      user.set('permissions.canDelete', permissions.canDelete === true);
-      user.set('permissions.canEdit', permissions.canEdit === true);
-      user.set('permissions.canExport', permissions.canExport === true);
-      user.set('permissions.canManageUsers', permissions.canManageUsers === true);
-      user.set('permissions.canViewRewards', permissions.canViewRewards === true);
-      user.set('permissions.canViewLeaderboard', permissions.canViewLeaderboard === true);
-      user.set('permissions.canManageProducts', permissions.canManageProducts === true);
-      user.set('permissions.canManageQRCodes', permissions.canManageQRCodes === true);
-      user.set('permissions.canManageCoAdminRequests', permissions.canManageCoAdminRequests === true);
-      user.set('permissions.canManageApplicators', permissions.canManageApplicators === true);
-      user.set('permissions.canManageApplicatorProgram', permissions.canManageApplicatorProgram === true);
-      user.set('permissions.canPrintQRCodes', permissions.canPrintQRCodes === true);
-      user.set('permissions.canViewQRAnalytics', permissions.canViewQRAnalytics === true);
-      user.set('permissions.canViewAdvancedInsights', permissions.canViewAdvancedInsights === true);
-      user.set('permissions.canViewAuditLogs', permissions.canViewAuditLogs === true);
-      user.set('permissions.canViewFeedbacks', permissions.canViewFeedbacks === true);
+      Object.keys(permissions).forEach(key => {
+        if (typeof permissions[key] === 'boolean') {
+          user.set(`permissions.${key}`, permissions[key]);
+        }
+      });
     }
 
     // For QR admin type, automatically enable QR permissions
@@ -736,27 +722,9 @@ router.put('/users/:id', protect, async (req, res) => {
         ...(role !== undefined && { role }),
         ...(isActive !== undefined && { isActive }),
         ...(points !== undefined && { points: Math.max(0, points) }),
-        ...(permissions !== undefined && {
-          'permissions.canViewDashboard': permissions.canViewDashboard === true,
-          'permissions.canViewScans': permissions.canViewScans === true,
-          'permissions.canManageCoAdmins': permissions.canManageCoAdmins === true,
-          'permissions.canDelete': permissions.canDelete === true,
-          'permissions.canEdit': permissions.canEdit === true,
-          'permissions.canExport': permissions.canExport === true,
-          'permissions.canManageUsers': permissions.canManageUsers === true,
-          'permissions.canViewRewards': permissions.canViewRewards === true,
-          'permissions.canViewLeaderboard': permissions.canViewLeaderboard === true,
-          'permissions.canManageProducts': permissions.canManageProducts === true,
-          'permissions.canManageQRCodes': permissions.canManageQRCodes === true,
-          'permissions.canPrintQRCodes': permissions.canPrintQRCodes === true,
-          'permissions.canViewQRAnalytics': permissions.canViewQRAnalytics === true,
-          'permissions.canManageCoAdminRequests': permissions.canManageCoAdminRequests === true,
-          'permissions.canManageApplicators': permissions.canManageApplicators === true,
-          'permissions.canManageApplicatorProgram': permissions.canManageApplicatorProgram === true,
-          'permissions.canViewAdvancedInsights': permissions.canViewAdvancedInsights === true,
-          'permissions.canViewAuditLogs': permissions.canViewAuditLogs === true,
-          'permissions.canViewFeedbacks': permissions.canViewFeedbacks === true
-        })
+        ...(permissions !== undefined && Object.fromEntries(
+          Object.entries(permissions).map(([k, v]) => [`permissions.${k}`, v === true])
+        ))
       }
     };
 
@@ -1103,6 +1071,142 @@ router.post('/users/bulk-delete', protect, async (req, res) => {
     }
 
     res.json({ success: true, count: filteredIds.length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/auth/users/bulk-permissions
+// @desc    Apply a permission template to multiple users at once
+// @access  Private/Main Admin
+router.post('/users/bulk-permissions', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' || req.user.email !== 'admin@megakem.com') {
+      return res.status(403).json({ success: false, message: 'Only the main admin can apply permission templates' });
+    }
+
+    const { userIds, template } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide user IDs' });
+    }
+
+    // Define permission templates
+    const TEMPLATES = {
+      'read-only': {
+        canViewDashboard: true, canViewScans: true, canViewLeaderboard: true,
+        canViewAdvancedInsights: false, canManageCoAdmins: false, canManageUsers: false,
+        canViewRewards: false, canManageProducts: false, canManageQRCodes: false,
+        canPrintQRCodes: false, canViewQRAnalytics: false, canManageCoAdminRequests: false,
+        canManageApplicators: false, canManageApplicatorProgram: false,
+        canViewAuditLogs: false, canViewFeedbacks: false, canManageLeads: false,
+        // Global
+        canEdit: false, canDelete: false, canExport: false,
+        // Per-tab
+        canCreateMembers: false, canEditMembers: false, canDeleteMembers: false, canExportMembers: false,
+        canCreateScans: false, canEditScans: false, canDeleteScans: false, canExportScans: false,
+        canCreateProducts: false, canEditProducts: false, canDeleteProducts: false,
+        canCreateQRCodes: false, canEditQRCodes: false, canDeleteQRCodes: false,
+        canCreateApplicators: false, canEditApplicators: false, canDeleteApplicators: false,
+        canCreateLeads: false, canEditLeads: false, canDeleteLeads: false, canExportLeads: false,
+        canCreateRewards: false, canEditRewards: false, canDeleteRewards: false,
+      },
+      'content-manager': {
+        canViewDashboard: true, canViewScans: true, canViewLeaderboard: true,
+        canManageProducts: true, canManageQRCodes: true, canPrintQRCodes: true,
+        canViewQRAnalytics: true,
+        canViewAdvancedInsights: false, canManageCoAdmins: false, canManageUsers: false,
+        canViewRewards: false, canManageCoAdminRequests: false, canManageApplicators: false,
+        canManageApplicatorProgram: false, canViewAuditLogs: false, canViewFeedbacks: false,
+        canManageLeads: false,
+        // Global
+        canEdit: true, canDelete: false, canExport: true,
+        // Per-tab
+        canCreateMembers: false, canEditMembers: false, canDeleteMembers: false, canExportMembers: false,
+        canCreateScans: false, canEditScans: false, canDeleteScans: false, canExportScans: false,
+        canCreateProducts: true, canEditProducts: true, canDeleteProducts: false,
+        canCreateQRCodes: true, canEditQRCodes: true, canDeleteQRCodes: false,
+        canCreateApplicators: false, canEditApplicators: false, canDeleteApplicators: false,
+        canCreateLeads: false, canEditLeads: false, canDeleteLeads: false, canExportLeads: false,
+        canCreateRewards: false, canEditRewards: false, canDeleteRewards: false,
+      },
+      'sales-agent': {
+        canViewDashboard: true, canViewAdvancedInsights: true, canManageLeads: true,
+        canViewRewards: true, canViewLeaderboard: true, canViewScans: true,
+        canViewQRAnalytics: true,
+        canManageCoAdmins: false, canManageUsers: false, canManageProducts: false,
+        canManageQRCodes: false, canPrintQRCodes: false, canManageCoAdminRequests: false,
+        canManageApplicators: false, canManageApplicatorProgram: false,
+        canViewAuditLogs: false, canViewFeedbacks: false,
+        // Global
+        canEdit: false, canDelete: false, canExport: true,
+        // Per-tab
+        canCreateMembers: false, canEditMembers: false, canDeleteMembers: false, canExportMembers: false,
+        canCreateScans: false, canEditScans: false, canDeleteScans: false, canExportScans: true,
+        canCreateProducts: false, canEditProducts: false, canDeleteProducts: false,
+        canCreateQRCodes: false, canEditQRCodes: false, canDeleteQRCodes: false,
+        canCreateApplicators: false, canEditApplicators: false, canDeleteApplicators: false,
+        canCreateLeads: true, canEditLeads: true, canDeleteLeads: false, canExportLeads: true,
+        canCreateRewards: false, canEditRewards: false, canDeleteRewards: false,
+      },
+      'full-access': {
+        canViewDashboard: true, canViewAdvancedInsights: true, canViewScans: true,
+        canManageCoAdmins: false, canManageUsers: true, canViewRewards: true,
+        canViewLeaderboard: true, canManageProducts: true, canManageQRCodes: true,
+        canPrintQRCodes: true, canViewQRAnalytics: true, canManageCoAdminRequests: true,
+        canManageApplicators: true, canManageApplicatorProgram: true,
+        canViewAuditLogs: true, canViewFeedbacks: true, canManageLeads: true,
+        // Global
+        canEdit: true, canDelete: true, canExport: true,
+        // Per-tab
+        canCreateMembers: true, canEditMembers: true, canDeleteMembers: true, canExportMembers: true,
+        canCreateScans: true, canEditScans: true, canDeleteScans: true, canExportScans: true,
+        canCreateProducts: true, canEditProducts: true, canDeleteProducts: true,
+        canCreateQRCodes: true, canEditQRCodes: true, canDeleteQRCodes: true,
+        canCreateApplicators: true, canEditApplicators: true, canDeleteApplicators: true,
+        canCreateLeads: true, canEditLeads: true, canDeleteLeads: true, canExportLeads: true,
+        canCreateRewards: true, canEditRewards: true, canDeleteRewards: true,
+      },
+      'clear-all': {
+        canViewDashboard: false, canViewAdvancedInsights: false, canViewScans: false,
+        canManageCoAdmins: false, canManageUsers: false, canViewRewards: false,
+        canViewLeaderboard: false, canManageProducts: false, canManageQRCodes: false,
+        canPrintQRCodes: false, canViewQRAnalytics: false, canManageCoAdminRequests: false,
+        canManageApplicators: false, canManageApplicatorProgram: false,
+        canViewAuditLogs: false, canViewFeedbacks: false, canManageLeads: false,
+        // Global
+        canEdit: false, canDelete: false, canExport: false,
+        // Per-tab
+        canCreateMembers: false, canEditMembers: false, canDeleteMembers: false, canExportMembers: false,
+        canCreateScans: false, canEditScans: false, canDeleteScans: false, canExportScans: false,
+        canCreateProducts: false, canEditProducts: false, canDeleteProducts: false,
+        canCreateQRCodes: false, canEditQRCodes: false, canDeleteQRCodes: false,
+        canCreateApplicators: false, canEditApplicators: false, canDeleteApplicators: false,
+        canCreateLeads: false, canEditLeads: false, canDeleteLeads: false, canExportLeads: false,
+        canCreateRewards: false, canEditRewards: false, canDeleteRewards: false,
+      }
+    };
+
+    const permissions = TEMPLATES[template];
+    if (!permissions) {
+      return res.status(400).json({ success: false, message: `Unknown template: ${template}` });
+    }
+
+    // Do not allow updating the main admin
+    const mainAdmin = await User.findOne({ email: 'admin@megakem.com' });
+    const filteredIds = userIds.filter(id => id.toString() !== mainAdmin._id.toString());
+
+    await User.updateMany({ _id: { $in: filteredIds } }, { $set: { permissions } });
+    await logAction(req, 'BULK_APPLY_TEMPLATE', 'USERS', { count: filteredIds.length, template });
+
+    // Return the updated users
+    const updatedUsers = await User.find({ _id: { $in: filteredIds } }).select('-password');
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'users' });
+    }
+
+    res.json({ success: true, count: filteredIds.length, data: updatedUsers });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

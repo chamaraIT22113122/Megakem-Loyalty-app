@@ -1193,6 +1193,7 @@ function App() {
     localStorage.setItem('user_cart', JSON.stringify(cart));
   }, [cart]);
   const [coAdminSearchQuery, setCoAdminSearchQuery] = useState('');
+  const [selectedCoAdmins, setSelectedCoAdmins] = useState([]);
   const [rewardSearchQuery, setRewardSearchQuery] = useState('');
   const [rewardStatusFilter, setRewardStatusFilter] = useState('ALL');
   const [selectedRewards, setSelectedRewards] = useState([]);
@@ -3789,6 +3790,34 @@ function App() {
     }
   };
 
+  const handleBulkCoAdminAction = async (action, payload) => {
+    if (!isMainAdmin()) return showNotification('Only main admin can perform bulk actions', 'error');
+    if (!selectedCoAdmins.length) return;
+    setLoading(true);
+    try {
+      if (action === 'delete') {
+        await authAPI.bulkDelete(selectedCoAdmins);
+        setUsers(users.filter(u => !selectedCoAdmins.includes(u._id)));
+        showNotification(`${selectedCoAdmins.length} users deleted`, 'success');
+      } else if (action === 'status') {
+        const updates = { isActive: payload };
+        await authAPI.bulkUpdate(selectedCoAdmins, updates);
+        setUsers(users.map(u => selectedCoAdmins.includes(u._id) ? { ...u, isActive: payload } : u));
+        showNotification(`${selectedCoAdmins.length} users ${payload ? 'enabled' : 'disabled'}`, 'success');
+      } else if (action === 'template') {
+        const res = await authAPI.bulkUpdatePermissions(selectedCoAdmins, payload);
+        const updatedIds = res.data.data.map(u => u._id);
+        setUsers(users.map(u => updatedIds.includes(u._id) ? res.data.data.find(up => up._id === u._id) : u));
+        showNotification(`Applied ${payload} template to ${selectedCoAdmins.length} users`, 'success');
+      }
+      setSelectedCoAdmins([]);
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Bulk action failed', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateUser = async () => {
     if (!isMainAdmin()) {
       showNotification('Only the main admin can manage co-admins', 'error');
@@ -3823,28 +3852,7 @@ function App() {
         email,
         role: role || 'admin',
         managerAdminId: userDialog.user?.managerAdminId || null,
-        permissions: {
-          canViewDashboard: permissions?.canViewDashboard === true,
-          canViewAdvancedInsights: permissions?.canViewAdvancedInsights === true,
-          canViewScans: permissions?.canViewScans === true,
-          canManageCoAdmins: permissions?.canManageCoAdmins === true,
-          canDelete: permissions?.canDelete === true,
-          canEdit: permissions?.canEdit === true,
-          canExport: permissions?.canExport === true,
-          canManageUsers: permissions?.canManageUsers === true,
-          canViewRewards: permissions?.canViewRewards === true,
-          canViewLeaderboard: permissions?.canViewLeaderboard === true,
-          canManageProducts: permissions?.canManageProducts === true,
-          canManageQRCodes: permissions?.canManageQRCodes === true,
-          canManageCoAdminRequests: permissions?.canManageCoAdminRequests === true,
-          canManageApplicators: permissions?.canManageApplicators === true,
-          canManageApplicatorProgram: permissions?.canManageApplicatorProgram === true,
-          canPrintQRCodes: permissions?.canPrintQRCodes === true,
-          canViewQRAnalytics: permissions?.canViewQRAnalytics === true,
-          canViewAuditLogs: permissions?.canViewAuditLogs === true,
-          canViewFeedbacks: permissions?.canViewFeedbacks === true,
-          canManageLeads: permissions?.canManageLeads === true
-        }
+        permissions: permissions || {}
       };
 
       if (!_id) {
@@ -8557,8 +8565,38 @@ function App() {
               />
               <Typography variant='body2' color='text.secondary'>Total Users: {users.filter(u => (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com').length}</Typography>
             </Box>
+
+            {selectedCoAdmins.length > 0 && (
+              <Box sx={{ mb: 2, p: 1.5, bgcolor: 'primary.50', borderRadius: 1, border: '1px solid', borderColor: 'primary.200', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" fontWeight={600} color="primary.main">{selectedCoAdmins.length} selected</Typography>
+                
+                <FormControl size="small" sx={{ minWidth: 160, ml: 'auto' }}>
+                  <InputLabel>Apply Template</InputLabel>
+                  <Select label="Apply Template" onChange={(e) => handleBulkCoAdminAction('template', e.target.value)} value="">
+                    <MenuItem value="" disabled>Select template...</MenuItem>
+                    <MenuItem value="read-only">Read Only</MenuItem>
+                    <MenuItem value="content-manager">Content Manager</MenuItem>
+                    <MenuItem value="sales-agent">Sales Agent</MenuItem>
+                    <MenuItem value="full-access">Full Access</MenuItem>
+                    <MenuItem value="clear-all">Clear All</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <Button size="small" variant="outlined" color="success" onClick={() => handleBulkCoAdminAction('status', true)}>Enable</Button>
+                <Button size="small" variant="outlined" color="warning" onClick={() => handleBulkCoAdminAction('status', false)}>Disable</Button>
+                <Button size="small" variant="contained" color="error" onClick={() => handleBulkCoAdminAction('delete')}>Delete</Button>
+              </Box>
+            )}
+
             <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
               <Table><TableHead><TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox 
+                    checked={users.filter(u => (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com').length > 0 && selectedCoAdmins.length === users.filter(u => (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com').length}
+                    indeterminate={selectedCoAdmins.length > 0 && selectedCoAdmins.length < users.filter(u => (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com').length}
+                    onChange={(e) => setSelectedCoAdmins(e.target.checked ? users.filter(u => (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com').map(u => u._id) : [])}
+                  />
+                </TableCell>
                 <TableCell><strong>Username</strong></TableCell>
                 <TableCell><strong>Email</strong></TableCell>
                 <TableCell><strong>Role</strong></TableCell>
@@ -8571,6 +8609,9 @@ function App() {
                   (u.role === 'admin' || u.role === 'co-admin') && u.email !== 'admin@megakem.com' && 
                   (!coAdminSearchQuery || u.username?.toLowerCase().includes(coAdminSearchQuery.toLowerCase()) || u.email?.toLowerCase().includes(coAdminSearchQuery.toLowerCase()))
                 ).map(u => <TableRow key={u._id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                  <TableCell padding="checkbox">
+                    <Checkbox checked={selectedCoAdmins.includes(u._id)} onChange={(e) => setSelectedCoAdmins(prev => e.target.checked ? [...prev, u._id] : prev.filter(id => id !== u._id))} />
+                  </TableCell>
                   <TableCell>
                     <Typography variant='body2' fontWeight={600}>{u.username}</Typography>
                     {u.email === 'admin@megakem.com' && <Chip label='Main Admin' size='small' color='success' sx={{ mt: 0.5, fontSize: '0.65rem' }} />}
@@ -8635,28 +8676,7 @@ function App() {
                           user: { 
                             ...u, 
                             password: '',
-                            permissions: {
-                              canViewDashboard: u.permissions?.canViewDashboard === true,
-                              canViewAdvancedInsights: u.permissions?.canViewAdvancedInsights === true,
-                              canViewScans: u.permissions?.canViewScans === true,
-                              canManageCoAdmins: u.permissions?.canManageCoAdmins === true,
-                              canDelete: u.permissions?.canDelete === true,
-                              canEdit: u.permissions?.canEdit === true,
-                              canExport: u.permissions?.canExport === true,
-                              canManageUsers: u.permissions?.canManageUsers === true,
-                              canViewRewards: u.permissions?.canViewRewards === true,
-                              canViewLeaderboard: u.permissions?.canViewLeaderboard === true,
-                              canManageProducts: u.permissions?.canManageProducts === true,
-                              canManageQRCodes: u.permissions?.canManageQRCodes === true,
-                              canManageCoAdminRequests: u.permissions?.canManageCoAdminRequests === true,
-                              canManageApplicators: u.permissions?.canManageApplicators === true,
-                              canManageApplicatorProgram: u.permissions?.canManageApplicatorProgram === true,
-                              canPrintQRCodes: u.permissions?.canPrintQRCodes === true,
-                              canViewQRAnalytics: u.permissions?.canViewQRAnalytics === true,
-                              canViewAuditLogs: u.permissions?.canViewAuditLogs === true,
-                              canViewFeedbacks: u.permissions?.canViewFeedbacks === true,
-                              canManageLeads: u.permissions?.canManageLeads === true
-                            }
+                            permissions: u.permissions || {}
                           } 
                         })} 
                         title='Edit Permissions'
@@ -11133,447 +11153,131 @@ function App() {
               <Typography variant='subtitle2' sx={{ mt: 2, mb: 1, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Security /> Permissions
               </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, pl: 2 }}>
-                {/* 1. Dashboard */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can View Dashboard</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Dashboard tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canViewDashboard === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canViewDashboard: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
 
-                {/* 1.5. Advanced Insights */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can View Advanced Insights</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Advanced Insights tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canViewAdvancedInsights === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canViewAdvancedInsights: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
+              {/* Helper to update a single permission key */}
+              {(() => {
+                const setPerm = (key, val) => setUserDialog(prev => ({
+                  ...prev,
+                  user: { ...prev.user, permissions: { ...(prev.user?.permissions || {}), [key]: val } }
+                }));
+                const p = userDialog.user?.permissions || {};
 
-                {/* 2. Scans */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can View Scans</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Scans tab</Typography>
+                // Reusable permission row sub-toggle
+                const ActionRow = ({ label, permKey, color = 'primary', disabled = false }) => (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pl: 2, pr: 1, py: 0.5, bgcolor: 'grey.100', borderRadius: 1, opacity: disabled ? 0.4 : 1 }}>
+                    <Typography variant='caption' color='text.secondary'>{label}</Typography>
+                    <Switch size='small' checked={p[permKey] === true} onChange={e => setPerm(permKey, e.target.checked)} color={color} disabled={disabled} />
                   </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canViewScans === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canViewScans: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
+                );
 
-                {/* 3. Co-Admins */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Manage Co-Admins</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Co-Admins tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canManageCoAdmins === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canManageCoAdmins: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
+                // Reusable tab header row
+                const TabHeader = ({ icon, label, permKey, color = 'info', children }) => {
+                  const enabled = p[permKey] === true;
+                  return (
+                    <Box sx={{ border: '1px solid', borderColor: enabled ? `${color}.main` : 'grey.200', borderRadius: 2, overflow: 'hidden', transition: 'all 0.2s' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: enabled ? `${color}.50` : 'grey.50' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography fontSize='1.1rem'>{icon}</Typography>
+                          <Box>
+                            <Typography variant='body2' fontWeight={700}>{label}</Typography>
+                            <Typography variant='caption' color='text.secondary'>Tab access</Typography>
+                          </Box>
+                        </Box>
+                        <Switch checked={enabled} onChange={e => setPerm(permKey, e.target.checked)} color={color} />
+                      </Box>
+                      {children && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, p: 1, bgcolor: 'white' }}>
+                          {React.Children.map(children, child => React.cloneElement(child, { disabled: !enabled }))}
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                };
 
-                {/* 4. Members & Loyalty */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Access Members & Loyalty</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Members & Loyalty tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canManageUsers === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canManageUsers: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='warning' 
-                  />
-                </Box>
+                return (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
 
-                {/* 5. Cash Rewards */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can View Cash Rewards</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Cash Rewards tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canViewRewards === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canViewRewards: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='primary' 
-                  />
-                </Box>
+                    {/* Dashboard */}
+                    <TabHeader icon="📊" label="Dashboard" permKey="canViewDashboard" color="info" />
 
-                {/* 6. Leaderboard */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can View Leaderboard</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Leaderboard tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canViewLeaderboard === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canViewLeaderboard: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
+                    {/* Advanced Insights */}
+                    <TabHeader icon="📈" label="Insights & Leads" permKey="canViewAdvancedInsights" color="info" />
 
-                {/* 7. Products */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Manage Products</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Products tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canManageProducts === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canManageProducts: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='success' 
-                  />
-                </Box>
+                    {/* Scans */}
+                    <TabHeader icon="🔍" label="Scans" permKey="canViewScans" color="info">
+                      <ActionRow label="➕ Create Scans" permKey="canCreateScans" color="success" />
+                      <ActionRow label="✏️ Edit Scans" permKey="canEditScans" color="warning" />
+                      <ActionRow label="🗑️ Delete Scans" permKey="canDeleteScans" color="error" />
+                      <ActionRow label="📤 Export Scans" permKey="canExportScans" color="primary" />
+                    </TabHeader>
 
-                {/* 8. QR Codes */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Manage QR Codes</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the QR Codes tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canManageQRCodes === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canManageQRCodes: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='secondary' 
-                  />
-                </Box>
+                    {/* Co-Admins */}
+                    <TabHeader icon="👥" label="Co-Admins" permKey="canManageCoAdmins" color="info" />
 
-                {/* 8b. Print QR Codes */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Print QR Codes</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to print QR codes</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canPrintQRCodes === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canPrintQRCodes: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='secondary' 
-                  />
-                </Box>
+                    {/* Members & Loyalty */}
+                    <TabHeader icon="🧑" label="Members & Loyalty" permKey="canManageUsers" color="warning">
+                      <ActionRow label="➕ Create Members" permKey="canCreateMembers" color="success" />
+                      <ActionRow label="✏️ Edit Members" permKey="canEditMembers" color="warning" />
+                      <ActionRow label="🗑️ Delete Members" permKey="canDeleteMembers" color="error" />
+                      <ActionRow label="📤 Export Members" permKey="canExportMembers" color="primary" />
+                    </TabHeader>
 
-                {/* 8c. QR Analytics */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can View QR Analytics</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to view QR code analytics</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canViewQRAnalytics === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canViewQRAnalytics: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
+                    {/* Cash Rewards */}
+                    <TabHeader icon="🎁" label="Cash Rewards" permKey="canViewRewards" color="success">
+                      <ActionRow label="➕ Create Rewards" permKey="canCreateRewards" color="success" />
+                      <ActionRow label="✏️ Edit Rewards" permKey="canEditRewards" color="warning" />
+                      <ActionRow label="🗑️ Delete Rewards" permKey="canDeleteRewards" color="error" />
+                    </TabHeader>
 
-                {/* 9. Co-Admin Requests */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Access Reprint Requests</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Reprint Requests tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canManageCoAdminRequests === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canManageCoAdminRequests: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='warning' 
-                  />
-                </Box>
+                    {/* Leaderboard */}
+                    <TabHeader icon="🏆" label="Leaderboard" permKey="canViewLeaderboard" color="info" />
 
-                {/* 10. Applicator & Hardware */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Manage Applicator & Hardware Info</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Applicator & Hardware tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canManageApplicators === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canManageApplicators: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
+                    {/* Products */}
+                    <TabHeader icon="📦" label="Products" permKey="canManageProducts" color="success">
+                      <ActionRow label="➕ Create Products" permKey="canCreateProducts" color="success" />
+                      <ActionRow label="✏️ Edit Products" permKey="canEditProducts" color="warning" />
+                      <ActionRow label="🗑️ Delete Products" permKey="canDeleteProducts" color="error" />
+                    </TabHeader>
 
-                {/* 10b. Applicator Program */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Access Applicator Program</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Applicator Program tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canManageApplicatorProgram === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canManageApplicatorProgram: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='secondary' 
-                  />
-                </Box>
+                    {/* QR Codes */}
+                    <TabHeader icon="🔲" label="QR Codes" permKey="canManageQRCodes" color="secondary">
+                      <ActionRow label="➕ Create QR Codes" permKey="canCreateQRCodes" color="success" />
+                      <ActionRow label="✏️ Edit QR Codes" permKey="canEditQRCodes" color="warning" />
+                      <ActionRow label="🗑️ Delete QR Codes" permKey="canDeleteQRCodes" color="error" />
+                      <ActionRow label="🖨️ Print QR Codes" permKey="canPrintQRCodes" color="secondary" />
+                      <ActionRow label="📉 View QR Analytics" permKey="canViewQRAnalytics" color="info" />
+                    </TabHeader>
 
-                {/* Audit Logs */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can View Audit Logs</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Audit Logs tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canViewAuditLogs === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canViewAuditLogs: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
+                    {/* Reprint Requests */}
+                    <TabHeader icon="📋" label="Reprint Requests" permKey="canManageCoAdminRequests" color="warning" />
 
-                {/* Feedbacks */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can View Feedbacks</Typography>
-                    <Typography variant='caption' color='text.secondary'>Access permission for the Feedbacks tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canViewFeedbacks === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canViewFeedbacks: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
+                    {/* Applicator & Hardware */}
+                    <TabHeader icon="🔧" label="Applicator & Hardware" permKey="canManageApplicators" color="info">
+                      <ActionRow label="➕ Create Applicators" permKey="canCreateApplicators" color="success" />
+                      <ActionRow label="✏️ Edit Applicators" permKey="canEditApplicators" color="warning" />
+                      <ActionRow label="🗑️ Delete Applicators" permKey="canDeleteApplicators" color="error" />
+                    </TabHeader>
 
-                {/* Manage Leads */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Manage Leads</Typography>
-                    <Typography variant='caption' color='text.secondary'>Manage purchase intents and CRM</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canManageLeads === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canManageLeads: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='info' 
-                  />
-                </Box>
+                    {/* Applicator Program */}
+                    <TabHeader icon="⭐" label="Applicator Program" permKey="canManageApplicatorProgram" color="secondary" />
 
-                {/* Edit Records */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Edit Records</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to edit records across tabs</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canEdit === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canEdit: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='warning' 
-                  />
-                </Box>
+                    {/* Audit Logs */}
+                    <TabHeader icon="🔐" label="Audit Logs" permKey="canViewAuditLogs" color="info" />
 
-                {/* Delete Records */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Delete Records</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to delete scans in Scans tab</Typography>
-                  </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canDelete === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canDelete: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='error' 
-                  />
-                </Box>
+                    {/* Feedbacks */}
+                    <TabHeader icon="💬" label="Feedbacks" permKey="canViewFeedbacks" color="info" />
 
-                {/* 12. Export Data */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant='body2' fontWeight={600}>Can Export Data</Typography>
-                    <Typography variant='caption' color='text.secondary'>Permission to export reports and data sheets</Typography>
+                    {/* Manage Leads */}
+                    <TabHeader icon="🎯" label="Manage Leads" permKey="canManageLeads" color="info">
+                      <ActionRow label="➕ Create Leads" permKey="canCreateLeads" color="success" />
+                      <ActionRow label="✏️ Edit Leads" permKey="canEditLeads" color="warning" />
+                      <ActionRow label="🗑️ Delete Leads" permKey="canDeleteLeads" color="error" />
+                      <ActionRow label="📤 Export Leads" permKey="canExportLeads" color="primary" />
+                    </TabHeader>
+
                   </Box>
-                  <Switch 
-                    checked={userDialog.user?.permissions?.canExport === true} 
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUserDialog(prev => ({ 
-                        ...prev, 
-                        user: { 
-                          ...prev.user, 
-                          permissions: { ...(prev.user?.permissions || {}), canExport: checked } 
-                        } 
-                      }));
-                    }} 
-                    color='primary' 
-                  />
-                </Box>
-              </Box>
+                );
+              })()}
             </DialogContent>
             <DialogActions><Button onClick={() => setUserDialog({ open: false, user: null })}>Cancel</Button><Button variant='contained' onClick={handleCreateUser} disabled={loading} startIcon={loading ? <CircularProgress size={20} color='inherit' /> : (userDialog.user?._id ? <Save /> : <Add />)}>{loading ? (userDialog.user?._id ? 'Saving...' : 'Creating...') : (userDialog.user?._id ? 'Save Changes' : 'Create User')}</Button></DialogActions>
           </Dialog>

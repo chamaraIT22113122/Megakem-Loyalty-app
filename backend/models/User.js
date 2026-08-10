@@ -46,86 +46,68 @@ const userSchema = new mongoose.Schema({
     min: 0
   },
   permissions: {
-    canViewDashboard: {
-      type: Boolean,
-      default: true
-    },
-    canViewAdvancedInsights: {
-      type: Boolean,
-      default: false
-    },
-    canViewScans: {
-      type: Boolean,
-      default: false
-    },
-    canManageCoAdmins: {
-      type: Boolean,
-      default: false
-    },
-    canDelete: {
-      type: Boolean,
-      default: false
-    },
-    canEdit: {
-      type: Boolean,
-      default: false
-    },
-    canExport: {
-      type: Boolean,
-      default: false
-    },
-    canManageUsers: {
-      type: Boolean,
-      default: false
-    },
-    canViewRewards: {
-      type: Boolean,
-      default: false
-    },
-    canViewLeaderboard: {
-      type: Boolean,
-      default: false
-    },
-    canManageProducts: {
-      type: Boolean,
-      default: false
-    },
-    canManageQRCodes: {
-      type: Boolean,
-      default: false
-    },
-    canManageCoAdminRequests: {
-      type: Boolean,
-      default: false
-    },
-    canManageApplicators: {
-      type: Boolean,
-      default: false
-    },
-    canManageApplicatorProgram: {
-      type: Boolean,
-      default: false
-    },
-    canPrintQRCodes: {
-      type: Boolean,
-      default: false
-    },
-    canViewQRAnalytics: {
-      type: Boolean,
-      default: false
-    },
-    canViewAuditLogs: {
-      type: Boolean,
-      default: false
-    },
-    canViewFeedbacks: {
-      type: Boolean,
-      default: false
-    },
-    canManageLeads: {
-      type: Boolean,
-      default: false
-    }
+    // ─── Tab Access Permissions ────────────────────────────────────
+    canViewDashboard:         { type: Boolean, default: true },
+    canViewAdvancedInsights:  { type: Boolean, default: false },
+    canViewScans:             { type: Boolean, default: false },
+    canManageCoAdmins:        { type: Boolean, default: false },
+    canManageUsers:           { type: Boolean, default: false },
+    canViewRewards:           { type: Boolean, default: false },
+    canViewLeaderboard:       { type: Boolean, default: false },
+    canManageProducts:        { type: Boolean, default: false },
+    canManageQRCodes:         { type: Boolean, default: false },
+    canManageCoAdminRequests: { type: Boolean, default: false },
+    canManageApplicators:     { type: Boolean, default: false },
+    canManageApplicatorProgram: { type: Boolean, default: false },
+    canPrintQRCodes:          { type: Boolean, default: false },
+    canViewQRAnalytics:       { type: Boolean, default: false },
+    canViewAuditLogs:         { type: Boolean, default: false },
+    canViewFeedbacks:         { type: Boolean, default: false },
+    canManageLeads:           { type: Boolean, default: false },
+
+    // ─── Global Action Permissions (legacy - kept for compatibility) ─
+    canEdit:   { type: Boolean, default: false },
+    canDelete: { type: Boolean, default: false },
+    canExport: { type: Boolean, default: false },
+
+    // ─── Per-Tab Action Permissions ────────────────────────────────
+    // Members tab
+    canCreateMembers: { type: Boolean, default: false },
+    canEditMembers:   { type: Boolean, default: false },
+    canDeleteMembers: { type: Boolean, default: false },
+    canExportMembers: { type: Boolean, default: false },
+
+    // Scans tab
+    canCreateScans: { type: Boolean, default: false },
+    canEditScans:   { type: Boolean, default: false },
+    canDeleteScans: { type: Boolean, default: false },
+    canExportScans: { type: Boolean, default: false },
+
+    // Products tab
+    canCreateProducts: { type: Boolean, default: false },
+    canEditProducts:   { type: Boolean, default: false },
+    canDeleteProducts: { type: Boolean, default: false },
+
+    // QR Codes tab
+    canCreateQRCodes: { type: Boolean, default: false },
+    canEditQRCodes:   { type: Boolean, default: false },
+    canDeleteQRCodes: { type: Boolean, default: false },
+
+    // Applicators tab
+    canCreateApplicators: { type: Boolean, default: false },
+    canEditApplicators:   { type: Boolean, default: false },
+    canDeleteApplicators: { type: Boolean, default: false },
+
+    // Leads / Purchase Intents tab
+    canCreateLeads: { type: Boolean, default: false },
+    canEditLeads:   { type: Boolean, default: false },
+    canDeleteLeads: { type: Boolean, default: false },
+    canExportLeads: { type: Boolean, default: false },
+
+    // Cash Rewards tab
+    canCreateRewards: { type: Boolean, default: false },
+    canEditRewards:   { type: Boolean, default: false },
+    canDeleteRewards: { type: Boolean, default: false },
   },
   adminType: {
     type: String,
