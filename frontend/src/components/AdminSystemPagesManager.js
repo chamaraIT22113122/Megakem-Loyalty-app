@@ -454,13 +454,14 @@ const AdminSystemPagesManager = ({
                   <TextField
                     fullWidth
                     size="small"
-                    type="datetime-local"
+                    type="text"
                     label="Scheduled Completion Date & Time"
                     InputLabelProps={{ shrink: true }}
                     value={maintenance.scheduledEndTime || ''}
                     onChange={(e) => setMaintenance({ ...maintenance, scheduledEndTime: e.target.value })}
                     sx={{ mb: 1 }}
-                    helperText="Pick date & time from calendar to enable live ticking countdown"
+                    placeholder="e.g. Sunday 2pm to 4pm or 2026-08-10T14:00"
+                    helperText="Describe maintenance end time (free-text or ISO format for countdown timer)"
                   />
                   <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', mb: 2 }}>
                     <Chip 

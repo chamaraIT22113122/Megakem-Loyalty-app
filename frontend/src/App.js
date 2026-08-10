@@ -4336,20 +4336,22 @@ function App() {
           <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: { xs: '0.55rem', sm: '0.65rem' }, opacity: 0.9, display: { xs: 'none', sm: 'block' } }}>WHERE TRUST MEETS EXCELLENCE</Typography>
         </Box>
         {adminAuth && view === 'admin' && (
-          <Tooltip title={isMainAdmin() ? "Pending Requests" : "My Requests & Notifications"}>
-            <IconButton 
-              color='inherit' 
-              onClick={(e) => setNotificationAnchorEl(e.currentTarget)}
-              sx={{ 
-                mr: 2, 
-                bgcolor: 'rgba(255,255,255,0.1)', 
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
-              }}
-            >
-              <Badge badgeContent={isMainAdmin() ? (pendingRequestsCount + pendingFeedbacksCount) : (coAdminApprovedCount + (hasPermission('canViewFeedbacks') ? pendingFeedbacksCount : 0))} color="error">
-                <Notifications />
-              </Badge>
-            </IconButton>
+          <>
+            <Tooltip title={isMainAdmin() ? "Pending Requests" : "My Requests & Notifications"}>
+              <IconButton 
+                color='inherit' 
+                onClick={(e) => setNotificationAnchorEl(e.currentTarget)}
+                sx={{ 
+                  mr: 2, 
+                  bgcolor: 'rgba(255,255,255,0.1)', 
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+                }}
+              >
+                <Badge badgeContent={isMainAdmin() ? (pendingRequestsCount + pendingFeedbacksCount) : (coAdminApprovedCount + (hasPermission('canViewFeedbacks') ? pendingFeedbacksCount : 0))} color="error">
+                  <Notifications />
+                </Badge>
+              </IconButton>
+            </Tooltip>
             <Menu
               anchorEl={notificationAnchorEl}
               open={Boolean(notificationAnchorEl)}
@@ -4396,7 +4398,7 @@ function App() {
                  <MenuItem disabled>No new notifications</MenuItem>
               )}
             </Menu>
-          </Tooltip>
+          </>
         )}
         {adminAuth && view === 'admin' && (
           <Button color='inherit' onClick={handleAdminLogout} sx={{ mr: 1, bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}>Logout</Button>

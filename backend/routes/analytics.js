@@ -44,12 +44,20 @@ router.get('/dashboard', protect, hasPermission('canViewDashboard'), async (req,
     ]);
 
     // Top products
-    const topProducts = await Scan.aggregate([
+    let topProducts = await Scan.aggregate([
       { $match: dateFilter },
       { $group: { _id: '$productName', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
     ]);
+    // If date filter returns nothing, fall back to all-time data
+    if (topProducts.length === 0 && Object.keys(dateFilter).length > 0) {
+      topProducts = await Scan.aggregate([
+        { $group: { _id: '$productName', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]);
+    }
 
     // Daily scan trends
     const dailyTrends = await Scan.aggregate([
