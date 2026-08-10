@@ -39,6 +39,9 @@ const AdminSystemPagesManager = ({
 }) => {
   const [activeTab, setActiveTab] = useState(0);
 
+  // Global Settings State
+  const [whatsappLeadNumber, setWhatsappLeadNumber] = useState('94760241288');
+
   // Advanced Maintenance State
   const [maintenance, setMaintenance] = useState({
     enabled: false,
@@ -95,6 +98,9 @@ const AdminSystemPagesManager = ({
 
   useEffect(() => {
     if (loyaltyConfig) {
+      if (loyaltyConfig.whatsappLeadNumber) {
+        setWhatsappLeadNumber(loyaltyConfig.whatsappLeadNumber);
+      }
       if (loyaltyConfig.maintenanceNotice) {
         setMaintenance(prev => ({ 
           ...prev, 
@@ -129,6 +135,7 @@ const AdminSystemPagesManager = ({
 
   const handleSaveAll = async () => {
     const payload = {
+      whatsappLeadNumber,
       maintenanceNotice: maintenance,
       pageConfig403: config403,
       pageConfig404: config404,
@@ -283,8 +290,34 @@ const AdminSystemPagesManager = ({
           <Tab icon={<Security fontSize="small" />} iconPosition="start" label="🔒 Custom 403" />
           <Tab icon={<SearchOff fontSize="small" />} iconPosition="start" label="🔍 Custom 404" />
           <Tab icon={<RocketLaunch fontSize="small" />} iconPosition="start" label="🚀 Coming Soon" />
+          <Tab icon={<Build fontSize="small" />} iconPosition="start" label="⚙️ Global Settings" />
         </Tabs>
       </Paper>
+
+      {/* TAB 4: GLOBAL SETTINGS */}
+      {activeTab === 4 && (
+        <Grid container spacing={{ xs: 2, md: 3 }}>
+          <Grid item xs={12} md={7}>
+            <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3.5, border: '1px solid #e2e8f0' }}>
+              <Typography variant="h6" fontWeight="800" sx={{ color: '#003366', mb: 2, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+                Global App Settings
+              </Typography>
+              
+              <Box sx={{ mb: 3 }}>
+                <TextField
+                  fullWidth
+                  label="WhatsApp Lead Number"
+                  value={whatsappLeadNumber}
+                  onChange={(e) => setWhatsappLeadNumber(e.target.value)}
+                  placeholder="e.g. 94760241288"
+                  helperText="The default WhatsApp number used when a user clicks 'Order via WhatsApp'."
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      )}
 
       {/* TAB 0: MAINTENANCE & BANNER */}
       {activeTab === 0 && (

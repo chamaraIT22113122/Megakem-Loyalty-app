@@ -189,6 +189,11 @@ const loyaltyConfigSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // WhatsApp Lead Settings
+  whatsappLeadNumber: {
+    type: String,
+    default: '94760241288'
+  },
   // Advanced System Maintenance Configuration
   maintenanceNotice: {
     enabled: { type: Boolean, default: false },

@@ -3569,12 +3569,15 @@ function App() {
       localStorage.setItem('megakem_visitor_id', visitorId);
     }
     
+    // Get custom WhatsApp number or fallback
+    const targetWhatsAppNumber = loyaltyConfig?.whatsappLeadNumber || '94760241288';
+    
     let inquiryNumber = '';
     try {
       const response = await api.post('/analytics/purchase-intent', {
         productId: product._id,
         name: 'WhatsApp Lead',
-        mobile: '',
+        mobile: targetWhatsAppNumber, // This makes it show in the Leads Management table
         memberId: user ? user.id : '',
         visitorId
       });
@@ -3588,7 +3591,9 @@ function App() {
       text += ` Inquiry No: ${inquiryNumber}`;
     }
     
-    window.open(`https://wa.me/94760241288?text=${encodeURIComponent(text)}`, '_blank');
+    // Clean up the number just in case there are pluses or spaces, then open WhatsApp
+    const cleanedNumber = targetWhatsAppNumber.replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/${cleanedNumber}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const handleUpdateProfile = async () => {
