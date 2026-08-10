@@ -3557,6 +3557,35 @@ function App() {
     processPendingScan();
   }, [pendingScan, role, view, products, cart]);
 
+  const handleWhatsAppClick = async (product) => {
+    let visitorId = localStorage.getItem('megakem_visitor_id');
+    if (!visitorId) {
+      visitorId = 'visitor_' + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('megakem_visitor_id', visitorId);
+    }
+    
+    let inquiryNumber = '';
+    try {
+      const response = await api.post('/analytics/purchase-intent', {
+        productId: product._id,
+        name: 'WhatsApp Lead',
+        mobile: '',
+        memberId: user ? user.id : '',
+        visitorId
+      });
+      inquiryNumber = response.data?.data?.inquiryNumber;
+    } catch(e) {
+      console.error('Error logging WhatsApp purchase intent:', e);
+    }
+    
+    let text = `Hello Dinithi, I am interested in your product: ${product.name}.`;
+    if (inquiryNumber) {
+      text += ` Inquiry No: ${inquiryNumber}`;
+    }
+    
+    window.open(`https://wa.me/94760241288?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
   const handleUpdateProfile = async () => {
     if (!profileData.username || !profileData.email) return showNotification('Please enter username and email', 'error');
     if (!isValidEmail(profileData.email)) return showNotification('Please enter a valid email address', 'error');
@@ -4965,9 +4994,7 @@ function App() {
                             size="small" 
                             variant="contained" 
                             startIcon={<ShoppingCart sx={{ fontSize: { xs: '0.85rem !important', sm: '1rem !important' } }} />} 
-                            href={p.buyUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            onClick={() => setLeadDialog({ open: true, product: p, loading: false })}
                             sx={{ borderRadius: '6px', fontWeight: 800, fontSize: { xs: '0.65rem', sm: '0.75rem' }, textTransform: 'none', py: { xs: 0.4, sm: 0.8 }, background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0, 51, 102, 0.25)', '&:hover': { background: 'linear-gradient(135deg, #002244 0%, #0096B8 100%)' } }}
                           >
                             Buy Online
@@ -4978,7 +5005,7 @@ function App() {
                             size="small" 
                             variant="contained" 
                             startIcon={<WhatsApp sx={{ fontSize: { xs: '0.85rem !important', sm: '1rem !important' } }} />} 
-                            onClick={() => window.open(`https://wa.me/94760241288?text=Hello%20Dinithi,%20I%20am%20interested%20in%20your%20product:%20${encodeURIComponent(p.name)}`, '_blank')}
+                            onClick={() => handleWhatsAppClick(p)}
                             sx={{ borderRadius: '6px', fontWeight: 800, fontSize: { xs: '0.65rem', sm: '0.75rem' }, textTransform: 'none', py: { xs: 0.4, sm: 0.8 }, background: 'linear-gradient(135deg, #128C7E 0%, #25D366 100%)', color: 'white', boxShadow: '0 4px 12px rgba(37, 211, 102, 0.25)', '&:hover': { background: 'linear-gradient(135deg, #075E54 0%, #128C7E 100%)' } }}
                           >
                             Order via WhatsApp
@@ -5133,9 +5160,7 @@ function App() {
                               variant="contained" 
                               size="large" 
                               startIcon={<ShoppingCart />} 
-                              href={selectedProductCatalogDialog.product.buyUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              onClick={() => setLeadDialog({ open: true, product: selectedProductCatalogDialog.product })}
                               sx={{ borderRadius: 2, fontWeight: 800, px: 3, py: 1.2, background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', color: 'white', boxShadow: '0 4px 15px rgba(56, 239, 125, 0.4)' }}
                             >
                               Buy Now / Order Online
@@ -5146,7 +5171,7 @@ function App() {
                               color="secondary"
                               size="large" 
                               startIcon={<WhatsApp />} 
-                              onClick={() => window.open(`https://wa.me/94760241288?text=Hello%20Dinithi,%20I%20am%20interested%20in%20your%20product:%20${encodeURIComponent(selectedProductCatalogDialog.product.name)}`, '_blank')}
+                              onClick={() => handleWhatsAppClick(selectedProductCatalogDialog.product)}
                               sx={{ borderRadius: 2, fontWeight: 800, px: 3, py: 1.2, background: 'linear-gradient(135deg, #128C7E 0%, #25D366 100%)', color: 'white', boxShadow: '0 4px 15px rgba(37, 211, 102, 0.4)', '&:hover': { background: 'linear-gradient(135deg, #075E54 0%, #128C7E 100%)' } }}
                             >
                               Order via WhatsApp
@@ -14944,12 +14969,17 @@ function App() {
           
           setLeadDialog({ open: false, product: null, loading: false });
           
-          const url = leadDialog.product.buyUrl?.trim() || 'https://megakem.lk';
-          const trackingUrl = url.includes('?') 
-            ? `${url}&utm_source=megakem_loyalty_app&utm_medium=button&utm_campaign=product_catalog` 
-            : `${url}?utm_source=megakem_loyalty_app&utm_medium=button&utm_campaign=product_catalog`;
+          let finalUrl;
+          if (leadDialog.product.buyUrl?.trim()) {
+            const url = leadDialog.product.buyUrl.trim();
+            finalUrl = url.includes('?') 
+              ? `${url}&utm_source=megakem_loyalty_app&utm_medium=button&utm_campaign=product_catalog` 
+              : `${url}?utm_source=megakem_loyalty_app&utm_medium=button&utm_campaign=product_catalog`;
+          } else {
+            finalUrl = `https://wa.me/94760241288?text=Hello%20Dinithi,%20I%20am%20interested%20in%20your%20product:%20${encodeURIComponent(leadDialog.product.name)}`;
+          }
             
-          window.open(trackingUrl, '_blank');
+          window.open(finalUrl, '_blank');
         }}
       />
       <TrafficTracker view={view} subView={view === 'admin' ? adminTab : ''} />

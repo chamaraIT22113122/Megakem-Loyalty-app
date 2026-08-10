@@ -10,6 +10,10 @@ const purchaseIntentSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  inquiryNumber: {
+    type: String,
+    trim: true
+  },
   mobile: {
     type: String,
     trim: true

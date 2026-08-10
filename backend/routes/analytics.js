@@ -615,7 +615,15 @@ router.post('/purchase-intent', async (req, res) => {
       }
     }
 
+    let inquiryNumber = 'INQ-' + Math.floor(100000 + Math.random() * 900000);
+    let exists = await PurchaseIntent.findOne({ inquiryNumber });
+    while (exists) {
+      inquiryNumber = 'INQ-' + Math.floor(100000 + Math.random() * 900000);
+      exists = await PurchaseIntent.findOne({ inquiryNumber });
+    }
+
     const intent = await PurchaseIntent.create({
+      inquiryNumber,
       product: productId,
       name,
       mobile,

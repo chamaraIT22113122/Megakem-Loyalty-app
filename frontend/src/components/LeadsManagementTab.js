@@ -224,16 +224,16 @@ function LeadsManagementTab({ onShowNotification }) {
                         {lead.name || lead.member?.username || lead.member?.memberName || lead.member?.name || <Box component="span" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>Anonymous</Box>}
                       </Typography>
                       <Typography variant="caption" display="block" color="text.secondary">
-                        {lead.mobile || lead.member?.phone || lead.member?.whatsappNumber || lead.member?.mobile || lead.memberId || 'No Contact Info'}
+                        {lead.mobile || lead.member?.phone || lead.member?.whatsappNumber || lead.member?.mobile || (lead.memberId && lead.memberId.length < 20 ? lead.memberId : null) || 'No Contact Info'}
                       </Typography>
-                      {lead.memberId && !lead.member && (
-                        <Typography variant="caption" display="block" color="warning.main">
-                          (Unlinked ID: {lead.memberId})
-                        </Typography>
-                      )}
-                      {lead.member && (
-                        <Chip size="small" label="Registered" color="success" variant="outlined" sx={{ height: 16, fontSize: '0.6rem', mt: 0.5 }} />
-                      )}
+                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                        {lead.inquiryNumber && (
+                          <Chip size="small" label={lead.inquiryNumber} color="primary" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 'bold' }} />
+                        )}
+                        {lead.member && (
+                          <Chip size="small" label="Registered" color="success" variant="outlined" sx={{ height: 18, fontSize: '0.65rem' }} />
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">{new Date(lead.createdAt).toLocaleDateString()}</Typography>
