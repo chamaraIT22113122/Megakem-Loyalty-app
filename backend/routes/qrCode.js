@@ -505,6 +505,8 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
       }
     ]);
 
+
+
     // Group raw summary by prefix (excluding package number)
     const grouped = {};
     rawSummary.forEach(item => {
@@ -607,6 +609,53 @@ router.get('/batches/summary', protect, qrAdmin, async (req, res) => {
     });
 
     res.json(batchSummary);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+// Get print history for a specific batch prefix
+router.get('/batches/:prefix/print-history', protect, qrAdmin, async (req, res) => {
+  try {
+    const { prefix } = req.params;
+    
+    // We look for QR codes that start with the batch prefix and are printed or scanned
+    // Using regex to match any batchNo that starts with this prefix
+    const history = await QRCodeModel.aggregate([
+      { 
+        $match: { 
+          batchNo: new RegExp(`^${prefix}`),
+          $or: [{ status: 'printed' }, { status: 'scanned' }]
+        } 
+      },
+      {
+        $group: {
+          _id: '$printedDate',
+          count: { $sum: 1 },
+          printedBy: { $first: '$printedBy' },
+          printerModel: { $first: '$printerModel' }
+        }
+      },
+      { $sort: { _id: -1 } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'printedBy',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: '$_id',
+          count: 1,
+          printerModel: 1,
+          printedBy: { $arrayElemAt: ['$user.username', 0] }
+        }
+      }
+    ]);
+
+    res.json(history);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

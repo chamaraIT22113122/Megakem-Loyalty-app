@@ -27,6 +27,7 @@ import {
   Paper,
   Alert,
   Checkbox,
+  Switch,
   FormControlLabel,
   Chip,
   IconButton,
@@ -54,6 +55,7 @@ import {
   Search,
   Settings,
   KeyboardArrowDown,
+  History,
   KeyboardArrowUp
 } from '@mui/icons-material';
 import { Collapse } from '@mui/material';
@@ -227,6 +229,10 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
   const [deleteRangeStart, setDeleteRangeStart] = useState('');
   const [deleteRangeEnd, setDeleteRangeEnd] = useState('');
   const [bulkDeleteBatchNo, setBulkDeleteBatchNo] = useState('');
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedBatchHistory, setSelectedBatchHistory] = useState(null);
+  const [printHistoryData, setPrintHistoryData] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedQRCode, setSelectedQRCode] = useState(null);
   
   // Reprint request states
@@ -994,6 +1000,20 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       onShowNotification('Error loading batch details', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewHistory = async (batch) => {
+    setSelectedBatchHistory(batch);
+    setHistoryDialogOpen(true);
+    setHistoryLoading(true);
+    try {
+      const response = await qrCodesAPI.getPrintHistory(batch._id);
+      setPrintHistoryData(response.data);
+    } catch (err) {
+      onShowNotification('Error loading print history: ' + (err.response?.data?.error || err.message), 'error');
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -2484,9 +2504,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                     )}
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>First Generated Time</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Last Print Time</TableCell>
-                    {isMainAdmin && (
-                      <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                    )}
+                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -2579,23 +2597,30 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                         <TableCell align="right">
                           {formatPerfectTime(batch.lastPrintDate, 'N/A')}
                         </TableCell>
-                        {isMainAdmin && (
-                          <TableCell align="center">
-                            <Tooltip title="Edit Batch">
-                              <IconButton size="small" color="primary" onClick={() => openEditBatch(batch._id)}>
-                                <Edit fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete Batch">
-                              <IconButton size="small" color="error" onClick={() => {
-                                setBulkDeleteBatchNo(batch._id);
-                                setOpenBulkDeleteDialog(true);
-                              }}>
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
-                        )}
+                        <TableCell align="center">
+                          <Tooltip title="View Print History">
+                            <IconButton size="small" color="info" onClick={() => handleViewHistory(batch)}>
+                              <History fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {isMainAdmin && (
+                            <>
+                              <Tooltip title="Edit Batch">
+                                <IconButton size="small" color="primary" onClick={() => openEditBatch(batch._id)}>
+                                  <Edit fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete Batch">
+                                <IconButton size="small" color="error" onClick={() => {
+                                  setBulkDeleteBatchNo(batch._id);
+                                  setOpenBulkDeleteDialog(true);
+                                }}>
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -2997,6 +3022,83 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
             startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <DeleteIcon />}
           >
             {loading ? 'Deleting...' : 'Delete All in Batch'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Print History Dialog */}
+      <Dialog open={historyDialogOpen} onClose={() => setHistoryDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Batch Details & Print History: {selectedBatchHistory?._id}</DialogTitle>
+        <DialogContent dividers>
+          
+          {selectedBatchHistory && (
+            <Box sx={{ mb: 4, p: 3, bgcolor: 'background.default', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+              <Grid container spacing={3}>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="textSecondary" display="block">Product</Typography>
+                  <Typography variant="body2" fontWeight="bold">{selectedBatchHistory.product || 'N/A'}</Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="textSecondary" display="block">Total QR Codes</Typography>
+                  <Typography variant="body2" fontWeight="bold">{selectedBatchHistory.totalQRs || 0}</Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="textSecondary" display="block">Total Printed</Typography>
+                  <Typography variant="body2" fontWeight="bold" color="primary">{selectedBatchHistory.printed || 0}</Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="textSecondary" display="block">Total Scanned</Typography>
+                  <Typography variant="body2" fontWeight="bold" color="success.main">{selectedBatchHistory.scanned || 0}</Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="textSecondary" display="block">Manufacturing Date</Typography>
+                  <Typography variant="body2">{formatPerfectTime(selectedBatchHistory.manufactureDate, 'N/A')}</Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="textSecondary" display="block">Expiry Date</Typography>
+                  <Typography variant="body2">{formatPerfectTime(selectedBatchHistory.minExpiryDate, 'N/A')}</Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>Print History Logs</Typography>
+
+          {historyLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : printHistoryData.length === 0 ? (
+            <Alert severity="info">No print history available for this batch.</Alert>
+          ) : (
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead sx={{ backgroundColor: 'grey.100' }}>
+                  <TableRow>
+                    <TableCell><strong>Print Date & Time</strong></TableCell>
+                    <TableCell align="center"><strong>Quantity Printed</strong></TableCell>
+                    <TableCell><strong>Printed By</strong></TableCell>
+                    <TableCell><strong>Printer Model</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {printHistoryData.map((record, index) => (
+                    <TableRow key={index} hover>
+                      <TableCell>{new Date(record.date).toLocaleString()}</TableCell>
+                      <TableCell align="center">
+                        <Chip label={`${record.count} QR Codes`} size="small" color="primary" />
+                      </TableCell>
+                      <TableCell>{record.printedBy || 'Unknown User'}</TableCell>
+                      <TableCell>{record.printerModel || 'Zebra ZD320'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHistoryDialogOpen(false)} color="primary">
+            Close
           </Button>
         </DialogActions>
       </Dialog>

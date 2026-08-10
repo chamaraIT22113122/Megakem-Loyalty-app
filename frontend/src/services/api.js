@@ -241,6 +241,7 @@ export const qrCodesAPI = {
   getScanLogs: (params) => api.get('/qr-codes/scan-logs', { params }),
   getPrintLayout: (target = 'loyalty') => api.get(`/qr-codes/settings/print-layout?target=${target}`),
   savePrintLayout: (settings) => api.put('/qr-codes/settings/print-layout', settings),
+  getPrintHistory: (prefix) => api.get(`/qr-codes/batches/${prefix}/print-history`),
 };
 
 // Upload API
