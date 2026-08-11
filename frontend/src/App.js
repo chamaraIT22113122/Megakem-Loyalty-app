@@ -7746,7 +7746,7 @@ function App() {
               </Box>
             </Box></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>💎 Tier Distribution</Typography><Box sx={{ mt: 2 }}>{(() => {
+            <Grid item xs={12} md={isMainAdmin() ? 4 : 6}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>💎 Tier Distribution</Typography><Box sx={{ mt: 2 }}>{(() => {
               const tierCounts = filteredDashboardScans.reduce((acc, scan) => {
                 const member = members.find(m => m.memberId === scan.memberId);
                 const tier = member?.tier || 'bronze';
@@ -7774,7 +7774,7 @@ function App() {
               ));
             })()}</Box></CardContent></Card></Grid>
 
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📊 Member Activity Ranking</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Rank</TableCell><TableCell sx={{ fontWeight: 700 }}>Member</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Role</TableCell></TableRow></TableHead><TableBody>{(() => {
+            <Grid item xs={12} md={isMainAdmin() ? 4 : 6}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}><CardContent><Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>📊 Member Activity Ranking</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell sx={{ fontWeight: 700 }}>Rank</TableCell><TableCell sx={{ fontWeight: 700 }}>Member</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Total Scans</TableCell><TableCell align='right' sx={{ fontWeight: 700 }}>Role</TableCell></TableRow></TableHead><TableBody>{(() => {
               const memberStats = filteredDashboardScans.reduce((acc, scan) => {
                 const key = scan.memberId || 'unknown';
                 if (!acc[key]) {
@@ -7796,29 +7796,31 @@ function App() {
                 ));
             })()}</TableBody></Table></TableContainer></CardContent></Card></Grid>
             
-            <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}>
-              <CardContent>
-                <Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography>
-                <List dense>
-                  {activityLog.slice(0, 5).map((log, i) => (
-                    <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: log.severity === 'error' ? 'error.main' : log.severity === 'warning' ? 'warning.main' : log.severity === 'success' ? 'success.main' : 'info.main', mb: 0.5, bgcolor: 'grey.50', borderRadius: 1, flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 0.5 }}>
-                        <Typography variant='body2' fontWeight={600}>{log.action}</Typography>
-                        <Typography variant='caption' color='text.secondary'>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
-                      </Box>
-                      <Typography variant='caption' color='text.secondary' sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{log.details}</Typography>
-                      <Chip label={log.user} size='small' sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />
-                    </ListItem>
-                  ))}
-                  {activityLog.length === 0 && <Box sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}><Typography variant='h3' sx={{ mb: 1 }}>📭</Typography><Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center' }}>No recent activity to show</Typography></Box>}
-                </List>
-                {activityLog.length > 5 && (
-                  <Button fullWidth variant="outlined" size="small" onClick={() => setActivityStreamDialog(true)} sx={{ mt: 1 }}>
-                    View All Recent Activity
-                  </Button>
-                )}
-              </CardContent>
-            </Card></Grid>
+            {isMainAdmin() && (
+              <Grid item xs={12} md={4}><Card sx={{ height: '100%', bgcolor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.4)', borderRadius: 3, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)' }}>
+                <CardContent>
+                  <Typography variant='h6' gutterBottom sx={{ fontWeight: 700 }}>🔥 Recent Activity Stream</Typography>
+                  <List dense>
+                    {activityLog.slice(0, 5).map((log, i) => (
+                      <ListItem key={i} sx={{ borderLeft: '3px solid', borderLeftColor: log.severity === 'error' ? 'error.main' : log.severity === 'warning' ? 'warning.main' : log.severity === 'success' ? 'success.main' : 'info.main', mb: 0.5, bgcolor: 'grey.50', borderRadius: 1, flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 0.5 }}>
+                          <Typography variant='body2' fontWeight={600}>{log.action}</Typography>
+                          <Typography variant='caption' color='text.secondary'>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
+                        </Box>
+                        <Typography variant='caption' color='text.secondary' sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{log.details}</Typography>
+                        <Chip label={log.user} size='small' sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />
+                      </ListItem>
+                    ))}
+                    {activityLog.length === 0 && <Box sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}><Typography variant='h3' sx={{ mb: 1 }}>📭</Typography><Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center' }}>No recent activity to show</Typography></Box>}
+                  </List>
+                  {activityLog.length > 5 && (
+                    <Button fullWidth variant="outlined" size="small" onClick={() => setActivityStreamDialog(true)} sx={{ mt: 1 }}>
+                      View All Recent Activity
+                    </Button>
+                  )}
+                </CardContent>
+              </Card></Grid>
+            )}
           </Grid>
           
           {/* Full Activity Stream Dialog */}
