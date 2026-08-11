@@ -12547,19 +12547,21 @@ function App() {
               </Tooltip>
             </Box>
           </Box>
-          <Tabs 
-            value={dailyReportTab} 
-            onChange={(e, v) => setDailyReportTab(v)}
-            textColor='inherit'
-            TabIndicatorProps={{ style: { backgroundColor: 'white' } }}
-            variant='scrollable'
-            scrollButtons='auto'
-          >
-            <Tab label='Overview' sx={{ color: 'rgba(255,255,255,0.7)', '&.Mui-selected': { color: 'white' } }} />
-            <Tab label='Comparisons' sx={{ color: 'rgba(255,255,255,0.7)', '&.Mui-selected': { color: 'white' } }} />
-            <Tab label='Analytics' sx={{ color: 'rgba(255,255,255,0.7)', '&.Mui-selected': { color: 'white' } }} />
-            <Tab label='Details' sx={{ color: 'rgba(255,255,255,0.7)', '&.Mui-selected': { color: 'white' } }} />
-          </Tabs>
+          <Box sx={{ mt: 2, mb: 1 }}>
+            <Tabs 
+              value={dailyReportTab} 
+              onChange={(e, v) => setDailyReportTab(v)}
+              TabIndicatorProps={{ style: { display: 'none' } }}
+              variant='scrollable'
+              scrollButtons='auto'
+              sx={{ minHeight: 40 }}
+            >
+              <Tab label='Overview' sx={{ minHeight: 36, py: 0.5, px: 2.5, mx: 0.5, borderRadius: 20, color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontSize: '0.95rem', '&.Mui-selected': { color: '#003366', bgcolor: 'white', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' } }} />
+              <Tab label='Comparisons' sx={{ minHeight: 36, py: 0.5, px: 2.5, mx: 0.5, borderRadius: 20, color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontSize: '0.95rem', '&.Mui-selected': { color: '#003366', bgcolor: 'white', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' } }} />
+              <Tab label='Analytics' sx={{ minHeight: 36, py: 0.5, px: 2.5, mx: 0.5, borderRadius: 20, color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontSize: '0.95rem', '&.Mui-selected': { color: '#003366', bgcolor: 'white', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' } }} />
+              <Tab label='Details' sx={{ minHeight: 36, py: 0.5, px: 2.5, mx: 0.5, borderRadius: 20, color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontSize: '0.95rem', '&.Mui-selected': { color: '#003366', bgcolor: 'white', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' } }} />
+            </Tabs>
+          </Box>
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {loadingCalendar ? (
@@ -12573,7 +12575,7 @@ function App() {
             <>
               {/* Tab 0: Overview */}
               {dailyReportTab === 0 && (
-                <>
+                <Box sx={{ animation: 'fadeIn 0.5s ease-out' }}>
                   {dailyReport.summary.totalScans === 0 && (
                     <Box sx={{ textAlign: 'center', py: 4, bgcolor: 'info.lighter', borderRadius: 2, mb: 3 }}>
                       <Typography variant='h6' color='text.secondary' sx={{ mb: 1 }}>
@@ -12586,285 +12588,310 @@ function App() {
                   )}
 
                   {/* Enhanced Summary Cards with Trends */}
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid container spacing={2} sx={{ mb: 4 }}>
                     <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2, bgcolor: 'primary.lighter', position: 'relative', overflow: 'hidden' }}>
-                        <Box sx={{ position: 'relative', zIndex: 1 }}>
-                          <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                            {dailyReport.summary.totalScans}
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 1 }}>
-                            Total Scans
-                          </Typography>
+                      <Card sx={{ 
+                        height: '100%',
+                        background: 'linear-gradient(135deg, rgba(30, 64, 175, 0.95) 0%, rgba(59, 130, 246, 0.85) 100%)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        borderRadius: 4,
+                        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)',
+                        transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                        '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(59, 130, 246, 0.5)' }
+                      }}>
+                        <CardContent sx={{ p: { xs: 1.5, sm: 2 }, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Box>
+                              <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 'bold', mb: 0.5 }}>
+                                {dailyReport.summary.totalScans}
+                              </Typography>
+                              <Typography variant='body2' sx={{ opacity: 0.9 }}>
+                                Total Scans
+                              </Typography>
+                            </Box>
+                            <ShowChart sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                          </Box>
                           {previousDayReport && (
-                            <Chip 
-                              label={
-                                previousDayReport.summary.totalScans > 0
-                                  ? `${((dailyReport.summary.totalScans - previousDayReport.summary.totalScans) / previousDayReport.summary.totalScans * 100).toFixed(1)}%`
-                                  : dailyReport.summary.totalScans > 0 ? '+100%' : '0%'
-                              }
-                              size='small'
-                              color={dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? 'success' : 'error'}
-                              icon={dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? <TrendingUp /> : <TrendingUp style={{ transform: 'rotate(180deg)' }} />}
-                              sx={{ fontSize: '0.7rem', height: 20 }}
-                            />
+                            <Box sx={{ mt: 1.5 }}>
+                              <Chip 
+                                label={
+                                  previousDayReport.summary.totalScans > 0
+                                    ? `${((dailyReport.summary.totalScans - previousDayReport.summary.totalScans) / previousDayReport.summary.totalScans * 100).toFixed(1)}%`
+                                    : dailyReport.summary.totalScans > 0 ? '+100%' : '0%'
+                                }
+                                size='small'
+                                icon={dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? <TrendingUp style={{ color: 'inherit' }} /> : <TrendingUp style={{ transform: 'rotate(180deg)', color: 'inherit' }} />}
+                                sx={{ 
+                                  bgcolor: dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                  color: dailyReport.summary.totalScans >= previousDayReport.summary.totalScans ? '#10b981' : '#f87171',
+                                  fontWeight: 700,
+                                  height: 24,
+                                  '& .MuiChip-icon': { color: 'inherit' }
+                                }}
+                              />
+                            </Box>
                           )}
-                        </Box>
-                      </Paper>
+                        </CardContent>
+                      </Card>
                     </Grid>
+
                     <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2, bgcolor: 'success.lighter', position: 'relative', overflow: 'hidden' }}>
-                        <Box sx={{ position: 'relative', zIndex: 1 }}>
-                          <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                            {dailyReport.summary.uniqueMembers > 0 
-                              ? (dailyReport.summary.totalScans / dailyReport.summary.uniqueMembers).toFixed(1)
-                              : '0'}
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 1 }}>
-                            Avg Scans/Member
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Card sx={{ 
+                        height: '100%',
+                        background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.95) 0%, rgba(16, 185, 129, 0.85) 100%)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        borderRadius: 4,
+                        boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)',
+                        transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                        '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(16, 185, 129, 0.5)' }
+                      }}>
+                        <CardContent sx={{ p: { xs: 1.5, sm: 2 }, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Box>
+                              <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 'bold', mb: 0.5 }}>
+                                {dailyReport.summary.uniqueMembers > 0 
+                                  ? (dailyReport.summary.totalScans / dailyReport.summary.uniqueMembers).toFixed(1)
+                                  : '0'}
+                              </Typography>
+                              <Typography variant='body2' sx={{ opacity: 0.9 }}>
+                                Avg Scans/Member
+                              </Typography>
+                            </Box>
+                            <People sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                          </Box>
+                          <Box sx={{ mt: 1.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                             <Chip 
-                              label={`${dailyReport.summary.roleBreakdown?.applicator || 0} Applicators`}
+                              label={`${dailyReport.summary.roleBreakdown?.applicator || 0} App`}
                               size='small'
-                              color='warning'
-                              sx={{ fontSize: '0.7rem', height: 20 }}
+                              sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, height: 24 }}
                             />
                             <Chip 
-                              label={`${dailyReport.summary.roleBreakdown?.customer || 0} Hardwares`}
+                              label={`${dailyReport.summary.roleBreakdown?.customer || 0} Hrdw`}
                               size='small'
-                              color='info'
-                              sx={{ fontSize: '0.7rem', height: 20 }}
+                              sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, height: 24 }}
                             />
                           </Box>
-                        </Box>
-                      </Paper>
+                        </CardContent>
+                      </Card>
                     </Grid>
+
                     <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2, bgcolor: 'warning.lighter', position: 'relative', overflow: 'hidden' }}>
-                        <Box sx={{ position: 'relative', zIndex: 1 }}>
-                          <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'warning.main' }}>
-                            {(() => {
-                              if (dailyReport.hourlyDistribution && Object.keys(dailyReport.hourlyDistribution).length > 0) {
-                                const peak = Object.entries(dailyReport.hourlyDistribution).reduce(
-                                  (max, [hour, count]) => count > max.count ? { hour, count } : max, 
-                                  { hour: '0', count: 0 }
-                                );
-                                return `${peak.hour}:00`;
-                              }
-                              return 'N/A';
-                            })()}
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 1 }}>
-                            Peak Hour
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Card sx={{ 
+                        height: '100%',
+                        background: 'linear-gradient(135deg, rgba(190, 18, 60, 0.95) 0%, rgba(244, 63, 94, 0.85) 100%)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        borderRadius: 4,
+                        boxShadow: '0 10px 30px rgba(244, 63, 94, 0.3)',
+                        transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                        '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(244, 63, 94, 0.5)' }
+                      }}>
+                        <CardContent sx={{ p: { xs: 1.5, sm: 2 }, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Box>
+                              <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 'bold', mb: 0.5 }}>
+                                {(() => {
+                                  if (dailyReport.hourlyDistribution && Object.keys(dailyReport.hourlyDistribution).length > 0) {
+                                    const peak = Object.entries(dailyReport.hourlyDistribution).reduce(
+                                      (max, [hour, count]) => count > max.count ? { hour, count } : max, 
+                                      { hour: '0', count: 0 }
+                                    );
+                                    return `${peak.hour}:00`;
+                                  }
+                                  return 'N/A';
+                                })()}
+                              </Typography>
+                              <Typography variant='body2' sx={{ opacity: 0.9 }}>
+                                Peak Hour
+                              </Typography>
+                            </Box>
+                            <AccessTime sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                          </Box>
+                          <Box sx={{ mt: 1.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                             <Chip 
                               label={`${dailyReport.summary.uniqueProducts} Products`}
                               size='small'
-                              color='primary'
-                              sx={{ fontSize: '0.7rem', height: 20 }}
+                              sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, height: 24 }}
                             />
                             <Chip 
                               label={`${dailyReport.summary.uniqueMembers} Members`}
                               size='small'
-                              color='success'
-                              sx={{ fontSize: '0.7rem', height: 20 }}
+                              sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, height: 24 }}
                             />
                           </Box>
-                        </Box>
-                      </Paper>
+                        </CardContent>
+                      </Card>
                     </Grid>
+
                     <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2, bgcolor: 'info.lighter', position: 'relative', overflow: 'hidden' }}>
-                        <Box sx={{ position: 'relative', zIndex: 1 }}>
-                          <Typography variant='h3' sx={{ fontWeight: 'bold', color: 'info.main' }}>
-                            Rs. {(() => {
-                              if (dailyReport.scans && dailyReport.scans.length > 0) {
-                                const totalValue = dailyReport.scans.reduce((sum, scan) => {
-                                  // Try to get price from scan or find matching product
-                                  const scanPrice = scan.price || 0;
-                                  const productMatch = products.find(p => 
-                                    p.productNo.toUpperCase() === (scan.productNo || '').toUpperCase() && 
-                                    p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
-                                  );
-                                  const price = productMatch ? productMatch.price : scanPrice;
-                                  return sum + price;
-                                }, 0);
-                                return totalValue.toLocaleString();
-                              }
-                              return '0';
-                            })()}
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>
-                            Estimated Sales
-                          </Typography>
-                        </Box>
-                      </Paper>
+                      <Card sx={{ 
+                        height: '100%',
+                        background: 'linear-gradient(135deg, rgba(3, 105, 161, 0.95) 0%, rgba(14, 165, 233, 0.85) 100%)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        borderRadius: 4,
+                        boxShadow: '0 10px 30px rgba(14, 165, 233, 0.3)',
+                        transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                        '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(14, 165, 233, 0.5)' }
+                      }}>
+                        <CardContent sx={{ p: { xs: 1.5, sm: 2 }, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Box sx={{ width: '80%' }}>
+                              <Typography variant='h4' sx={{ fontSize: { xs: '1.25rem', sm: '1.6rem', lg: '2rem' }, fontWeight: 'bold', mb: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                Rs. {(() => {
+                                  if (dailyReport.scans && dailyReport.scans.length > 0) {
+                                    const totalValue = dailyReport.scans.reduce((sum, scan) => {
+                                      const scanPrice = scan.price || 0;
+                                      const productMatch = products.find(p => 
+                                        p.productNo.toUpperCase() === (scan.productNo || '').toUpperCase() && 
+                                        p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
+                                      );
+                                      const price = productMatch ? productMatch.price : scanPrice;
+                                      return sum + price;
+                                    }, 0);
+                                    return totalValue.toLocaleString();
+                                  }
+                                  return '0';
+                                })()}
+                              </Typography>
+                              <Typography variant='body2' sx={{ opacity: 0.9 }}>
+                                Estimated Sales
+                              </Typography>
+                            </Box>
+                            <Star sx={{ opacity: 0.5, fontSize: '2rem' }} />
+                          </Box>
+                          <Box sx={{ mt: 1.5 }}>
+                             <Chip 
+                              label={dailyReport.topProducts?.[0] ? `Top: ${dailyReport.topProducts[0].productName.substring(0, 15)}...` : 'No Scans'}
+                              size='small'
+                              sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, height: 24 }}
+                            />
+                          </Box>
+                        </CardContent>
+                      </Card>
                     </Grid>
                   </Grid>
 
-                  {/* Quick Insights */}
-                  {dailyReport.summary.totalScans > 0 && (
-                    <Paper sx={{ p: 2, mb: 3, bgcolor: 'secondary.lighter', borderLeft: '4px solid', borderLeftColor: 'secondary.main' }}>
-                      <Typography variant='subtitle2' sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Assessment /> Key Insights
-                      </Typography>
-                      <Grid container spacing={1}>
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant='body2'>
-                            • Avg scans per member: <strong>{(dailyReport.summary.totalScans / dailyReport.summary.uniqueMembers).toFixed(1)}</strong>
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant='body2'>
-                            • Avg scans per product: <strong>{(dailyReport.summary.totalScans / dailyReport.summary.uniqueProducts).toFixed(1)}</strong>
-                          </Typography>
-                        </Grid>
-                        {dailyReport.hourlyDistribution && Object.keys(dailyReport.hourlyDistribution).length > 0 && (
-                          <Grid item xs={12} sm={6}>
-                            <Typography variant='body2'>
-                              • Peak hour: <strong>{Object.entries(dailyReport.hourlyDistribution).reduce((max, [hour, count]) => count > max.count ? { hour, count } : max, { hour: 0, count: 0 }).hour}:00</strong>
-                            </Typography>
-                          </Grid>
-                        )}
-                        {dailyReport.topProducts && dailyReport.topProducts.length > 0 && (
-                          <Grid item xs={12} sm={6}>
-                            <Typography variant='body2'>
-                              • Most popular: <strong>{dailyReport.topProducts[0]?.productName?.substring(0, 25)}...</strong>
-                            </Typography>
-                          </Grid>
-                        )}
-                      </Grid>
-                    </Paper>
-                  )}
+                  {/* Side by Side Tables */}
+                  <Grid container spacing={3}>
+                    {/* Top Products */}
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 2, borderRadius: 3, height: '100%', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                        <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Inventory2 color="primary" /> Top Products Today
+                        </Typography>
+                        <TableContainer>
+                          <Table size='small'>
+                            <TableHead>
+                              <TableRow sx={{ '& th': { borderBottom: '2px solid #eee', color: 'text.secondary', fontWeight: 600 } }}>
+                                <TableCell>Product</TableCell>
+                                <TableCell align='right'>Scans</TableCell>
+                                <TableCell align='right'>%</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {dailyReport.topProducts && dailyReport.topProducts.length > 0 ? (
+                                dailyReport.topProducts.slice(0, 5).map((product, i) => (
+                                  <TableRow key={i} sx={{ '& td': { borderBottom: '1px solid #f5f5f5' }, '&:hover': { bgcolor: 'action.hover' } }}>
+                                    <TableCell>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Typography variant="caption" sx={{ width: 18, height: 18, borderRadius: '50%', bgcolor: i === 0 ? 'primary.main' : 'grey.200', color: i === 0 ? 'white' : 'text.secondary', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                          {i + 1}
+                                        </Typography>
+                                        <Typography variant='body2' fontWeight={i === 0 ? 600 : 400}>
+                                          {product.productName}
+                                        </Typography>
+                                      </Box>
+                                    </TableCell>
+                                    <TableCell align='right'>
+                                      <Typography variant='body2' fontWeight={600}>{product.count}</Typography>
+                                    </TableCell>
+                                    <TableCell align='right'>
+                                      <Typography variant='caption' color='text.secondary'>
+                                        {((product.count / dailyReport.summary.totalScans) * 100).toFixed(0)}%
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              ) : (
+                                <TableRow>
+                                  <TableCell colSpan={3} align='center'>
+                                    <Typography variant='body2' color='text.secondary' sx={{ py: 3 }}>
+                                      No products scanned today
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Paper>
+                    </Grid>
 
-                  {/* Top Products */}
-                  <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Inventory2 /> Top 5 Products
-                  </Typography>
-                  <TableContainer component={Paper} sx={{ mb: 3 }}>
-                    <Table size='small'>
-                      <TableHead>
-                        <TableRow sx={{ bgcolor: 'grey.100' }}>
-                          <TableCell sx={{ fontWeight: 700 }}>Rank</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Code</TableCell>
-                          <TableCell align='right' sx={{ fontWeight: 700 }}>Scans</TableCell>
-                          <TableCell align='right' sx={{ fontWeight: 700 }}>% of Total</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {dailyReport.topProducts && dailyReport.topProducts.length > 0 ? (
-                          dailyReport.topProducts.slice(0, 5).map((product, i) => (
-                            <TableRow key={i} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                              <TableCell>
-                                <Chip 
-                                  label={i + 1} 
-                                  size='small' 
-                                  color={i === 0 ? 'primary' : 'default'}
-                                  sx={{ width: 32, height: 24 }}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant='body2' fontWeight={i === 0 ? 700 : 400}>
-                                  {product.productName}
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Chip label={product.productNo} size='small' variant='outlined' />
-                              </TableCell>
-                              <TableCell align='right'>
-                                <strong>{product.count}</strong>
-                              </TableCell>
-                              <TableCell align='right'>
-                                <Typography variant='body2' color='text.secondary'>
-                                  {((product.count / dailyReport.summary.totalScans) * 100).toFixed(1)}%
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={5} align='center'>
-                              <Typography variant='body2' color='text.secondary' sx={{ py: 2 }}>
-                                No products scanned on this day
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-
-                  {/* Top Members */}
-                  <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <People /> Top Active Members
-                  </Typography>
-                  <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-                    <Table size='small'>
-                      <TableHead>
-                        <TableRow sx={{ bgcolor: 'grey.100' }}>
-                          <TableCell sx={{ fontWeight: 700 }}>Rank</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Member</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
-                          <TableCell align='right' sx={{ fontWeight: 700 }}>Scans</TableCell>
-                          <TableCell align='right' sx={{ fontWeight: 700 }}>% of Total</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {dailyReport.topMembers && dailyReport.topMembers.length > 0 ? (
-                          dailyReport.topMembers.map((member, i) => (
-                            <TableRow key={i} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                              <TableCell>
-                                <Chip 
-                                  label={i + 1} 
-                                  size='small' 
-                                  color={i === 0 ? 'success' : 'default'}
-                                  sx={{ width: 32, height: 24 }}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant='body2' fontWeight={i === 0 ? 700 : 400}>
-                                  {member.memberName}
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Chip 
-                                  label={member.role} 
-                                  size='small' 
-                                  color={member.role === 'applicator' ? 'warning' : 'info'}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant='body2' color='text.secondary'>
-                                  {member.location || 'N/A'}
-                                </Typography>
-                              </TableCell>
-                              <TableCell align='right'>
-                                <strong>{member.count}</strong>
-                              </TableCell>
-                              <TableCell align='right'>
-                                <Typography variant='body2' color='text.secondary'>
-                                  {((member.count / dailyReport.summary.totalScans) * 100).toFixed(1)}%
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={6} align='center'>
-                              <Typography variant='body2' color='text.secondary' sx={{ py: 2 }}>
-                                No member activity on this day
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </>
+                    {/* Top Members */}
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 2, borderRadius: 3, height: '100%', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                        <Typography variant='subtitle1' sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <People color="success" /> Top Active Members
+                        </Typography>
+                        <TableContainer>
+                          <Table size='small'>
+                            <TableHead>
+                              <TableRow sx={{ '& th': { borderBottom: '2px solid #eee', color: 'text.secondary', fontWeight: 600 } }}>
+                                <TableCell>Member</TableCell>
+                                <TableCell>Role</TableCell>
+                                <TableCell align='right'>Scans</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {dailyReport.topMembers && dailyReport.topMembers.length > 0 ? (
+                                dailyReport.topMembers.slice(0, 5).map((member, i) => (
+                                  <TableRow key={i} sx={{ '& td': { borderBottom: '1px solid #f5f5f5' }, '&:hover': { bgcolor: 'action.hover' } }}>
+                                    <TableCell>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Typography variant="caption" sx={{ width: 18, height: 18, borderRadius: '50%', bgcolor: i === 0 ? 'success.main' : 'grey.200', color: i === 0 ? 'white' : 'text.secondary', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                          {i + 1}
+                                        </Typography>
+                                        <Typography variant='body2' fontWeight={i === 0 ? 600 : 400}>
+                                          {member.memberName}
+                                        </Typography>
+                                      </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Chip 
+                                        label={member.role === 'applicator' ? 'App' : 'Hdw'} 
+                                        size='small' 
+                                        color={member.role === 'applicator' ? 'warning' : 'info'}
+                                        sx={{ height: 20, fontSize: '0.65rem' }}
+                                      />
+                                    </TableCell>
+                                    <TableCell align='right'>
+                                      <Typography variant='body2' fontWeight={600}>{member.count}</Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              ) : (
+                                <TableRow>
+                                  <TableCell colSpan={3} align='center'>
+                                    <Typography variant='body2' color='text.secondary' sx={{ py: 3 }}>
+                                      No member activity today
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                </Box>
               )}
 
               {/* Tab 1: Comparisons */}
