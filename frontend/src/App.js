@@ -4314,17 +4314,17 @@ function App() {
       return true;
     }
 
-    // Check user state's direct permissions first (populated during login)
-    if (user && user.permissions) {
-      return user.permissions[permission] === true;
-    }
-    
-    // Fallback: Find current logged-in user from users array
+    // ALWAYS PREFER THE users ARRAY IF AVAILABLE, as it gets updated via WebSocket
     const currentUser = users.find(u => u.email === adminEmail || u.email === user?.email);
     
-    // If user found, check their specific permission
+    // If user found in users array, check their specific permission
     if (currentUser && currentUser.permissions) {
       return currentUser.permissions[permission] === true;
+    }
+
+    // Fallback to user state's direct permissions (populated during login)
+    if (user && user.permissions) {
+      return user.permissions[permission] === true;
     }
     
     // Default to false if no permission found
