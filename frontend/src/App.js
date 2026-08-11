@@ -4381,21 +4381,19 @@ function App() {
               transformOrigin={{ horizontal: 'right', vertical: 'top' }}
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
-              {(isMainAdmin() || hasPermission('canManageCoAdminRequests')) && (
-                <MenuItem onClick={() => {
-                  setNotificationAnchorEl(null);
-                  if (isMainAdmin()) {
-                    setAdminTab('reprint-requests');
-                  } else {
-                    setCoAdminRequestsDialogOpen(true);
-                  }
-                }}>
-                  <Badge badgeContent={pendingRequestsCount || coAdminApprovedCount} color="error" sx={{ mr: 2 }}>
-                    <PictureAsPdf fontSize="small" />
-                  </Badge>
-                  Reprint Requests
-                </MenuItem>
-              )}
+              <MenuItem onClick={() => {
+                setNotificationAnchorEl(null);
+                if (isMainAdmin()) {
+                  setAdminTab('reprint-requests');
+                } else {
+                  setCoAdminRequestsDialogOpen(true);
+                }
+              }}>
+                <Badge badgeContent={pendingRequestsCount || coAdminApprovedCount} color="error" sx={{ mr: 2 }}>
+                  <PictureAsPdf fontSize="small" />
+                </Badge>
+                {isMainAdmin() ? 'Reprint Requests' : 'My Reprint Requests'}
+              </MenuItem>
               {hasPermission('canViewFeedbacks') && (
                 <MenuItem onClick={() => {
                   setNotificationAnchorEl(null);
