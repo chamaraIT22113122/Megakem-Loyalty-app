@@ -52,6 +52,8 @@ jobs:
 
     - name: Sync files via FTP
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      env:
+        ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       with:
         server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
