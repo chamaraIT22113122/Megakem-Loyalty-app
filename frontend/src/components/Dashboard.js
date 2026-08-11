@@ -149,9 +149,9 @@ export default function Dashboard(props) {
                     <Box sx={{ borderRight: { sm: '1px solid rgba(255,255,255,0.2)' }, pr: { sm: 2 } }}>
                       <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>Avg Scans/Day</Typography>
                       <Typography variant='h5' fontWeight={800} sx={{ color: '#4dabf5' }}>
-                        {stats.dailyStats && stats.dailyStats.length > 0 
-                          ? Math.round(stats.total / stats.dailyStats.length)
-                          : stats.total}
+                        {stats.dailyTrends && stats.dailyTrends.length > 0 
+                          ? Math.round((stats.totalScans || 0) / stats.dailyTrends.length)
+                          : (stats.totalScans || 0)}
                       </Typography>
                     </Box>
                   </Grid>
@@ -159,7 +159,11 @@ export default function Dashboard(props) {
                     <Box sx={{ borderRight: { sm: '1px solid rgba(255,255,255,0.2)' }, pr: { sm: 2 } }}>
                       <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>App/Cust Ratio</Typography>
                       <Typography variant='h5' fontWeight={800} sx={{ color: '#66bb6a' }}>
-                        {stats.customer > 0 ? (stats.applicator / stats.customer).toFixed(2) : stats.applicator}:1
+                        {(() => {
+                          const appCount = stats.roleDistribution?.find(r => r._id === 'applicator')?.count || 0;
+                          const custCount = stats.roleDistribution?.find(r => r._id === 'customer')?.count || 0;
+                          return custCount > 0 ? (appCount / custCount).toFixed(2) : appCount;
+                        })()}:1
                       </Typography>
                     </Box>
                   </Grid>
@@ -167,14 +171,14 @@ export default function Dashboard(props) {
                     <Box sx={{ borderRight: { sm: '1px solid rgba(255,255,255,0.2)' }, pr: { sm: 2 } }}>
                       <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>Scans This Week</Typography>
                       <Typography variant='h5' fontWeight={800} sx={{ color: '#ffca28' }}>
-                        {stats.lastWeek || 0}
+                        {stats.dailyTrends?.slice(-7).reduce((sum, item) => sum + (item.count || 0), 0) || 0}
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={6} sm={3}>
                     <Box>
-                      <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>Active Products</Typography>
-                      <Typography variant='h5' fontWeight={800} sx={{ color: '#ab47bc' }}>
+                      <Typography variant='caption' sx={{ opacity: 0.7, textTransform: 'uppercase', fontWeight: 600 }}>Top Products</Typography>
+                      <Typography variant='h5' fontWeight={800} sx={{ color: '#ffffff' }}>
                         {stats.topProducts?.length || 0}
                       </Typography>
                     </Box>
@@ -468,6 +472,7 @@ export default function Dashboard(props) {
             {/* Core Summary Cards with hover scale transitions */}
             <Grid item xs={6} md={3}>
               <Card sx={{ 
+                height: '100%',
                 background: 'linear-gradient(135deg, rgba(30, 64, 175, 0.95) 0%, rgba(59, 130, 246, 0.85) 100%)',
                 backdropFilter: 'blur(12px)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -478,11 +483,11 @@ export default function Dashboard(props) {
                 transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
                 '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(59, 130, 246, 0.5)' }
               }}>
-                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 }, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Box>
                       <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold', mb: 0.5 }}>
-                        {comparisonData ? comparisonData.scans.current : stats.total}
+                        {stats.totalScans?.toLocaleString() || 0}
                       </Typography>
                       <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
                         Total Scans
@@ -492,7 +497,7 @@ export default function Dashboard(props) {
                       <ShowChart sx={{ opacity: 0.5, fontSize: '2rem' }} />
                     </Tooltip>
                   </Box>
-                  {comparisonData && (
+                  {comparisonData ? (
                     <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                       <Box sx={{ 
                         display: 'inline-flex', 
@@ -511,13 +516,14 @@ export default function Dashboard(props) {
                       </Box>
                       <Typography variant='caption' sx={{ opacity: 0.8, fontSize: '0.7rem' }}>vs prev period</Typography>
                     </Box>
-                  )}
+                  ) : <Box sx={{ mt: 1, height: 24 }} />}
                 </CardContent>
               </Card>
             </Grid>
             
             <Grid item xs={6} md={3}>
               <Card sx={{ 
+                height: '100%',
                 background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.95) 0%, rgba(16, 185, 129, 0.85) 100%)',
                 backdropFilter: 'blur(12px)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -528,18 +534,11 @@ export default function Dashboard(props) {
                 transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
                 '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(16, 185, 129, 0.5)' }
               }}>
-                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 }, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Box sx={{ width: '80%' }}>
                       <Typography variant='h4' sx={{ fontSize: { xs: '1.25rem', sm: '1.6rem', md: '1.9rem', lg: '2.2rem' }, fontWeight: 'bold', mb: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        Rs. {(comparisonData ? comparisonData.value.current : allScans.reduce((total, scan) => { 
-                          const product = products.find(p => 
-                            p.productNo.toUpperCase() === scan.productNo.toUpperCase() && 
-                            p.category && scan.qty && p.category.toUpperCase() === scan.qty.toUpperCase()
-                          ); 
-                          const price = product ? product.price : (scan.price || 0);
-                          return total + price; 
-                        }, 0)).toLocaleString()}
+                        Rs. {stats.totalValue?.toLocaleString() || 0}
                       </Typography>
                       <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
                         Est. Value
@@ -549,7 +548,7 @@ export default function Dashboard(props) {
                       <Star sx={{ opacity: 0.5, fontSize: '2rem' }} />
                     </Tooltip>
                   </Box>
-                  {comparisonData && (
+                  {comparisonData ? (
                     <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                       <Box sx={{ 
                         display: 'inline-flex', 
@@ -568,13 +567,14 @@ export default function Dashboard(props) {
                       </Box>
                       <Typography variant='caption' sx={{ opacity: 0.8, fontSize: '0.7rem' }}>vs prev period</Typography>
                     </Box>
-                  )}
+                  ) : <Box sx={{ mt: 1, height: 24 }} />}
                 </CardContent>
               </Card>
             </Grid>
             
             <Grid item xs={6} md={3}>
               <Card sx={{ 
+                height: '100%',
                 background: 'linear-gradient(135deg, rgba(190, 18, 60, 0.95) 0%, rgba(244, 63, 94, 0.85) 100%)',
                 backdropFilter: 'blur(12px)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -585,11 +585,11 @@ export default function Dashboard(props) {
                 transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
                 '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(244, 63, 94, 0.5)' }
               }}>
-                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 }, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Box>
                       <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold', mb: 0.5 }}>
-                        {stats.applicator}
+                        {stats.roleDistribution?.find(r => r._id === 'applicator')?.count || 0}
                       </Typography>
                       <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
                         Applicators
@@ -599,9 +599,9 @@ export default function Dashboard(props) {
                       <Build sx={{ opacity: 0.5, fontSize: '2rem' }} />
                     </Tooltip>
                   </Box>
-                  <Box sx={{ mt: 1.5 }}>
+                  <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center' }}>
                     <Typography variant='caption' sx={{ opacity: 0.9, fontWeight: 600, bgcolor: 'rgba(255,255,255,0.15)', px: 1, py: 0.5, borderRadius: 1 }}>
-                      {stats.total > 0 ? ((stats.applicator / stats.total) * 100).toFixed(1) : 0}% of scans
+                      {stats.totalScans > 0 ? (((stats.roleDistribution?.find(r => r._id === 'applicator')?.count || 0) / stats.totalScans) * 100).toFixed(1) : 0}% of scans
                     </Typography>
                   </Box>
                 </CardContent>
@@ -610,6 +610,7 @@ export default function Dashboard(props) {
             
             <Grid item xs={6} md={3}>
               <Card sx={{ 
+                height: '100%',
                 background: 'linear-gradient(135deg, rgba(3, 105, 161, 0.95) 0%, rgba(14, 165, 233, 0.85) 100%)',
                 backdropFilter: 'blur(12px)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -620,11 +621,11 @@ export default function Dashboard(props) {
                 transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
                 '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 14px 40px -10px rgba(14, 165, 233, 0.5)' }
               }}>
-                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 }, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Box>
                       <Typography variant='h4' sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }, fontWeight: 'bold', mb: 0.5 }}>
-                        {stats.customer}
+                        {stats.roleDistribution?.find(r => r._id === 'customer')?.count || 0}
                       </Typography>
                       <Typography variant='body2' sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' }, opacity: 0.9 }}>
                         Hardwares
@@ -634,9 +635,9 @@ export default function Dashboard(props) {
                       <People sx={{ opacity: 0.5, fontSize: '2rem' }} />
                     </Tooltip>
                   </Box>
-                  <Box sx={{ mt: 1.5 }}>
+                  <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center' }}>
                     <Typography variant='caption' sx={{ opacity: 0.9, fontWeight: 600, bgcolor: 'rgba(255,255,255,0.15)', px: 1, py: 0.5, borderRadius: 1 }}>
-                      {stats.total > 0 ? ((stats.customer / stats.total) * 100).toFixed(1) : 0}% of scans
+                      {stats.totalScans > 0 ? (((stats.roleDistribution?.find(r => r._id === 'customer')?.count || 0) / stats.totalScans) * 100).toFixed(1) : 0}% of scans
                     </Typography>
                   </Box>
                 </CardContent>
