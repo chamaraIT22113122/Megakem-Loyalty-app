@@ -2333,33 +2333,46 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
                             sx={{ fontWeight: 'bold', alignSelf: 'flex-start' }}
                           />
                         )}
-                        {isMainAdmin ? (
-                          qr.status === 'scanned' ? (
-                            <Box sx={{ pl: 0.5 }}>
-                              <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: 'success.main' }}>
-                                Scanned by: {qr.scannedByMemberId || 'N/A'}
+                        {isMainAdmin && qr.status === 'scanned' && (
+                          <Box sx={{ pl: 0.5, mb: 1 }}>
+                            <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: 'success.main' }}>
+                              Scanned by: {qr.scannedByMemberId || 'N/A'}
+                            </Typography>
+                            {qr.scannedByMemberName && (
+                              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                                Name: {qr.scannedByMemberName}
                               </Typography>
-                              {qr.scannedByMemberName && (
-                                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
-                                  Name: {qr.scannedByMemberName}
-                                </Typography>
-                              )}
-                              {qr.scanPoints > 0 && (
-                                <Typography variant="caption" sx={{ display: 'block', color: 'primary.main', fontWeight: 'medium' }}>
-                                  Points: +{qr.scanPoints} pts
-                                </Typography>
-                              )}
-                              {qr.scanLocation && (
-                                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
-                                  Loc: {qr.scanLocation}
-                                </Typography>
-                              )}
-                            </Box>
-                          ) : (
-                            <Typography variant="caption" color="textSecondary">—</Typography>
-                          )
-                        ) : (
-                          (!qr.reprintCount || qr.reprintCount === 0) && <Typography variant="caption" color="textSecondary">—</Typography>
+                            )}
+                            {qr.scanPoints > 0 && (
+                              <Typography variant="caption" sx={{ display: 'block', color: 'primary.main', fontWeight: 'medium' }}>
+                                Points: +{qr.scanPoints} pts
+                              </Typography>
+                            )}
+                            {qr.scanLocation && (
+                              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                                Loc: {qr.scanLocation}
+                              </Typography>
+                            )}
+                          </Box>
+                        )}
+                        {qr.reprintPending && (
+                          <Chip 
+                            label="PENDING" 
+                            size="small" 
+                            color="warning" 
+                            sx={{ fontWeight: 'bold', alignSelf: 'flex-start' }}
+                          />
+                        )}
+                        {qr.reprintApproved && (
+                          <Chip 
+                            label="APPROVED" 
+                            size="small" 
+                            color="success" 
+                            sx={{ fontWeight: 'bold', alignSelf: 'flex-start' }}
+                          />
+                        )}
+                        {(!qr.reprintCount || qr.reprintCount === 0) && !qr.reprintPending && !qr.reprintApproved && !(isMainAdmin && qr.status === 'scanned') && (
+                          <Typography variant="caption" color="textSecondary">—</Typography>
                         )}
                       </Box>
                     </TableCell>
