@@ -2805,7 +2805,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (adminAuth && (hasPermission('canManageUsers') || hasPermission('canManageProducts') || hasPermission('canViewLeaderboard'))) {
+    if (adminAuth && (isMainAdmin() || hasPermission('canManageUsers') || hasPermission('canManageApplicators'))) {
       fetchPaginatedMembers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3147,11 +3147,11 @@ function App() {
     if (!adminAuth) return;
     try {
       const hasUsers = hasPermission('canManageUsers');
-      const hasProducts = hasPermission('canManageProducts');
+      const hasApplicators = hasPermission('canManageApplicators');
       const hasLeaderboard = hasPermission('canViewLeaderboard');
       
       let membersRes;
-      if (hasUsers || hasProducts || hasLeaderboard) {
+      if (hasUsers || hasApplicators || hasLeaderboard) {
         membersRes = await membersAPI.getAll();
       } else {
         return; // No permission to load members or applicators

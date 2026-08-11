@@ -186,12 +186,13 @@ router.get('/', protect, async (req, res) => {
     const isCoAdmin = req.user.role === 'co-admin';
     const hasUsersPerm = req.user.permissions?.canManageUsers === true;
     const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
+    const hasLeaderboardPerm = req.user.permissions?.canViewLeaderboard === true;
 
     let allowed = false;
     if (isAdmin) {
       allowed = true;
     } else if (isCoAdmin) {
-      if (hasUsersPerm) {
+      if (hasUsersPerm || hasLeaderboardPerm) {
         allowed = true;
       } else if (hasApplicatorsPerm && (!role || role === 'applicator' || role === 'customer')) {
         // canManageApplicators covers both Applicators (MA) and Hardwares (MH)
