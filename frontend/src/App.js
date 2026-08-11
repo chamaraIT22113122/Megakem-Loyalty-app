@@ -6844,6 +6844,9 @@ function App() {
                                           primaryTypographyProps={{ component: 'div' }}
                                           secondaryTypographyProps={{ component: 'div' }}
                                         />
+                                      </ListItem>
+                                    );
+                                  })}
                                   {dailyReport.scans?.length > 3 && (
                                     <Typography variant="caption" color="primary.main" sx={{ display: 'block', mt: 0.5, textAlign: 'center', cursor: 'pointer', fontWeight: 600 }} onClick={() => setDailyReportDialog({ open: true, date: selectedCalendarDate })}>
                                       + {dailyReport.scans.length - 3} more scans
