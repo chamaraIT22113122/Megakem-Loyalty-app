@@ -1591,9 +1591,15 @@ function App() {
         try { 
           // Always try to fetch the current session. The backend will use HttpOnly cookies.
           const response = await authAPI.getMe(); 
-          setUser(response.data.data);
-          // If we have adminAuth flag in localStorage and the user has correct permissions,
-          // they can access the admin panel. The backend already verified their session.
+          const fetchedUser = response.data.data;
+          setUser(fetchedUser);
+          
+          // If we have adminAuth flag in localStorage but the user is NOT an admin/co-admin,
+          // clear the flag so they don't incorrectly try to load admin data.
+          if (storedAdminAuth === 'true' && fetchedUser.role !== 'admin' && fetchedUser.role !== 'co-admin') {
+            localStorage.removeItem('adminAuth');
+            setAdminAuth(false);
+          }
         }
         catch { 
           // Not logged in or session expired
@@ -3012,7 +3018,7 @@ function App() {
   }, [dashboardStartDate, dashboardEndDate, dateFilter, adminAuth, adminTab]);
 
   const loadAdminData = async () => {
-    if (!adminAuth) return;
+    if (!adminAuth || (user && user.role !== 'admin' && user.role !== 'co-admin')) return;
     try {
       console.log('🔄 Loading admin data...');
       
