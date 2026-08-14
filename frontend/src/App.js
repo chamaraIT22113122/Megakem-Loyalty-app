@@ -6244,7 +6244,7 @@ function App() {
               <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? 'Phone Number' : 'Member ID'} placeholder={role === 'customer' ? 'e.g. 0712345678' : 'e.g. APP-001'} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
               <Grid item xs={12}>
                 <Autocomplete
-                  options={members.filter(m => m.role === 'customer' || m.memberId.toUpperCase().startsWith('MH'))}
+                  options={members.filter(m => m.role === 'customer' || m.equipment === 'Hardware' || m.memberId?.toUpperCase().startsWith('MH'))}
                   getOptionLabel={(option) => option.memberName || ''}
                   value={members.find(m => m.memberName === connectedHardware) || null}
                   onChange={(event, newValue) => {
@@ -8037,7 +8037,7 @@ function App() {
                   {manualScanForm.role === 'applicator' && (
                     <Grid item xs={12} md={6}>
                       <Autocomplete
-                        options={members.filter(m => m.role === 'customer' || m.memberId.toUpperCase().startsWith('MH'))}
+                        options={members.filter(m => m.role === 'customer' || m.equipment === 'Hardware' || m.memberId?.toUpperCase().startsWith('MH'))}
                         getOptionLabel={(option) => `${option.memberId} - ${option.memberName}`}
                         value={members.find(m => m.memberName === manualScanForm.connectedHardware) || null}
                         onChange={(event, newValue) => {
