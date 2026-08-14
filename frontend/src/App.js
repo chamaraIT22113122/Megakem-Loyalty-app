@@ -1546,7 +1546,7 @@ function App() {
   useEffect(() => {
     const fetchApplicators = async () => {
       try {
-        const res = await membersAPI.getAll();
+        const res = await membersAPI.getAll({ limit: 10000 });
         const rawMembers = res.data.data || [];
         setMembers(rawMembers);
         
@@ -3158,7 +3158,7 @@ function App() {
       
       let membersRes;
       if (hasUsers || hasApplicators || hasLeaderboard) {
-        membersRes = await membersAPI.getAll();
+        membersRes = await membersAPI.getAll({ limit: 10000 });
       } else {
         return; // No permission to load members or applicators
       }
@@ -3500,7 +3500,7 @@ function App() {
       const loadMemberProfile = async () => {
         try {
           // Try to find member by memberId
-          const membersRes = await membersAPI.getAll();
+          const membersRes = await membersAPI.getAll({ limit: 10000 });
           const member = membersRes.data.data?.find(m => m.memberId === memberId.toUpperCase());
           if (member) {
             // Load member's scan history
@@ -4015,7 +4015,7 @@ function App() {
       const response = await membersAPI.syncFromScans();
       
       // Reload members after sync
-      const membersRes = await membersAPI.getAll();
+      const membersRes = await membersAPI.getAll({ limit: 10000 });
       setMembers(membersRes.data.data || []);
       
       showNotification(
