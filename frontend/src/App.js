@@ -1824,8 +1824,8 @@ function App() {
 
       // Support 4-part and 5-part batch formats ("MLSP 001 050525 001", "MLSP_001_050525_001", "MLSP 001 050525 001 001")
       if (batchParam) {
-        const batchInfo = extractBatchInfo(batchParam);
-        if (batchInfo.parsed) {
+        const batchInfo = parseBatchInfo(batchParam);
+        if (batchInfo && batchInfo.parsed) {
           parsedData.productCode = productParam || batchInfo.productCode;
           parsedData.materialBatch = batchInfo.materialBatch;
           parsedData.dateCode = batchInfo.date;
