@@ -31,6 +31,7 @@ import LeadsManagementTab from './components/LeadsManagementTab';
 import AdminSystemPagesManager from './components/AdminSystemPagesManager';
 import RichTextEditor from './components/RichTextEditor';
 import LeadCaptureDialog from './components/LeadCaptureDialog';
+import { DashboardCardSkeleton, ChartSkeleton } from './components/SkeletonLoaders';
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
@@ -1572,6 +1573,7 @@ function App() {
           condition: m.condition || 'good',
           notes: m.notes || '',
           photo: m.photo || '',
+          bankDetails: m.bankDetails || null,
           connectedHardware: m.connectedHardware?.memberName || (typeof m.connectedHardware === 'string' ? m.connectedHardware : ''),
           connectedHardwareId: m.connectedHardware?._id || m.connectedHardwareId || ''
         }));
@@ -1581,8 +1583,19 @@ function App() {
       }
     };
     
+    const fetchPublicHardwares = async () => {
+      try {
+        const res = await membersAPI.getPublicHardwares();
+        setMembers(res.data.data || []);
+      } catch (error) {
+        console.error('Error loading public hardwares:', error);
+      }
+    };
+    
     if (user) {
       fetchApplicators();
+    } else {
+      fetchPublicHardwares();
     }
   }, [user]);
 
@@ -2819,6 +2832,7 @@ function App() {
         condition: m.condition || 'good',
         notes: m.notes || '',
         photo: m.photo || '',
+        bankDetails: m.bankDetails || null,
         connectedHardware: m.connectedHardware?.memberName || (typeof m.connectedHardware === 'string' ? m.connectedHardware : ''),
         connectedHardwareId: m.connectedHardware?._id || m.connectedHardwareId || ''
       }));
@@ -3242,6 +3256,7 @@ function App() {
         condition: m.condition || 'good',
         notes: m.notes || '',
         photo: m.photo || '',
+        bankDetails: m.bankDetails || null,
         connectedHardware: m.connectedHardware?.memberName || (typeof m.connectedHardware === 'string' ? m.connectedHardware : ''),
         connectedHardwareId: m.connectedHardware?._id || m.connectedHardwareId || ''
       }));
@@ -3996,18 +4011,13 @@ function App() {
     }
   };
 
-  const handleUpdateLoyaltyConfig = async (customPayload) => {
+  const handleUpdateLoyaltyConfig = async (e) => {
+    const customPayload = (e && e.nativeEvent) ? null : e;
     if (!loyaltyConfig && !customPayload) return;
     
     setLoading(true);
     try {
-      const payloadToSave = customPayload || {
-        tierThresholds: loyaltyConfig.tierThresholds,
-        tierNames: loyaltyConfig.tierNames,
-        pointsCalculation: loyaltyConfig.pointsCalculation,
-        annualTiers: loyaltyConfig.annualTiers,
-        pointsReset: loyaltyConfig.pointsReset
-      };
+      const payloadToSave = customPayload || loyaltyConfig;
 
       const response = await loyaltyAPI.updateConfig(payloadToSave);
       
@@ -6449,7 +6459,26 @@ function App() {
               onRequestPermission={() => setFeedbackDialogOpen(true)}
             />
           )}
-              {adminTab === 'dashboard' && stats && (() => {
+          
+          {adminTab === 'dashboard' && (!stats || isLoadingAdminData.current) && (
+            <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+                  <Typography variant='h5' sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <DashboardIcon /> Dashboard Overview
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}><DashboardCardSkeleton /></Grid>
+              <Grid item xs={12} sm={6} md={3}><DashboardCardSkeleton /></Grid>
+              <Grid item xs={12} sm={6} md={3}><DashboardCardSkeleton /></Grid>
+              <Grid item xs={12} sm={6} md={3}><DashboardCardSkeleton /></Grid>
+              <Grid item xs={12} md={8}><ChartSkeleton height={350} /></Grid>
+              <Grid item xs={12} md={4}><ChartSkeleton height={350} /></Grid>
+            </Grid>
+          )}
+
+          {adminTab === 'dashboard' && stats && !isLoadingAdminData.current && (() => {
             const filteredDashboardScans = scanHistory.filter(scan => {
               if (!dashboardStartDate && !dashboardEndDate) return true;
               const scanDate = new Date(scan.timestamp);
@@ -10192,6 +10221,7 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Zone</TableCell>
                             <TableCell sx={{ fontWeight: 700, maxWidth: 150 }}>Notes</TableCell>
+                            <TableCell sx={{ fontWeight: 700, minWidth: 200 }}>Bank Details</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                           </>
                         ) : (
@@ -10207,6 +10237,7 @@ function App() {
                             <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Zone</TableCell>
                             <TableCell sx={{ fontWeight: 700, maxWidth: 150 }}>Notes</TableCell>
+                            <TableCell sx={{ fontWeight: 700, minWidth: 200 }}>Bank Details</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                           </>
                         )}
@@ -10335,22 +10366,22 @@ function App() {
                                   <TableCell sx={{ maxWidth: 150, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
                                     {applicator.notes || '-'}
                                   </TableCell>
+                                  <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
+                                    {applicator.bankDetails ? (
+                                      <Box>
+                                        {applicator.bankDetails.bankName && <Typography variant="caption" display="block"><strong>Bank:</strong> {applicator.bankDetails.bankName}</Typography>}
+                                        {applicator.bankDetails.branchName && <Typography variant="caption" display="block"><strong>Branch:</strong> {applicator.bankDetails.branchName}</Typography>}
+                                        {applicator.bankDetails.accountName && <Typography variant="caption" display="block"><strong>Name:</strong> {applicator.bankDetails.accountName}</Typography>}
+                                        {applicator.bankDetails.accountNumber && <Typography variant="caption" display="block"><strong>Acc:</strong> {applicator.bankDetails.accountNumber}</Typography>}
+                                        {!applicator.bankDetails.bankName && !applicator.bankDetails.branchName && !applicator.bankDetails.accountName && !applicator.bankDetails.accountNumber && '-'}
+                                      </Box>
+                                    ) : '-'}
+                                  </TableCell>
                                 </>
                               )}
                               <TableCell>
                                 <Box sx={{ display: 'flex', gap: 1 }}>
-                                  <Tooltip title="Quick View">
-                                    <IconButton
-                                      size="small"
-                                      color="primary"
-                                      onClick={() => {
-                                        setDrawerMember(applicator);
-                                        setDrawerOpen(true);
-                                      }}
-                                    >
-                                      <Visibility />
-                                    </IconButton>
-                                  </Tooltip>
+
                                   <Tooltip title='View Profile'>
                                     <IconButton
                                       size='small'
@@ -14012,7 +14043,23 @@ function App() {
                 onChange={(e) => setApplicatorFormData({ ...applicatorFormData, notes: e.target.value })}
               />
             </Grid>
-
+            <Grid item xs={12}>
+              <Divider sx={{ my: 1 }}>
+                <Chip label="Bank Details" size="small" />
+              </Divider>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="Bank Name" value={applicatorFormData.bankDetails?.bankName || ''} onChange={(e) => setApplicatorFormData({ ...applicatorFormData, bankDetails: { ...applicatorFormData.bankDetails, bankName: e.target.value } })} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="Branch Name" value={applicatorFormData.bankDetails?.branchName || ''} onChange={(e) => setApplicatorFormData({ ...applicatorFormData, bankDetails: { ...applicatorFormData.bankDetails, branchName: e.target.value } })} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="Account Name" value={applicatorFormData.bankDetails?.accountName || ''} onChange={(e) => setApplicatorFormData({ ...applicatorFormData, bankDetails: { ...applicatorFormData.bankDetails, accountName: e.target.value } })} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="Account Number" value={applicatorFormData.bankDetails?.accountNumber || ''} onChange={(e) => setApplicatorFormData({ ...applicatorFormData, bankDetails: { ...applicatorFormData.bankDetails, accountNumber: e.target.value } })} />
+            </Grid>
 
           </Grid>
         </DialogContent>
@@ -14057,7 +14104,8 @@ function App() {
                   role: 'applicator',
                   connectedHardware: applicatorFormData.connectedHardware || '',
                   connectedHardwareId: applicatorFormData.connectedHardwareId || '',
-                  photo: applicatorFormData.photo || ''
+                  photo: applicatorFormData.photo || '',
+                  bankDetails: applicatorFormData.bankDetails || null
                 };
                 
                 // Handle photo upload

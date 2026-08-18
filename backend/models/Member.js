@@ -159,6 +159,12 @@ const memberSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: 0
+  },
+  bankDetails: {
+    bankName: { type: String, trim: true },
+    branchName: { type: String, trim: true },
+    accountName: { type: String, trim: true },
+    accountNumber: { type: String, trim: true }
   }
 }, {
   timestamps: true

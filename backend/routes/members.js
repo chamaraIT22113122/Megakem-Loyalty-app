@@ -8,6 +8,19 @@ const LoyaltyConfig = require('../models/LoyaltyConfig');
 const { protect } = require('../middleware/auth');
 const { logAction } = require('../middleware/audit');
 
+// @route   GET /api/members/public/hardwares
+// @desc    Get all hardware shops publicly for the scanner dropdown
+// @access  Public
+router.get('/public/hardwares', async (req, res) => {
+  try {
+    const hardwares = await Member.find({ equipment: 'Hardware' })
+      .select('memberName memberId location role equipment');
+    res.json({ success: true, data: hardwares });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
 // @route   GET /api/members/stats/summary
 // @desc    Get summary statistics for applicators and hardwares
 // @access  Private/Admin
@@ -228,7 +241,7 @@ router.get('/', protect, async (req, res) => {
     let selectFields = '';
     if (req.user.role !== 'admin' && !hasUsersPerm) {
       // Exclude sensitive financial and points info for users/co-admins without canManageUsers
-      selectFields = 'memberId memberName phone whatsappNumber nic birthday role location hardwareAddress contactPersonName contactPersonMobile zone equipment equipmentBrand purchaseDate condition notes connectedHardware photo';
+      selectFields = 'memberId memberName phone whatsappNumber nic birthday role location hardwareAddress contactPersonName contactPersonMobile zone equipment equipmentBrand purchaseDate condition notes connectedHardware photo bankDetails';
     }
 
     const pageNum = parseInt(page);
@@ -694,7 +707,8 @@ router.post('/', protect, [
       notes,
       connectedHardware,
       connectedHardwareId,
-      photo
+      photo,
+      bankDetails
     } = req.body;
 
     if (isCoAdmin && !hasUsersPerm && hasApplicatorsPerm && role !== 'applicator' && role !== 'customer') {
@@ -731,6 +745,7 @@ router.post('/', protect, [
       if (connectedHardware !== undefined) member.connectedHardware = connectedHardware;
       if (connectedHardwareId !== undefined) member.connectedHardwareId = connectedHardwareId;
       if (photo !== undefined) member.photo = photo;
+      if (bankDetails !== undefined) member.bankDetails = bankDetails;
 
       const config = await LoyaltyConfig.getConfig();
       member.updateTier(config.tierThresholds);
@@ -773,7 +788,10 @@ router.post('/', protect, [
       notes,
       connectedHardware,
       connectedHardwareId,
-      photo
+      photo,
+      bankDetails,
+      points,
+      totalScans: points > 0 ? 1 : 0
     });
 
     const config = await LoyaltyConfig.getConfig();
@@ -854,7 +872,8 @@ router.put('/:id', protect, async (req, res) => {
       'connectedHardware',
       'connectedHardwareId',
       'photo',
-      'idCardConfig'
+      'idCardConfig',
+      'bankDetails'
     ];
 
     fieldsToUpdate.forEach(field => {

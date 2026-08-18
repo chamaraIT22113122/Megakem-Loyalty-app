@@ -181,7 +181,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Trust proxy for Render load balancers so rate limiter works properly
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute (reduced from 15m to quickly clear old penalties)
   max: 2000, // limit each IP to 2000 requests per windowMs

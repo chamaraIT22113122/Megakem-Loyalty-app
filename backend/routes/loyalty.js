@@ -173,10 +173,24 @@ router.put('/config', protect, [
     clearCacheKey('loyalty_config');
     await logAction(req, 'UPDATE_LOYALTY_CONFIG', 'SETTINGS', req.body);
 
+    // Recalculate tiers for all members based on new config
+    const Member = require('../models/Member');
+    const members = await Member.find({});
+    let updatedTiersCount = 0;
+    
+    for (const m of members) {
+      const oldTier = m.tier;
+      m.updateTier(config.tierThresholds);
+      if (oldTier !== m.tier) {
+        await m.save();
+        updatedTiersCount++;
+      }
+    }
+
     res.json({
       success: true,
       data: config,
-      message: 'Loyalty configuration updated successfully'
+      message: `Loyalty configuration updated. Recalculated tiers for ${updatedTiersCount} members.`
     });
   } catch (error) {
     res.status(400).json({
@@ -263,6 +277,40 @@ router.put('/products/:id/points', protect, [
       success: false,
       message: error.message
     });
+  }
+});
+
+// @route   PUT /api/loyalty/recalculate-tiers
+// @desc    Recalculate tiers for all members based on current config
+// @access  Private/Admin
+router.put('/recalculate-tiers', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const Member = require('../models/Member');
+    const config = await LoyaltyConfig.getConfig();
+    const members = await Member.find({});
+    let updated = 0;
+
+    for (const m of members) {
+      const oldTier = m.tier;
+      m.updateTier(config.tierThresholds);
+      
+      if (oldTier !== m.tier) {
+        await m.save();
+        updated++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully recalculated tiers. Updated ${updated} members.`,
+      updated
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
