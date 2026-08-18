@@ -1611,7 +1611,7 @@ function App() {
               
               // Network error or 5xx, server might be asleep. Retry.
               console.warn(`Server unreachable, retrying session verify (${i+1}/${retries})...`);
-              if (i === 1) showNotification('Waking up server, please wait...', 'info', 5000);
+              // Removed 'Waking up server' notification as requested
               if (i < retries - 1) await new Promise(res => setTimeout(res, 2000 + (1000 * i)));
               else throw err; // Out of retries
             }
@@ -1653,8 +1653,7 @@ function App() {
       } catch (error) {
         console.error(`Anonymous auth error (attempt ${i + 1}/${retries}):`, error);
         if (i === 2) {
-          // If it takes more than 2 attempts, show a friendly notification
-          showNotification('Waking up the server, this might take up to 30-50 seconds. Please wait...', 'info', 10000);
+          // If it takes more than 2 attempts, server is likely sleeping but we won't show the notification
         }
         if (i === retries - 1) {
           // Last attempt failed, show error to user
