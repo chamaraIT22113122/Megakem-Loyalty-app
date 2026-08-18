@@ -11,8 +11,39 @@ const api = axios.create({
   },
 });
 
+// --- API Request Queue to prevent Cloudflare rate limiting ---
+const MAX_CONCURRENT_REQUESTS = 3;
+const REQUEST_DELAY_MS = 50;
+let activeRequests = 0;
+const requestQueue = [];
+
+const processQueue = () => {
+  if (requestQueue.length === 0 || activeRequests >= MAX_CONCURRENT_REQUESTS) return;
+  
+  activeRequests++;
+  const nextRequest = requestQueue.shift();
+  // Execute the queued request
+  nextRequest();
+};
+
+const queueRequest = () => {
+  return new Promise(resolve => {
+    requestQueue.push(resolve);
+    processQueue();
+  });
+};
+
+const finishRequest = () => {
+  activeRequests--;
+  setTimeout(processQueue, REQUEST_DELAY_MS);
+};
+// -------------------------------------------------------------
+
 api.interceptors.request.use(
   async (config) => {
+    // Wait in queue before proceeding to prevent 429 errors from Cloudflare
+    await queueRequest();
+
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -78,8 +109,12 @@ api.interceptors.request.use(
 
 // Handle response errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    finishRequest();
+    return response;
+  },
   async (error) => {
+    finishRequest();
     // If the request was converted to a change request, mock a successful response
     // to prevent caller components from throwing an error and breaking the UI.
     if (axios.isCancel(error) && error.message === 'CHANGE_REQUEST_SUBMITTED') {
