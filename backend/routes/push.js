@@ -4,12 +4,22 @@ const webpush = require('web-push');
 const PushSubscription = require('../models/PushSubscription');
 const { protect } = require('../middleware/auth'); // assuming users are authenticated when subscribing
 
-// Initialize web-push with VAPID keys
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || 'mailto:admin@megakem.com',
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+// Initialize web-push with VAPID keys if present
+let isWebPushInitialized = false;
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  try {
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || 'mailto:admin@megakem.com',
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+    isWebPushInitialized = true;
+  } catch (err) {
+    console.error('Failed to initialize web-push:', err.message);
+  }
+} else {
+  console.warn('VAPID keys are missing. Web push notifications will be disabled.');
+}
 
 // @route   GET /api/push/vapidPublicKey
 // @desc    Get VAPID public key for frontend subscription
