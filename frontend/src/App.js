@@ -5443,16 +5443,93 @@ function App() {
                                     }}
                                   />
                                 </Box>
-                            {currentMember.location && (
-                              <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-                                <Typography variant="body2" sx={{ opacity: 0.7, mb: 0.5 }}>
-                                  Location
-                                </Typography>
-                                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                                  📍 {currentMember.location}
-                                </Typography>
-                              </Box>
-                            )}
+                            <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.2)', textAlign: 'left' }}>
+                              {/* Contact Details */}
+                              {(currentMember.phone || currentMember.mobile) && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>📞 Phone</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.phone || currentMember.mobile}</Typography>
+                                </Box>
+                              )}
+                              {currentMember.whatsappNumber && currentMember.whatsappNumber !== (currentMember.phone || currentMember.mobile) && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>💬 WhatsApp</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.whatsappNumber}</Typography>
+                                </Box>
+                              )}
+                              {currentMember.nic && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🪪 NIC</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.nic}</Typography>
+                                </Box>
+                              )}
+                              {currentMember.birthday && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🎂 Birthday</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{new Date(currentMember.birthday).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</Typography>
+                                </Box>
+                              )}
+                              {currentMember.location && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>📍 City</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.location}</Typography>
+                                </Box>
+                              )}
+                              {currentMember.zone && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🗺️ Zone</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.zone}</Typography>
+                                </Box>
+                              )}
+                              {currentMember.connectedHardware && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🏪 Hardware</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{typeof currentMember.connectedHardware === 'object' ? currentMember.connectedHardware?.memberName : currentMember.connectedHardware}</Typography>
+                                </Box>
+                              )}
+                              {currentMember.memberId && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🆔 Member ID</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: 'monospace', bgcolor: 'rgba(255,255,255,0.15)', px: 1, borderRadius: 1 }}>{currentMember.memberId}</Typography>
+                                </Box>
+                              )}
+                              {currentMember.notes && (
+                                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0, mt: 0.2 }}>📝 Notes</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500, opacity: 0.9, fontSize: '0.78rem' }}>{currentMember.notes}</Typography>
+                                </Box>
+                              )}
+                              {/* Bank Details */}
+                              {currentMember.bankDetails && (currentMember.bankDetails.bankName || currentMember.bankDetails.accountNumber) && (
+                                <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+                                  <Typography variant="caption" sx={{ opacity: 0.65, display: 'block', mb: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏦 Bank Details</Typography>
+                                  {currentMember.bankDetails.bankName && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                      <Typography variant="caption" sx={{ opacity: 0.6, minWidth: 68, flexShrink: 0 }}>Bank</Typography>
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.bankDetails.bankName}</Typography>
+                                    </Box>
+                                  )}
+                                  {currentMember.bankDetails.branchName && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                      <Typography variant="caption" sx={{ opacity: 0.6, minWidth: 68, flexShrink: 0 }}>Branch</Typography>
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.bankDetails.branchName}</Typography>
+                                    </Box>
+                                  )}
+                                  {currentMember.bankDetails.accountName && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                      <Typography variant="caption" sx={{ opacity: 0.6, minWidth: 68, flexShrink: 0 }}>Acc. Name</Typography>
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.bankDetails.accountName}</Typography>
+                                    </Box>
+                                  )}
+                                  {currentMember.bankDetails.accountNumber && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Typography variant="caption" sx={{ opacity: 0.6, minWidth: 68, flexShrink: 0 }}>Acc. No</Typography>
+                                      <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: 'monospace', bgcolor: 'rgba(255,255,255,0.15)', px: 1, borderRadius: 1 }}>{currentMember.bankDetails.accountNumber}</Typography>
+                                    </Box>
+                                  )}
+                                </Box>
+                              )}
+                            </Box>
                           </Box>
                         </Grid>
 
