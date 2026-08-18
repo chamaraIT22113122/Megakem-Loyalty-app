@@ -3398,7 +3398,7 @@ function App() {
           } else if (hasPermission('canManageQRCodes') || hasPermission('canPrintQRCodes')) {
             loadCoAdminRequests();
           }
-        }, 5000);
+        }, 30000); // Increased from 5s to 30s to prevent rate limit 429 errors
         return () => clearInterval(interval);
       }
     }

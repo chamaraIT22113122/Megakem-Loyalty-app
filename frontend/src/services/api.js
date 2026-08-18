@@ -37,10 +37,57 @@ const finishRequest = () => {
   activeRequests--;
   setTimeout(processQueue, REQUEST_DELAY_MS);
 };
+// --- Server Wake Mechanism to prevent 502/429 storms on cold start ---
+let isServerAwake = false;
+let isWakingUp = false;
+
+const ensureServerAwake = async () => {
+  if (isServerAwake) return true;
+  
+  if (isWakingUp) {
+    return new Promise(resolve => {
+      const interval = setInterval(() => {
+        if (isServerAwake) {
+          clearInterval(interval);
+          resolve(true);
+        }
+      }, 200);
+    });
+  }
+  
+  isWakingUp = true;
+  try {
+    let attempts = 0;
+    while(attempts < 30) {
+      try {
+        const res = await fetch(`${API_BASE_URL}`, { 
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
+        // If it's a 404 or any normal status, the Express server is awake!
+        if (res.status !== 502 && res.status !== 503) {
+          isServerAwake = true;
+          isWakingUp = false;
+          return true;
+        }
+      } catch (err) {
+        // Network error probably means CORS/502 from Render proxy
+      }
+      attempts++;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  } catch(e) {}
+  
+  isWakingUp = false;
+  return false;
+};
 // -------------------------------------------------------------
 
 api.interceptors.request.use(
   async (config) => {
+    // Before queuing, ensure server is awake to prevent 502/429 storms
+    await ensureServerAwake();
+    
     // Wait in queue before proceeding to prevent 429 errors from Cloudflare
     await queueRequest();
 
@@ -115,6 +162,12 @@ api.interceptors.response.use(
   },
   async (error) => {
     finishRequest();
+    
+    // If Render proxy returns 502/503 (server sleeping or crashed), reset awake state
+    if (error.response?.status === 502 || error.response?.status === 503 || error.message === 'Network Error') {
+      isServerAwake = false;
+    }
+
     // If the request was converted to a change request, mock a successful response
     // to prevent caller components from throwing an error and breaking the UI.
     if (axios.isCancel(error) && error.message === 'CHANGE_REQUEST_SUBMITTED') {
