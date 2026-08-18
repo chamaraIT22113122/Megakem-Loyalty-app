@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, Grid, Skeleton, Box, List, ListItem } from '@mui/material';
+import { Card, CardContent, Grid, Skeleton, Box, ListItem } from '@mui/material';
 
 // Skeleton for product cards
 export const ProductCardSkeleton = () => (

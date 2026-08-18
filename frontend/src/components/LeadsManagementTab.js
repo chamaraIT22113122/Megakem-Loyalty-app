@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Box, Typography, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, 
-  IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, FormControl, InputLabel, Tooltip, Grid, LinearProgress, CircularProgress
+  IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, FormControl, InputLabel, Tooltip, Grid, CircularProgress
 } from '@mui/material';
 import { Delete, Edit, Notes, FileDownload, FilterList, Refresh } from '@mui/icons-material';
 import api, { analyticsAPI } from '../services/api';
@@ -45,6 +45,7 @@ function LeadsManagementTab({ onShowNotification }) {
 
   useEffect(() => {
     loadLeads();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSaveEdit = async () => {
