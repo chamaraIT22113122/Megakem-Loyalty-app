@@ -58,9 +58,9 @@ jobs:
         server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
-        protocol: ftp
+        protocol: ftps
         port: 21
-        security: "loose"
+        security: "strict"
         timeout: 600000
         local-dir: ./frontend/build/
         server-dir: ./
