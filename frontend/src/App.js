@@ -13,7 +13,7 @@ import autoTable from 'jspdf-autotable';
 import * as faceapi from '@vladmandic/face-api';
 import { BarChart, Bar, PieChart, Pie, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import api, { authAPI, scansAPI, productsAPI, analyticsAPI, membersAPI, loyaltyAPI, cashRewardsAPI, qrCodesAPI, rewardsAPI, redemptionsAPI, auditLogsAPI, uploadAPI, backupAPI, feedbackAPI } from './services/api';
-import { generateIDCard } from './utils/generateIDCard';
+import { generateIDCard, generateIDCardImage } from './utils/generateIDCard';
 import QRCodeManager from './components/QRCodeManager';
 import SriLankaZoneMap from './components/SriLankaZoneMap';
 import FeedbackDialog from './components/FeedbackDialog';
@@ -1477,6 +1477,36 @@ function App() {
     }
   };
 
+  const handleDownloadIDCardImage = async (format = 'png') => {
+    try {
+      setLoading(true);
+      const apiUrl = process.env.REACT_APP_API_URL || (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', '');
+      const result = await generateIDCardImage(idCardPreviewDialog.member, apiUrl, idCardPreviewDialog.config, format);
+      result.download();
+      showNotification(`ID Card Front (${format.toUpperCase()}) downloaded successfully`, 'success');
+    } catch (err) {
+      console.error(err);
+      showNotification(`Failed to download ID Card ${format.toUpperCase()}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadIDCardPDF = async (frontOnly = false) => {
+    try {
+      setLoading(true);
+      const apiUrl = process.env.REACT_APP_API_URL || (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', '');
+      const result = await generateIDCard(idCardPreviewDialog.member, apiUrl, idCardPreviewDialog.config, { frontOnly });
+      result.doc.save(result.filename);
+      showNotification(`ID Card ${frontOnly ? 'Front PDF' : 'Full PDF'} downloaded successfully`, 'success');
+    } catch (err) {
+      console.error(err);
+      showNotification('Failed to download ID Card PDF', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const [hardwareFormData, setHardwareFormData] = useState({
     name: '',
     memberId: '',
@@ -1792,19 +1822,29 @@ function App() {
         fullBatch: batchParam || ''
       };
 
-      // Support for the old 5-part batch format "MLSP 001 050525 001 001"
-      if (batchParam && batchParam.trim().split(/\s+/).length === 5) {
-        const parts = batchParam.trim().split(/\s+/);
-        const [pCode, materialBatch, dateCode, packSize, packNo] = parts;
-        
-        parsedData = {
-          productCode: productParam || pCode,
-          materialBatch,
-          dateCode,
-          packSize: extractPackSize(packSize),
-          bagNo: pkgParam || packNo,
-          fullBatch: batchParam
-        };
+      // Support 4-part and 5-part batch formats ("MLSP 001 050525 001", "MLSP_001_050525_001", "MLSP 001 050525 001 001")
+      if (batchParam) {
+        const batchInfo = extractBatchInfo(batchParam);
+        if (batchInfo.parsed) {
+          parsedData.productCode = productParam || batchInfo.productCode;
+          parsedData.materialBatch = batchInfo.materialBatch;
+          parsedData.dateCode = batchInfo.date;
+          if (batchInfo.packSize && batchInfo.packSize !== '1') {
+            parsedData.packSize = batchInfo.packSize;
+          }
+          parsedData.bagNo = pkgParam || batchInfo.packNo || parsedData.bagNo;
+        } else if (batchParam.trim().split(/\s+/).length === 5) {
+          const parts = batchParam.trim().split(/\s+/);
+          const [pCode, materialBatch, dateCode, packSize, packNo] = parts;
+          parsedData = {
+            productCode: productParam || pCode,
+            materialBatch,
+            dateCode,
+            packSize: extractPackSize(packSize),
+            bagNo: pkgParam || packNo,
+            fullBatch: batchParam
+          };
+        }
       }
       
       console.log('Parsed QR data:', parsedData);
@@ -3588,24 +3628,76 @@ function App() {
       if (pendingScan && role && (view === 'scanner' || view === 'cart')) {
         console.log('Processing pending scan:', pendingScan);
         try {
-          // Find product by exact product code AND pack size match from admin products
-          console.log('Processing pending scan with productCode:', pendingScan.productCode, 'and packSize:', pendingScan.packSize);
-          console.log('Available products:', products.map(p => ({ name: p.name, code: p.productNo, packSize: p.category })));
+          // If products are not yet loaded (e.g. cold mobile browser load), fetch them from API directly
+          let availableProducts = products;
+          if (!availableProducts || availableProducts.length === 0) {
+            try {
+              const res = await productsAPI.getAll();
+              availableProducts = res.data?.data || [];
+              if (availableProducts.length > 0) {
+                setProducts(availableProducts);
+              }
+            } catch (err) {
+              console.error('Error fetching products during pending scan:', err);
+            }
+          }
+
+          // If products are still loading/empty, wait for next render
+          if (!availableProducts || availableProducts.length === 0) {
+            console.log('Products still loading from server, waiting...');
+            return;
+          }
+
+          const rawCode = (pendingScan.productCode || '').trim();
+          const rawBatch = (pendingScan.fullBatch || pendingScan.batchNo || '').trim();
+          const cleanCode = rawCode.replace(/[\s+_-]/g, '').toUpperCase();
           
-          // First try to find exact match: same product code AND pack size
-          let product = products.find(p => 
-            (pendingScan.productCode && p.productNo.toUpperCase() === pendingScan.productCode.toUpperCase()) &&
-            (pendingScan.packSize && p.category && p.category.toUpperCase() === pendingScan.packSize.toUpperCase())
+          console.log('Processing pending scan with productCode:', rawCode, 'and packSize:', pendingScan.packSize);
+
+          // 1. Exact match: same product code AND pack size
+          let product = availableProducts.find(p => 
+            p.productNo && 
+            p.productNo.trim().toUpperCase() === rawCode.toUpperCase() &&
+            pendingScan.packSize && p.category && p.category.trim().toUpperCase() === pendingScan.packSize.trim().toUpperCase()
           );
-          
-          // If no exact match, fall back to just product code match
-          if (!product) {
-            product = products.find(p => 
-              (pendingScan.productCode && p.productNo.toUpperCase() === pendingScan.productCode.toUpperCase())
+
+          // 2. Product code match (exact or normalized spaces/pluses/underscores)
+          if (!product && rawCode) {
+            product = availableProducts.find(p => {
+              if (!p.productNo) return false;
+              const pNo = p.productNo.trim().toUpperCase();
+              const cleanPNo = p.productNo.replace(/[\s+_-]/g, '').toUpperCase();
+              return pNo === rawCode.toUpperCase() || 
+                     cleanPNo === cleanCode ||
+                     pNo.startsWith(rawCode.toUpperCase()) ||
+                     rawCode.toUpperCase().startsWith(pNo);
+            });
+          }
+
+          // 3. Fallback: match from batch string (e.g. "MLSP 001 050525 001" or "MLSP_001_...")
+          if (!product && rawBatch) {
+            const batchParts = rawBatch.split(/[\s_]+/);
+            const firstPart = batchParts[0] ? batchParts[0].trim().toUpperCase() : '';
+            const cleanFirstPart = firstPart.replace(/[\s+_-]/g, '').toUpperCase();
+
+            product = availableProducts.find(p => {
+              if (!p.productNo) return false;
+              const pNo = p.productNo.trim().toUpperCase();
+              const cleanPNo = p.productNo.replace(/[\s+_-]/g, '').toUpperCase();
+              return pNo === firstPart || 
+                     cleanPNo === cleanFirstPart ||
+                     rawBatch.toUpperCase().startsWith(pNo);
+            });
+          }
+
+          // 4. Fallback: match product by name
+          if (!product && rawCode) {
+            product = availableProducts.find(p => 
+              p.name && (
+                p.name.trim().toUpperCase() === rawCode.toUpperCase() ||
+                p.name.replace(/[\s+_-]/g, '').toUpperCase() === cleanCode
+              )
             );
-            console.log('No exact pack size match, using fallback product:', product);
-          } else {
-            console.log('Found exact match:', product);
           }
           
           const itemPrice = product ? product.price : 0;
@@ -3616,7 +3708,7 @@ function App() {
               name: product.name,
               batch: pendingScan.fullBatch || pendingScan.batchNo,
               bag: pendingScan.bagNo || '001',
-              qty: pendingScan.packSize || '1kg',
+              qty: pendingScan.packSize || product.category || '1kg',
               price: itemPrice,
               tempId: Date.now()
             };
@@ -14709,7 +14801,7 @@ function App() {
             ))}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'space-between', px: 3 }}>
+        <DialogActions sx={{ justifyContent: 'space-between', px: 3, py: 2, flexWrap: 'wrap', gap: 1 }}>
           <Button 
             variant="outlined" 
             color="secondary" 
@@ -14717,23 +14809,49 @@ function App() {
           >
             Save as Default Layout
           </Button>
-          <Box>
-            <Button onClick={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })} sx={{ mr: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Button 
+              onClick={() => setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null })} 
+              sx={{ color: 'text.secondary' }}
+            >
               Close
             </Button>
             <Button 
+              variant="outlined" 
+              color="primary" 
+              startIcon={<PhotoCamera />}
+              onClick={() => handleDownloadIDCardImage('png')}
+              sx={{ fontWeight: 600 }}
+            >
+              Download PNG
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              startIcon={<PhotoCamera />}
+              onClick={() => handleDownloadIDCardImage('jpg')}
+              sx={{ fontWeight: 600 }}
+            >
+              Download JPG
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              startIcon={<PictureAsPdf />}
+              onClick={() => handleDownloadIDCardPDF(true)}
+              sx={{ fontWeight: 600 }}
+            >
+              PDF (Front Only)
+            </Button>
+            <Button 
               variant="contained" 
-            color="primary" 
-            onClick={() => {
-              if (idCardPreviewDialog.doc) {
-                idCardPreviewDialog.doc.save(idCardPreviewDialog.filename);
-                setIdCardPreviewDialog({ open: false, dataUri: '', filename: '', doc: null });
-                showNotification('ID Card downloaded', 'success');
-              }
-            }}
-          >
-            Download PDF
-          </Button>
+              color="primary" 
+              startIcon={<PictureAsPdf />}
+              onClick={() => handleDownloadIDCardPDF(false)}
+              sx={{ fontWeight: 700 }}
+            >
+              Download PDF (Both Sides)
+            </Button>
           </Box>
         </DialogActions>
       </Dialog>
