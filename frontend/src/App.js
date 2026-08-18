@@ -14080,138 +14080,181 @@ function App() {
                 showNotification('Please fill in required fields', 'error');
                 return;
               }
-              
-              setLoading(true);
-              try {
-                let newMemberId;
-                if (applicatorDialog.data) {
-                  newMemberId = applicatorDialog.data.memberId;
-                } else {
-                  do {
-                    newMemberId = 'MA' + Math.floor(1000 + Math.random() * 9000).toString();
-                    // eslint-disable-next-line no-loop-func
-                  } while (applicatorInfo.some(a => a.memberId === newMemberId));
-                }
-                const generatedMemberId = newMemberId;
-                const backendPayload = {
-                  memberName: applicatorFormData.name,
-                  memberId: generatedMemberId,
-                  phone: applicatorFormData.phoneNumber,
-                  whatsappNumber: applicatorFormData.whatsappNumber,
-                  nic: applicatorFormData.nic,
-                  birthday: applicatorFormData.birthday || null,
-                  location: applicatorFormData.location,
-                  zone: applicatorFormData.zone || null,
-                  notes: applicatorFormData.notes || '',
-                  condition: applicatorFormData.condition || 'good',
-                  equipment: applicatorFormData.equipment || 'Applicator',
-                  role: 'applicator',
-                  connectedHardware: applicatorFormData.connectedHardware || '',
-                  connectedHardwareId: applicatorFormData.connectedHardwareId || '',
-                  photo: applicatorFormData.photo || '',
-                  bankDetails: applicatorFormData.bankDetails || null
-                };
-                
-                // Handle photo upload
-                if (applicatorPhotoFile) {
-                  try {
-                    const uploadedUrl = await new Promise((resolve, reject) => {
-                      const reader = new FileReader();
-                      reader.readAsDataURL(applicatorPhotoFile);
-                      reader.onload = (e) => {
-                        const img = new Image();
-                        img.src = e.target.result;
-                        img.onload = () => {
-                          const canvas = document.createElement('canvas');
-                          let width = img.width;
-                          let height = img.height;
-                          const maxDim = 800;
-                          
-                          if (width > height && width > maxDim) {
-                            height *= maxDim / width;
-                            width = maxDim;
-                          } else if (height > maxDim) {
-                            width *= maxDim / height;
-                            height = maxDim;
-                          }
-                          
-                          canvas.width = width;
-                          canvas.height = height;
-                          const ctx = canvas.getContext('2d');
-                          ctx.drawImage(img, 0, 0, width, height);
-                          
-                          canvas.toBlob(async (blob) => {
-                            if (!blob) {
-                              reject(new Error('Canvas to Blob failed'));
-                              return;
-                            }
-                            const formData = new FormData();
-                            formData.append('image', blob, applicatorPhotoFile.name || 'photo.jpg');
-                            
-                            try {
-                              const uploadRes = await uploadAPI.uploadImage(formData);
-                              if (uploadRes.data && uploadRes.data.url) {
-                                resolve(uploadRes.data.url);
-                              } else if (uploadRes.data && uploadRes.data.data && uploadRes.data.data.url) {
-                                resolve(uploadRes.data.data.url);
-                              } else {
-                                reject(new Error('Upload API did not return a URL'));
-                              }
-                            } catch (err) {
-                              reject(err);
-                            }
-                          }, 'image/jpeg', 0.8);
-                        };
-                        img.onerror = (err) => reject(err);
-                      };
-                      reader.onerror = error => reject(error);
-                    });
-                    backendPayload.photo = uploadedUrl;
-                  } catch (uploadError) {
-                    console.error('Error processing photo:', uploadError);
-                    showNotification('Failed to upload photo. Saving without new photo.', 'warning');
-                  }
-                }
 
-                if (applicatorDialog.data && applicatorDialog.data._id) {
-                  const updateRes = await membersAPI.update(applicatorDialog.data._id, backendPayload);
-                  // Immediately patch local state so the table reflects changes without waiting for full reload
-                  const updatedMember = updateRes?.data?.data || updateRes?.data;
-                  if (updatedMember) {
-                    setApplicatorInfo(prev => prev.map(a =>
-                      a._id === applicatorDialog.data._id
-                        ? {
-                            ...a,
-                            name: backendPayload.memberName,
-                            phoneNumber: backendPayload.phone,
-                            whatsappNumber: backendPayload.whatsappNumber,
-                            nic: backendPayload.nic,
-                            birthday: backendPayload.birthday,
-                            location: backendPayload.location,
-                            zone: backendPayload.zone,
-                            notes: backendPayload.notes,
-                            condition: backendPayload.condition,
-                            photo: backendPayload.photo,
-                            bankDetails: backendPayload.bankDetails
-                          }
-                        : a
-                    ));
-                  }
-                  showNotification('Applicator info updated successfully', 'success');
-                } else {
-                  await membersAPI.create(backendPayload);
-                  showNotification('Applicator info added successfully', 'success');
-                }
+              let newMemberId;
+              if (applicatorDialog.data) {
+                newMemberId = applicatorDialog.data.memberId;
+              } else {
+                do {
+                  newMemberId = 'MA' + Math.floor(1000 + Math.random() * 9000).toString();
+                  // eslint-disable-next-line no-loop-func
+                } while (applicatorInfo.some(a => a.memberId === newMemberId));
+              }
 
-                // Refresh full data in background (non-blocking)
-                loadAdminData();
+              const backendPayload = {
+                memberName: applicatorFormData.name,
+                memberId: newMemberId,
+                phone: applicatorFormData.phoneNumber,
+                whatsappNumber: applicatorFormData.whatsappNumber,
+                nic: applicatorFormData.nic,
+                birthday: applicatorFormData.birthday || null,
+                location: applicatorFormData.location,
+                zone: applicatorFormData.zone || null,
+                notes: applicatorFormData.notes || '',
+                condition: applicatorFormData.condition || 'good',
+                equipment: applicatorFormData.equipment || 'Applicator',
+                role: 'applicator',
+                connectedHardware: applicatorFormData.connectedHardware || '',
+                connectedHardwareId: applicatorFormData.connectedHardwareId || '',
+                photo: applicatorFormData.photo || '',
+                bankDetails: applicatorFormData.bankDetails || null
+              };
+
+              const isUpdate = !!(applicatorDialog.data && applicatorDialog.data._id);
+
+              if (isUpdate) {
+                // ── OPTIMISTIC UPDATE ──────────────────────────────────────────
+                // 1. Snapshot previous state in case we need to revert
+                const previousApplicatorInfo = applicatorInfo;
+
+                // 2. Instantly update the table row
+                setApplicatorInfo(prev => prev.map(a =>
+                  a._id === applicatorDialog.data._id
+                    ? {
+                        ...a,
+                        name: backendPayload.memberName,
+                        phoneNumber: backendPayload.phone,
+                        whatsappNumber: backendPayload.whatsappNumber,
+                        nic: backendPayload.nic,
+                        birthday: backendPayload.birthday,
+                        location: backendPayload.location,
+                        zone: backendPayload.zone,
+                        notes: backendPayload.notes,
+                        condition: backendPayload.condition,
+                        photo: backendPayload.photo,
+                        bankDetails: backendPayload.bankDetails
+                      }
+                    : a
+                ));
+
+                // 3. Close modal immediately — no spinner, no wait
                 setApplicatorDialog({ open: false, data: null });
                 setApplicatorPhotoFile(null);
-              } catch (error) {
-                console.error('Error saving applicator:', error);
-                showNotification(error.response?.data?.message || 'Failed to save applicator information', 'error');
-              } finally {
-                setLoading(false);
+                showNotification('Applicator info updated successfully', 'success');
+
+                // 4. Send the actual API request in the background
+                (async () => {
+                  try {
+                    // Handle photo upload if a new photo was selected
+                    if (applicatorPhotoFile) {
+                      try {
+                        const uploadedUrl = await new Promise((resolve, reject) => {
+                          const reader = new FileReader();
+                          reader.readAsDataURL(applicatorPhotoFile);
+                          reader.onload = (e) => {
+                            const img = new Image();
+                            img.src = e.target.result;
+                            img.onload = () => {
+                              const canvas = document.createElement('canvas');
+                              let width = img.width;
+                              let height = img.height;
+                              const maxDim = 800;
+                              if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
+                              else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                              canvas.width = width;
+                              canvas.height = height;
+                              canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                              canvas.toBlob(async (blob) => {
+                                if (!blob) { reject(new Error('Canvas to Blob failed')); return; }
+                                const formData = new FormData();
+                                formData.append('image', blob, applicatorPhotoFile.name || 'photo.jpg');
+                                try {
+                                  const uploadRes = await uploadAPI.uploadImage(formData);
+                                  const url = uploadRes.data?.url || uploadRes.data?.data?.url;
+                                  if (url) resolve(url); else reject(new Error('No URL returned'));
+                                } catch (err) { reject(err); }
+                              }, 'image/jpeg', 0.8);
+                            };
+                            img.onerror = reject;
+                          };
+                          reader.onerror = reject;
+                        });
+                        backendPayload.photo = uploadedUrl;
+                        // Update photo in table too
+                        setApplicatorInfo(prev => prev.map(a =>
+                          a._id === applicatorDialog.data._id ? { ...a, photo: uploadedUrl } : a
+                        ));
+                      } catch (uploadErr) {
+                        console.error('Photo upload failed:', uploadErr);
+                      }
+                    }
+
+                    await membersAPI.update(applicatorDialog.data._id, backendPayload);
+                    // Silently refresh data in background
+                    loadAdminData();
+                  } catch (error) {
+                    console.error('Error saving applicator:', error);
+                    // Revert optimistic update on failure
+                    setApplicatorInfo(previousApplicatorInfo);
+                    showNotification(error.response?.data?.message || 'Update failed — changes have been reverted', 'error');
+                  }
+                })();
+
+              } else {
+                // ── CREATE (keep spinner, this is a new record) ───────────────
+                setLoading(true);
+                try {
+                  // Handle photo upload
+                  if (applicatorPhotoFile) {
+                    try {
+                      const uploadedUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(applicatorPhotoFile);
+                        reader.onload = (e) => {
+                          const img = new Image();
+                          img.src = e.target.result;
+                          img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+                            const maxDim = 800;
+                            if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
+                            else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                            canvas.width = width;
+                            canvas.height = height;
+                            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                            canvas.toBlob(async (blob) => {
+                              if (!blob) { reject(new Error('Canvas to Blob failed')); return; }
+                              const formData = new FormData();
+                              formData.append('image', blob, applicatorPhotoFile.name || 'photo.jpg');
+                              try {
+                                const uploadRes = await uploadAPI.uploadImage(formData);
+                                const url = uploadRes.data?.url || uploadRes.data?.data?.url;
+                                if (url) resolve(url); else reject(new Error('No URL returned'));
+                              } catch (err) { reject(err); }
+                            }, 'image/jpeg', 0.8);
+                          };
+                          img.onerror = reject;
+                        };
+                        reader.onerror = reject;
+                      });
+                      backendPayload.photo = uploadedUrl;
+                    } catch (uploadError) {
+                      console.error('Error processing photo:', uploadError);
+                      showNotification('Failed to upload photo. Saving without new photo.', 'warning');
+                    }
+                  }
+                  await membersAPI.create(backendPayload);
+                  showNotification('Applicator info added successfully', 'success');
+                  loadAdminData();
+                  setApplicatorDialog({ open: false, data: null });
+                  setApplicatorPhotoFile(null);
+                } catch (error) {
+                  console.error('Error saving applicator:', error);
+                  showNotification(error.response?.data?.message || 'Failed to add applicator', 'error');
+                } finally {
+                  setLoading(false);
+                }
               }
             }}
             disabled={!applicatorFormData.name}
