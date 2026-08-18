@@ -1588,24 +1588,49 @@ function App() {
       try {
         const storedAdminAuth = localStorage.getItem('adminAuth');
         
-        try { 
-          // Always try to fetch the current session. The backend will use HttpOnly cookies.
-          const response = await authAPI.getMe(); 
-          const fetchedUser = response.data.data;
-          setUser(fetchedUser);
-          
-          // If we have adminAuth flag in localStorage but the user is NOT an admin/co-admin,
-          // clear the flag so they don't incorrectly try to load admin data.
-          if (storedAdminAuth === 'true' && fetchedUser.role !== 'admin' && fetchedUser.role !== 'co-admin') {
-            localStorage.removeItem('adminAuth');
-            setAdminAuth(false);
+        const verifySession = async (retries = 10) => {
+          for (let i = 0; i < retries; i++) {
+            try {
+              // Always try to fetch the current session. The backend will use HttpOnly cookies.
+              const response = await authAPI.getMe(); 
+              const fetchedUser = response.data.data;
+              setUser(fetchedUser);
+              
+              // If we have adminAuth flag in localStorage but the user is NOT an admin/co-admin,
+              // clear the flag so they don't incorrectly try to load admin data.
+              if (storedAdminAuth === 'true' && fetchedUser.role !== 'admin' && fetchedUser.role !== 'co-admin') {
+                localStorage.removeItem('adminAuth');
+                setAdminAuth(false);
+              }
+              return true;
+            } catch (err) {
+              const isAuthError = err.response && (err.response.status === 401 || err.response.status === 403);
+              if (isAuthError) {
+                throw err; // Token actually expired or invalid
+              }
+              
+              // Network error or 5xx, server might be asleep. Retry.
+              console.warn(`Server unreachable, retrying session verify (${i+1}/${retries})...`);
+              if (i === 1) showNotification('Waking up server, please wait...', 'info', 5000);
+              if (i < retries - 1) await new Promise(res => setTimeout(res, 2000 + (1000 * i)));
+              else throw err; // Out of retries
+            }
           }
+        };
+
+        try { 
+          await verifySession();
         }
-        catch { 
-          // Not logged in or session expired
-          localStorage.removeItem('token'); 
-          localStorage.removeItem('adminAuth');
-          await createAnonymousSession(); 
+        catch (err) { 
+          // If token expired, or out of retries
+          const isAuthError = err.response && (err.response.status === 401 || err.response.status === 403);
+          if (isAuthError) {
+            localStorage.removeItem('token'); 
+            localStorage.removeItem('adminAuth');
+            await createAnonymousSession(); 
+          } else {
+            showNotification('Unable to connect to server. Please check your connection and refresh the page.', 'error', 8000);
+          }
         }
       } catch (error) { 
         console.error('Auth error:', error); 
@@ -1617,7 +1642,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const createAnonymousSession = async (retries = 3) => {
+  const createAnonymousSession = async (retries = 10) => {
     for (let i = 0; i < retries; i++) {
       try {
         const response = await authAPI.anonymous();
@@ -1627,6 +1652,10 @@ function App() {
         return; // Success, exit function
       } catch (error) {
         console.error(`Anonymous auth error (attempt ${i + 1}/${retries}):`, error);
+        if (i === 2) {
+          // If it takes more than 2 attempts, show a friendly notification
+          showNotification('Waking up the server, this might take up to 30-50 seconds. Please wait...', 'info', 10000);
+        }
         if (i === retries - 1) {
           // Last attempt failed, show error to user
           showNotification(
@@ -1636,7 +1665,7 @@ function App() {
           );
         } else {
           // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+          await new Promise(resolve => setTimeout(resolve, 2000 + (1000 * i)));
         }
       }
     }
