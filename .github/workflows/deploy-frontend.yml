@@ -60,7 +60,7 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         protocol: ftps
         port: 21
-        security: "strict"
+        security: "loose"
         timeout: 600000
         local-dir: ./frontend/build/
         server-dir: ./
