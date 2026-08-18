@@ -4633,7 +4633,7 @@ function App() {
               <TextField 
                 fullWidth 
                 label='Member ID (for Applicators)' 
-                placeholder='e.g., APP-001' 
+                placeholder='e.g., MA0000' 
                 value={searchMemberId} 
                 onChange={(e) => {
                   setSearchMemberId(e.target.value.toUpperCase());
@@ -4707,19 +4707,18 @@ function App() {
             // eslint-disable-next-line no-unused-vars
             const tierProgress = nextTier ? ((totalPoints - currentTier.min) / (nextTier.min - currentTier.min)) * 100 : 100;
             
-            // Group purchases by month for chart
-            const monthlyData = {};
-            memberHistory.forEach(scan => {
-              const month = new Date(scan.timestamp).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-              if (!monthlyData[month]) monthlyData[month] = 0;
-              const basePoints = Math.floor((scan.price || 0) / pointsDivisor);
-              const bonusPoints = scan.role === 'applicator' ? Math.floor(basePoints * applicatorBonusRate) : 0;
-              const scanPoints = basePoints + bonusPoints;
-              monthlyData[month] += scanPoints;
+            // Current Month calculations
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+            const currentMonthName = now.toLocaleString('default', { month: 'short' });
+
+            const currentMonthScans = memberHistory.filter(s => {
+              const d = new Date(s.timestamp || s.createdAt || s.date);
+              return !isNaN(d.getTime()) && d.getFullYear() === currentYear && d.getMonth() === currentMonth;
             });
-            const months = Object.keys(monthlyData).slice(-6);
-            const maxPoints = Math.max(...Object.values(monthlyData));
-            
+            const currentMonthPoints = currentMonthScans.reduce((sum, s) => sum + (Number(s.pointsEarned ?? s.points) || 0), 0);
+
             return (
             <Box>
               {/* Enhanced Total Points Card */}
@@ -4727,7 +4726,7 @@ function App() {
                 <Box sx={{ p: 3, background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant='h5' fontWeight={700}>
-                      🎉 Monthly Purchase Summary
+                      🎉 Monthly Purchase Summary ({currentMonthName} {currentYear})
                     </Typography>
                     <Chip 
                       label={memberHistory.filter(s => s.role === 'applicator').length > 0 ? 'Applicator' : 'Hardware'} 
@@ -4745,57 +4744,21 @@ function App() {
                     <Grid item xs={6} sm={6}>
                       <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
                         <EmojiEvents sx={{ fontSize: 40, mb: 1 }} />
-                        <Typography variant='h3' fontWeight={700}>{memberHistory.length}</Typography>
-                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Total Scans</Typography>
+                        <Typography variant='h3' fontWeight={700}>{currentMonthScans.length}</Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>{currentMonthName} Scans</Typography>
                       </Box>
                     </Grid>
                     <Grid item xs={6} sm={6}>
                       <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
                         <EmojiEvents sx={{ fontSize: 40, mb: 1 }} />
                         <Typography variant='h3' fontWeight={700}>
-                          {memberHistory.reduce((sum, s) => sum + (s.points || 0), 0).toLocaleString()}
+                          {currentMonthPoints.toLocaleString()}
                         </Typography>
-                        <Typography variant='caption' sx={{ opacity: 0.9 }}>Total Loyalty Points</Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>{currentMonthName} Points</Typography>
                       </Box>
                     </Grid>
                   </Grid>
                   
-                </Box>
-                
-                {/* Purchase Pattern Chart */}
-                <Box sx={{ p: 3, bgcolor: 'background.paper' }}>
-                  <Typography variant='h6' fontWeight={600} gutterBottom color='text.primary'>
-                    📊 Purchase Pattern (Last 6 Months)
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 120, mt: 2 }}>
-                    {months.map((month, idx) => {
-                      const height = (monthlyData[month] / maxPoints) * 100;
-                      return (
-                        <Box key={idx} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <Tooltip title={`${monthlyData[month]} purchases`}>
-                            <Box 
-                              sx={{ 
-                                width: '100%', 
-                                height: `${height}%`, 
-                                minHeight: monthlyData[month] > 0 ? '20px' : '5px',
-                                bgcolor: 'primary.main',
-                                borderRadius: '4px 4px 0 0',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s',
-                                '&:hover': {
-                                  bgcolor: 'primary.dark',
-                                  transform: 'translateY(-4px)'
-                                }
-                              }}
-                            />
-                          </Tooltip>
-                          <Typography variant='caption' sx={{ mt: 1, fontSize: '0.65rem' }}>
-                            {month.split(' ')[0]}
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-                  </Box>
                 </Box>
               </Card>
               {memberHistory.map((scan, idx) => {
@@ -5342,6 +5305,26 @@ function App() {
           const totalAmount = memberScans.reduce((sum, s) => sum + (s.price || 0), 0);
           const totalPoints = currentMember?.points || 0;
           
+          // Current Month calculations
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const currentMonth = now.getMonth();
+          const currentMonthName = now.toLocaleString('default', { month: 'short' });
+          
+          const currentMonthScans = memberScans.filter(s => {
+            const scanDate = new Date(s.timestamp || s.createdAt || s.date);
+            return !isNaN(scanDate.getTime()) && 
+                   scanDate.getFullYear() === currentYear && 
+                   scanDate.getMonth() === currentMonth;
+          });
+          const currentMonthPointsFromScans = currentMonthScans.reduce((sum, s) => sum + (Number(s.pointsEarned ?? s.points) || 0), 0);
+          const currentMonthRecord = (currentMember?.monthlyPurchases || []).find(
+            p => p.year === currentYear && p.month === (currentMonth + 1)
+          );
+          const currentMonthPoints = currentMonthRecord?.pointsEarned !== undefined
+            ? currentMonthRecord.pointsEarned
+            : currentMonthPointsFromScans;
+
           return (
             <Box sx={{ 
               minHeight: '100vh',
@@ -5365,8 +5348,8 @@ function App() {
                     onClick={() => setView(adminAuth ? 'admin' : 'welcome')} 
                     sx={{ 
                       bgcolor: 'white',
-                      boxShadow: 2,
-                      '&:hover': { bgcolor: 'primary.main', color: 'white' }
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      '&:hover': { bgcolor: 'grey.100' }
                     }}
                   >
                     <ArrowForward sx={{ transform: 'rotate(180deg)' }} />
@@ -5379,321 +5362,194 @@ function App() {
 
               {currentMember ? (
                 <Box sx={{ maxWidth: '1400px', mx: 'auto' }}>
-                  {/* Top Section - Profile Card with Stats */}
-                  <Card sx={{ 
-                    mb: 3,
-                    borderRadius: 3,
-                    overflow: 'hidden',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-                  }}>
-                    <Box sx={{ 
-                      background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90a4 100%)',
-                      p: 4
-                    }}>
-                      <Grid container spacing={4} alignItems="center">
-                        {/* Profile Info */}
-                        <Grid item xs={12} md={4.5} lg={3.5}>
-                          <Box sx={{ textAlign: 'center', color: 'white' }}>
-                            <Avatar 
-                              src={currentMember.photo ? (currentMember.photo.startsWith('data:image') || currentMember.photo.startsWith('http') ? currentMember.photo : `${(process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', '')}${currentMember.photo}`) : ''}
-                              sx={{ 
-                              width: 120, 
-                              height: 120, 
-                              mx: 'auto', 
-                              mb: 2, 
-                              bgcolor: 'secondary.main',
-                              fontSize: '3rem',
-                              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                              border: '4px solid rgba(255,255,255,0.2)'
-                            }}>
-                              {currentMember.memberName?.[0]?.toUpperCase() || currentMember.memberId?.[0] || 'M'}
-                            </Avatar>
-                            <Typography variant="h5" fontWeight={700} sx={{ mb: 1, wordBreak: 'break-word', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
-                              {currentMember.memberName || currentMember.memberId}
-                            </Typography>
-                            <Typography variant="body1" sx={{ opacity: 0.9, mb: 1, fontWeight: 600 }}>
-                              {currentMember.mobile || 'No mobile'}
-                            </Typography>
-                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                                  <Chip 
-                                    label={currentMember.role === 'applicator' ? 'Applicator' : 'Hardware'}
-                                    sx={{ 
-                                      bgcolor: 'secondary.main',
-                                      color: 'white',
-                                      fontWeight: 700,
-                                      fontSize: '0.85rem',
-                                      px: 1,
-                                      py: 1.5,
-                                      boxShadow: 2
-                                    }}
-                                  />
-                                  <Chip 
-                                    label={getTierDisplayName(currentMember.annualTier || currentMember.tier)}
-                                    sx={{ 
-                                      bgcolor: 
-                                        (currentMember.annualTier || currentMember.tier) === 'platinum' ? '#E5E4E2' :
-                                        (currentMember.annualTier || currentMember.tier) === 'gold' ? '#FFD700' :
-                                        (currentMember.annualTier || currentMember.tier) === 'silver' ? '#C0C0C0' : '#CD7F32',
-                                      color: (currentMember.annualTier || currentMember.tier) === 'platinum' || (currentMember.annualTier || currentMember.tier) === 'gold' || (currentMember.annualTier || currentMember.tier) === 'silver' ? 'black' : 'white',
-                                      fontWeight: 800,
-                                      fontSize: '0.85rem',
-                                      px: 1,
-                                      py: 1.5,
-                                      boxShadow: 2
-                                    }}
-                                  />
-                                </Box>
-                            <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.2)', textAlign: 'left' }}>
-                              {/* Contact Details */}
-                              {(currentMember.phone || currentMember.mobile) && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>📞 Phone</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.phone || currentMember.mobile}</Typography>
-                                </Box>
-                              )}
-                              {currentMember.whatsappNumber && currentMember.whatsappNumber !== (currentMember.phone || currentMember.mobile) && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>💬 WhatsApp</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.whatsappNumber}</Typography>
-                                </Box>
-                              )}
-                              {currentMember.nic && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🪪 NIC</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.nic}</Typography>
-                                </Box>
-                              )}
-                              {currentMember.birthday && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🎂 Birthday</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{new Date(currentMember.birthday).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</Typography>
-                                </Box>
-                              )}
-                              {currentMember.location && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>📍 City</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.location}</Typography>
-                                </Box>
-                              )}
-                              {currentMember.zone && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🗺️ Zone</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.zone}</Typography>
-                                </Box>
-                              )}
-                              {currentMember.connectedHardware && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🏪 Hardware</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{typeof currentMember.connectedHardware === 'object' ? currentMember.connectedHardware?.memberName : currentMember.connectedHardware}</Typography>
-                                </Box>
-                              )}
-                              {currentMember.memberId && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0 }}>🆔 Member ID</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: 'monospace', bgcolor: 'rgba(255,255,255,0.15)', px: 1, borderRadius: 1 }}>{currentMember.memberId}</Typography>
-                                </Box>
-                              )}
-                              {currentMember.notes && (
-                                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, minWidth: 68, flexShrink: 0, mt: 0.2 }}>📝 Notes</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500, opacity: 0.9, fontSize: '0.78rem' }}>{currentMember.notes}</Typography>
-                                </Box>
-                              )}
-                              {/* Bank Details */}
-                              {currentMember.bankDetails && (currentMember.bankDetails.bankName || currentMember.bankDetails.accountNumber) && (
-                                <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.15)' }}>
-                                  <Typography variant="caption" sx={{ opacity: 0.65, display: 'block', mb: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏦 Bank Details</Typography>
-                                  {currentMember.bankDetails.bankName && (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                      <Typography variant="caption" sx={{ opacity: 0.6, minWidth: 68, flexShrink: 0 }}>Bank</Typography>
-                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.bankDetails.bankName}</Typography>
-                                    </Box>
-                                  )}
-                                  {currentMember.bankDetails.branchName && (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                      <Typography variant="caption" sx={{ opacity: 0.6, minWidth: 68, flexShrink: 0 }}>Branch</Typography>
-                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.bankDetails.branchName}</Typography>
-                                    </Box>
-                                  )}
-                                  {currentMember.bankDetails.accountName && (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                      <Typography variant="caption" sx={{ opacity: 0.6, minWidth: 68, flexShrink: 0 }}>Acc. Name</Typography>
-                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{currentMember.bankDetails.accountName}</Typography>
-                                    </Box>
-                                  )}
-                                  {currentMember.bankDetails.accountNumber && (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                      <Typography variant="caption" sx={{ opacity: 0.6, minWidth: 68, flexShrink: 0 }}>Acc. No</Typography>
-                                      <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: 'monospace', bgcolor: 'rgba(255,255,255,0.15)', px: 1, borderRadius: 1 }}>{currentMember.bankDetails.accountNumber}</Typography>
-                                    </Box>
-                                  )}
-                                </Box>
-                              )}
+
+                  {/* ── HERO CARD ─────────────────────────────────────────── */}
+                  <Card sx={{ mb: 3, borderRadius: 4, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
+                    <Box sx={{ background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 55%, #4a90a4 100%)', p: { xs: 3, md: 4 } }}>
+                      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'center', md: 'center' }, gap: { xs: 3, md: 4 } }}>
+
+                        {/* ── LEFT: Photo + Name + Chips ── */}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: { md: 200 }, flexShrink: 0 }}>
+                          <Avatar
+                            src={currentMember.photo ? (currentMember.photo.startsWith('data:image') || currentMember.photo.startsWith('http') ? currentMember.photo : `${(process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace('/api', '')}${currentMember.photo}`) : ''}
+                            sx={{ width: 110, height: 110, mb: 2, bgcolor: 'secondary.main', fontSize: '2.8rem', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', border: '4px solid rgba(255,255,255,0.25)' }}
+                          >
+                            {currentMember.memberName?.[0]?.toUpperCase() || currentMember.memberId?.[0] || 'M'}
+                          </Avatar>
+                          <Typography variant="h5" fontWeight={800} sx={{ color: 'white', mb: 0.5, textAlign: 'center', textShadow: '0 2px 8px rgba(0,0,0,0.3)', wordBreak: 'break-word' }}>
+                            {currentMember.memberName || currentMember.memberId}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)', mb: 1.5, fontFamily: 'monospace', letterSpacing: 1 }}>
+                            {currentMember.memberId}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            <Chip
+                              label={currentMember.role === 'applicator' ? 'Applicator' : 'Hardware'}
+                              size="small"
+                              sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700, backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)' }}
+                            />
+                            <Chip
+                              label={getTierDisplayName(currentMember.annualTier || currentMember.tier)}
+                              size="small"
+                              sx={{
+                                bgcolor: (currentMember.annualTier || currentMember.tier) === 'platinum' ? '#E5E4E2' : (currentMember.annualTier || currentMember.tier) === 'gold' ? '#FFD700' : (currentMember.annualTier || currentMember.tier) === 'silver' ? '#C0C0C0' : '#CD7F32',
+                                color: ['platinum','gold','silver'].includes(currentMember.annualTier || currentMember.tier) ? 'black' : 'white',
+                                fontWeight: 800
+                              }}
+                            />
+                          </Box>
+                        </Box>
+
+                        {/* ── RIGHT: 4 Stat Cards ── */}
+                        <Box sx={{ flex: 1, display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, gap: 2, width: '100%' }}>
+                          {/* Total Scans */}
+                          <Box sx={{ bgcolor: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', borderRadius: 3, p: 2.5, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.5)', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' } }}>
+                            <Box sx={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}>
+                              <Typography variant="h5">📊</Typography>
                             </Box>
+                            <Typography variant="h4" fontWeight={800} sx={{ mb: 0.5, fontSize: { xs: '1.4rem', md: '1.8rem' }, background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                              {totalScans}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Scans</Typography>
+                          </Box>
+
+                          {/* Total Amount */}
+                          <Box sx={{ bgcolor: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', borderRadius: 3, p: 2.5, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.5)', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' } }}>
+                            <Box sx={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}>
+                              <Typography variant="h5">💰</Typography>
+                            </Box>
+                            <Typography variant="h5" fontWeight={800} sx={{ mb: 0.5, fontSize: { xs: '1rem', md: '1.2rem' }, background: 'linear-gradient(135deg, #2e7d32 0%, #43a047 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                              Rs. {totalAmount.toLocaleString()}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Amount</Typography>
+                          </Box>
+
+                          {/* Current Month Points */}
+                          <Box sx={{ bgcolor: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', borderRadius: 3, p: 2.5, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.5)', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' } }}>
+                            <Box sx={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}>
+                              <Typography variant="h5">🎯</Typography>
+                            </Box>
+                            <Typography variant="h4" fontWeight={800} sx={{ mb: 0.5, fontSize: { xs: '1.4rem', md: '1.8rem' }, background: 'linear-gradient(135deg, #7c3aed 0%, #9333ea 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                              {currentMonthPoints.toLocaleString()}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>{currentMonthName} Points</Typography>
+                          </Box>
+
+                          {/* Loyalty Points */}
+                          <Box sx={{ bgcolor: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', borderRadius: 3, p: 2.5, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.5)', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' } }}>
+                            <Box sx={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}>
+                              <EmojiEvents sx={{ fontSize: '2rem', color: 'warning.main' }} />
+                            </Box>
+                            <Typography variant="h4" fontWeight={800} sx={{ mb: 0.5, fontSize: { xs: '1.4rem', md: '1.8rem' }, background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                              {totalPoints.toLocaleString()}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>Loyalty Points</Typography>
+                          </Box>
+                        </Box>
+
+                      </Box>
+                    </Box>
+                  </Card>
+
+                  {/* ── DETAILS CARD ──────────────────────────────────────── */}
+                  <Card sx={{ mb: 3, borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+                    <Box sx={{ px: 3, py: 2, background: 'linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%)', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="h6" fontWeight={700} color="text.primary">📋 Member Details</Typography>
+                    </Box>
+                    <Box sx={{ p: 3 }}>
+                      <Grid container spacing={3}>
+
+                        {/* ── Contact Info ── */}
+                        <Grid item xs={12} md={4}>
+                          <Box sx={{ bgcolor: '#f0f7ff', borderRadius: 3, p: 2.5, height: '100%', border: '1px solid #dbeafe' }}>
+                            <Typography variant="subtitle2" fontWeight={700} color="primary.main" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.72rem' }}>
+                              📞 Contact Information
+                            </Typography>
+                            {[
+                              { label: 'Phone', value: currentMember.phone || currentMember.mobile, icon: '📱' },
+                              { label: 'WhatsApp', value: currentMember.whatsappNumber !== (currentMember.phone || currentMember.mobile) ? currentMember.whatsappNumber : null, icon: '💬' },
+                              { label: 'NIC', value: currentMember.nic, icon: '🪪', mono: true },
+                              { label: 'Birthday', value: currentMember.birthday ? new Date(currentMember.birthday).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : null, icon: '🎂' },
+                            ].filter(f => f.value).map((field) => (
+                              <Box key={field.label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid rgba(219,234,254,0.8)' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}>
+                                  {field.icon} {field.label}
+                                </Typography>
+                                <Typography variant="body2" fontWeight={700} sx={{ fontFamily: field.mono ? 'monospace' : 'inherit', textAlign: 'right', maxWidth: '60%', wordBreak: 'break-all' }}>
+                                  {field.value}
+                                </Typography>
+                              </Box>
+                            ))}
                           </Box>
                         </Grid>
 
-                        {/* Stats Cards */}
-                        <Grid item xs={12} md={7.5} lg={8.5}>
-                          <Grid container spacing={2}>
-                            <Grid item xs={6} sm={6} md={6} lg={3}>
-                              <Box sx={{ 
-                                bgcolor: 'rgba(255,255,255,0.9)',
-                                backdropFilter: 'blur(10px)',
-                                borderRadius: 4,
-                                p: 3,
-                                textAlign: 'center',
-                                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-                                border: '1px solid rgba(255,255,255,0.4)',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                height: '100%',
-                                '&:hover': {
-                                  transform: 'translateY(-5px) scale(1.02)',
-                                  boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-                                  bgcolor: 'rgba(255,255,255,0.95)'
-                                }
-                              }}>
-                                <Box sx={{ 
-                                  width: 64,
-                                  height: 64,
-                                  borderRadius: '50%',
-                                  background: 'linear-gradient(135deg, #e6f2ff 0%, #b3d9ff 100%)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  mx: 'auto',
-                                  mb: 2,
-                                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 12px rgba(0,51,102,0.15)'
-                                }}>
-                                  <Typography variant="h4">📊</Typography>
-                                </Box>
-                                <Typography variant="h3" fontWeight={800} sx={{ mb: 1, fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' }, background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                                  {totalScans}
+                        {/* ── Location & Assignment ── */}
+                        <Grid item xs={12} md={4}>
+                          <Box sx={{ bgcolor: '#f0fdf4', borderRadius: 3, p: 2.5, height: '100%', border: '1px solid #bbf7d0' }}>
+                            <Typography variant="subtitle2" fontWeight={700} color="success.dark" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.72rem' }}>
+                              📍 Location & Assignment
+                            </Typography>
+                            {[
+                              { label: 'City', value: currentMember.location, icon: '🏙️' },
+                              { label: 'Zone', value: currentMember.zone, icon: '🗺️' },
+                              { label: 'Hardware Store', value: typeof currentMember.connectedHardware === 'object' ? currentMember.connectedHardware?.memberName : currentMember.connectedHardware, icon: '🏪' },
+                              { label: 'Member ID', value: currentMember.memberId, icon: '🆔', mono: true, badge: true },
+                            ].filter(f => f.value).map((field) => (
+                              <Box key={field.label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid rgba(187,247,208,0.8)' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}>
+                                  {field.icon} {field.label}
                                 </Typography>
-                                <Typography variant="body1" color="text.secondary" fontWeight={700} sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                  Total Scans
-                                </Typography>
+                                {field.badge ? (
+                                  <Chip label={field.value} size="small" color="primary" variant="outlined" sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.75rem' }} />
+                                ) : (
+                                  <Typography variant="body2" fontWeight={700} sx={{ fontFamily: field.mono ? 'monospace' : 'inherit', textAlign: 'right', maxWidth: '60%' }}>
+                                    {field.value}
+                                  </Typography>
+                                )}
                               </Box>
-                            </Grid>
-                            <Grid item xs={6} sm={6} md={6} lg={3}>
-                              <Box sx={{ 
-                                bgcolor: 'rgba(255,255,255,0.9)',
-                                backdropFilter: 'blur(10px)',
-                                borderRadius: 4,
-                                p: 3,
-                                textAlign: 'center',
-                                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-                                border: '1px solid rgba(255,255,255,0.4)',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                height: '100%',
-                                '&:hover': {
-                                  transform: 'translateY(-5px) scale(1.02)',
-                                  boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-                                  bgcolor: 'rgba(255,255,255,0.95)'
-                                }
-                              }}>
-                                <Box sx={{ 
-                                  width: 64,
-                                  height: 64,
-                                  borderRadius: '50%',
-                                  background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  mx: 'auto',
-                                  mb: 2,
-                                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 12px rgba(16,185,129,0.15)'
-                                }}>
-                                  <Typography variant="h4">💰</Typography>
-                                </Box>
-                                <Typography variant="h4" fontWeight={800} sx={{ mb: 1, fontSize: { xs: '1.1rem', sm: '1.3rem', md: '1.5rem' }, background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                                  Rs. {totalAmount.toLocaleString()}
-                                </Typography>
-                                <Typography variant="body1" color="text.secondary" fontWeight={700} sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                  Total Amount
-                                </Typography>
+                            ))}
+                            {currentMember.notes && (
+                              <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid rgba(187,247,208,0.8)' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600, mb: 0.5 }}>📝 Notes</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem', lineHeight: 1.5 }}>{currentMember.notes}</Typography>
                               </Box>
-                            </Grid>
-                            <Grid item xs={6} sm={6} md={6} lg={3}>
-                              <Box sx={{ 
-                                bgcolor: 'rgba(255,255,255,0.9)',
-                                backdropFilter: 'blur(10px)',
-                                borderRadius: 4,
-                                p: 3,
-                                textAlign: 'center',
-                                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-                                border: '1px solid rgba(255,255,255,0.4)',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                height: '100%',
-                                '&:hover': {
-                                  transform: 'translateY(-5px) scale(1.02)',
-                                  boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-                                  bgcolor: 'rgba(255,255,255,0.95)'
-                                }
-                              }}>
-                                <Box sx={{ 
-                                  width: 64,
-                                  height: 64,
-                                  borderRadius: '50%',
-                                  background: 'linear-gradient(135deg, #f5fce8 0%, #dcf09e 100%)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  mx: 'auto',
-                                  mb: 2,
-                                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 12px rgba(164,210,51,0.15)'
-                                }}>
-                                  <Typography variant="h4">⭐</Typography>
-                                </Box>
-                                <Typography variant="h4" fontWeight={800} sx={{ mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' }, background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                                  {(currentMember?.annualPoints || 0).toLocaleString()}
-                                </Typography>
-                                <Typography variant="body1" color="text.secondary" fontWeight={700} sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                  Annual Points
-                                </Typography>
-                              </Box>
-                            </Grid>
-                            <Grid item xs={6} sm={6} md={6} lg={3}>
-                              <Box sx={{ 
-                                bgcolor: 'rgba(255,255,255,0.9)',
-                                backdropFilter: 'blur(10px)',
-                                borderRadius: 4,
-                                p: 3,
-                                textAlign: 'center',
-                                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-                                border: '1px solid rgba(255,255,255,0.4)',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                height: '100%',
-                                '&:hover': {
-                                  transform: 'translateY(-5px) scale(1.02)',
-                                  boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-                                  bgcolor: 'rgba(255,255,255,0.95)'
-                                }
-                              }}>
-                                <Box sx={{ 
-                                  width: 64,
-                                  height: 64,
-                                  borderRadius: '50%',
-                                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  mx: 'auto',
-                                  mb: 2,
-                                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 12px rgba(245,158,11,0.15)'
-                                }}>
-                                  <EmojiEvents sx={{ fontSize: '2.2rem', color: 'warning.main' }} />
-                                </Box>
-                                <Typography variant="h3" fontWeight={800} sx={{ mb: 1, fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' }, background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                                  {totalPoints.toLocaleString()}
-                                </Typography>
-                                <Typography variant="body1" color="text.secondary" fontWeight={700} sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                  Loyalty Points
-                                </Typography>
-                              </Box>
-                            </Grid>
-                          </Grid>
+                            )}
+                          </Box>
                         </Grid>
+
+                        {/* ── Bank Details ── */}
+                        <Grid item xs={12} md={4}>
+                          <Box sx={{ bgcolor: currentMember.bankDetails?.bankName ? '#fffbeb' : '#f9fafb', borderRadius: 3, p: 2.5, height: '100%', border: currentMember.bankDetails?.bankName ? '1px solid #fde68a' : '1px solid #e5e7eb' }}>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: currentMember.bankDetails?.bankName ? 'warning.dark' : 'text.disabled', mb: 2, display: 'flex', alignItems: 'center', gap: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.72rem' }}>
+                              🏦 Bank Details
+                            </Typography>
+                            {currentMember.bankDetails?.bankName ? (
+                              <>
+                                {[
+                                  { label: 'Bank', value: currentMember.bankDetails.bankName, icon: '🏛️' },
+                                  { label: 'Branch', value: currentMember.bankDetails.branchName, icon: '📌' },
+                                  { label: 'Account Name', value: currentMember.bankDetails.accountName, icon: '👤' },
+                                  { label: 'Account No', value: currentMember.bankDetails.accountNumber, icon: '🔢', mono: true },
+                                ].filter(f => f.value).map((field) => (
+                                  <Box key={field.label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid rgba(253,230,138,0.6)' }}>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}>
+                                      {field.icon} {field.label}
+                                    </Typography>
+                                    <Typography variant="body2" fontWeight={700} sx={{ fontFamily: field.mono ? 'monospace' : 'inherit', bgcolor: field.mono ? 'rgba(251,191,36,0.15)' : 'transparent', px: field.mono ? 1 : 0, borderRadius: 1, textAlign: 'right' }}>
+                                      {field.value}
+                                    </Typography>
+                                  </Box>
+                                ))}
+                              </>
+                            ) : (
+                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80%', py: 4 }}>
+                                <Typography variant="h4" sx={{ mb: 1, opacity: 0.3 }}>🏦</Typography>
+                                <Typography variant="body2" color="text.disabled">No bank details added</Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        </Grid>
+
                       </Grid>
                     </Box>
                   </Card>
@@ -6262,7 +6118,7 @@ function App() {
             </Box>
             
             <Box sx={{ position: 'absolute', zIndex: 0, opacity: 0.3, textAlign: 'center' }}><Typography variant='caption' sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Loading Camera...</Typography></Box>
-            <IconButton onClick={() => setView('welcome')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, left: { xs: 8, sm: 16 }, zIndex: 10, bgcolor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', transition: 'all 0.3s', '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
+            <IconButton onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, left: { xs: 8, sm: 16 }, zIndex: 10, bgcolor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', transition: 'all 0.3s', '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
             {cart.length > 0 && <Fab variant='extended' size={window.innerWidth < 600 ? 'small' : 'medium'} onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, right: { xs: 8, sm: 16 }, zIndex: 10, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white', fontWeight: 700, boxShadow: '0 6px 20px rgba(164,210,51,0.4)', animation: 'bounce 2s ease-in-out infinite', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }, '&:hover': { background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1.5, sm: 2 } }}>View Cart ({cart.length})</Fab>}
 
             {/* Upgrade 3: Scanner Control Bar — Torch + Continuous Scan + Count */}
@@ -6340,7 +6196,7 @@ function App() {
             />
           ) : <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', animation: 'slideIn 0.4s ease-out', '@keyframes slideIn': { from: { opacity: 0, transform: 'translateX(100px)' }, to: { opacity: 1, transform: 'translateX(0)' } } }}>
           <Box sx={{ mb: { xs: 2, sm: 3 }, display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
-            <IconButton onClick={() => setView('scanner')} sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0,51,102,0.3)', transition: 'all 0.3s', '&:hover': { transform: 'scale(1.1) rotate(-10deg)', boxShadow: '0 6px 16px rgba(0,51,102,0.4)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
+            <IconButton onClick={() => setView('welcome')} sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0,51,102,0.3)', transition: 'all 0.3s', '&:hover': { transform: 'scale(1.1) rotate(-10deg)', boxShadow: '0 6px 16px rgba(0,51,102,0.4)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
             <Box><Typography variant='h4' fontWeight='800' sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>Scanned Items</Typography><Typography variant='body1' color='text.secondary' fontWeight={500} sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>{cart.length} items ready for submission</Typography></Box>
           </Box>
           <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: { xs: 2, sm: 3 } }}>
@@ -6373,7 +6229,7 @@ function App() {
             )}
             <Grid container spacing={{ xs: 1.5, sm: 2.5 }}>
               {role === 'customer' && <Grid item xs={12}><TextField fullWidth label='Hardware Name' variant='outlined' value={memberName} onChange={(e) => setMemberName(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>}
-              <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? 'Phone Number' : 'Member ID'} placeholder={role === 'customer' ? 'e.g. 0712345678' : 'e.g. APP-001'} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
+              <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? 'Phone Number' : 'Member ID'} placeholder={role === 'customer' ? 'e.g. 0712345678' : 'e.g. MA0000'} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
               <Grid item xs={12}>
                 <Autocomplete
                   options={members.filter(m => m.role === 'customer' || m.equipment === 'Hardware' || m.memberId?.toUpperCase().startsWith('MH'))}
