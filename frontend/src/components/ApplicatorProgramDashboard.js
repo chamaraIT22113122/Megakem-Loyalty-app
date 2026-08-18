@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, Grid, Card, CardContent, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, CircularProgress, Chip, useTheme } from '@mui/material';
 import { Star, TrendingUp, Group, MonetizationOn, PieChart as PieChartIcon } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { membersAPI } from '../services/api';
+import api, { membersAPI } from '../services/api';
 
 const ApplicatorProgramDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -20,14 +20,15 @@ const ApplicatorProgramDashboard = () => {
   useEffect(() => {
     const fetchApplicatorStats = async () => {
       try {
-        setLoading(true);
+        if (!api.hasCache('/members', { params: { limit: 10000, role: 'applicator' } })) setLoading(true);
         // Fetch all members to calculate applicator stats
-        const res = await membersAPI.getAll({ limit: 10000, role: 'applicator' });
-        if (res.data && res.data.data) {
-          const applicators = res.data.data;
-          
-          let totalPoints = 0;
-          let totalRewards = 0;
+        
+        const processStats = (res) => {
+          if (res.data && res.data.data) {
+            const applicators = res.data.data;
+            
+            let totalPoints = 0;
+            let totalRewards = 0;
           
           const monthlyData = {};
           const tierCounts = { bronze: 0, silver: 0, gold: 0, platinum: 0 };
@@ -80,15 +81,19 @@ const ApplicatorProgramDashboard = () => {
              { name: 'Platinum', value: tierCounts.platinum, color: '#E5E4E2' }
           ].filter(d => d.value > 0);
           
-          setStats({
-            totalApplicators: applicators.length,
-            totalPointsEarned: totalPoints,
-            totalRewardsCalculated: totalRewards,
-            topApplicators: applicatorsWithStats.slice(0, 10), // Top 10
-            trendData,
-            pieData
-          });
-        }
+            setStats({
+              totalApplicators: applicators.length,
+              totalPointsEarned: totalPoints,
+              totalRewardsCalculated: totalRewards,
+              topApplicators: applicatorsWithStats.slice(0, 10), // Top 10
+              trendData,
+              pieData
+            });
+          }
+        };
+
+        const res = await membersAPI.getAll({ limit: 10000, role: 'applicator' }, processStats);
+        processStats(res);
       } catch (err) {
         console.error('Error fetching applicator stats:', err);
       } finally {

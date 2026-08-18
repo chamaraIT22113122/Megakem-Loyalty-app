@@ -626,17 +626,18 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
   const loadData = async () => {
     try {
-      setLoading(true);
-      
-      // QR codes are now fetched by loadQRCodes in a separate useEffect
+      const needsLoading = !api.hasCache('/qr-codes/batches/summary') || 
+                          (!initialProducts?.length && !api.hasCache('/products')) || 
+                          !api.hasCache('/qr-codes/reprint-requests');
+      if (needsLoading) setLoading(true);
       
       // Fetch batch summary
-      const batchResponse = await api.get('/qr-codes/batches/summary');
+      const batchResponse = await api.getWithCache('/qr-codes/batches/summary', {}, (fresh) => setBatchSummary(fresh.data));
       setBatchSummary(batchResponse.data);
       
       // Fetch products if not provided
       if (!initialProducts || initialProducts.length === 0) {
-        const productsResponse = await api.get('/products');
+        const productsResponse = await api.getWithCache('/products', {}, (fresh) => setProducts(fresh.data.data || []));
         setProducts(productsResponse.data.data || []);
       }
 
@@ -669,7 +670,7 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
       // Fetch reprint requests
       try {
-        const reprintResponse = await api.get('/qr-codes/reprint-requests');
+        const reprintResponse = await api.getWithCache('/qr-codes/reprint-requests', {}, (fresh) => setReprintRequests(fresh.data.data || []));
         setReprintRequests(reprintResponse.data.data || []);
       } catch (err) {
         console.error('Error loading reprint requests:', err);
@@ -683,7 +684,6 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
 
   const loadQRCodes = async () => {
     try {
-      setLoading(true);
       const params = new URLSearchParams();
       params.append('page', page + 1);
       params.append('limit', rowsPerPage);
@@ -699,7 +699,14 @@ const QRCodeManager = ({ userInfo, onShowNotification, products: initialProducts
       }
       if (searchQuery) params.append('search', searchQuery);
 
-      const qrResponse = await api.get(`/qr-codes?${params.toString()}`);
+      const url = `/qr-codes?${params.toString()}`;
+      if (!api.hasCache(url)) setLoading(true);
+
+      const qrResponse = await api.getWithCache(url, {}, (fresh) => {
+        setQRCodes(fresh.data.data || []);
+        setTotalQRCodes(fresh.data.pagination?.total || 0);
+      });
+      
       setQRCodes(qrResponse.data.data || []);
       setTotalQRCodes(qrResponse.data.pagination?.total || 0);
     } catch (error) {

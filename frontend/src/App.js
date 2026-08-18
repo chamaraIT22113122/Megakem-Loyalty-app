@@ -3009,41 +3009,49 @@ function App() {
       if (end) params.endDate = end;
 
       // Fetch dashboard data
-      const res = await analyticsAPI.getDashboard(params);
+      const updateDashboardState = (freshRes) => {
+        setDashboardData(freshRes.data?.data);
+        setStats({
+          ...(freshRes.data?.data?.summary || {}),
+          topProducts: freshRes.data?.data?.topProducts || [],
+          topMembers: freshRes.data?.data?.topMembers || [],
+          tierDistribution: freshRes.data?.data?.tierDistribution || [],
+          dailyTrends: freshRes.data?.data?.dailyTrends || [],
+          roleDistribution: freshRes.data?.data?.roleDistribution || [],
+          hourlyDistribution: freshRes.data?.data?.hourlyDistribution || [],
+          recentScans: freshRes.data?.data?.recentScans || [],
+        });
+      };
+
+      const res = await analyticsAPI.getDashboard(params, updateDashboardState);
+      updateDashboardState(res);
       
       // Fetch audit logs separately so it doesn't crash the dashboard if it fails
+      const updateAuditLogsState = (auditRes) => {
+        if (auditRes.data?.data && auditRes.data.data.length > 0) {
+          // Map backend audit log format to the frontend activityLog format
+          const mappedLogs = auditRes.data.data.map(log => ({
+            timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
+            action: log.action || 'Unknown',
+            details: `${log.module} - ${typeof log.details === 'object' ? JSON.stringify(log.details) : (log.details || '')}`,
+            severity: (log.action || '').includes('Delete') ? 'error' : (log.action || '').includes('Update') ? 'warning' : 'info',
+            user: log.performedBy?.username || log.performedBy?.email || 'System'
+          }));
+          setActivityLog(mappedLogs);
+        }
+      };
+
       let auditRes = { data: { data: [] } };
       try {
         if (isMainAdmin()) {
-          auditRes = await auditLogsAPI.getAll({ limit: 50 });
+          auditRes = await auditLogsAPI.getAll({ limit: 50 }, updateAuditLogsState);
         }
       } catch (err) {
         console.error('Error loading audit logs:', err);
       }
+      updateAuditLogsState(auditRes);
       
-      setDashboardData(res.data?.data);
-      setStats({
-        ...(res.data?.data?.summary || {}),
-        topProducts: res.data?.data?.topProducts || [],
-        topMembers: res.data?.data?.topMembers || [],
-        tierDistribution: res.data?.data?.tierDistribution || [],
-        dailyTrends: res.data?.data?.dailyTrends || [],
-        roleDistribution: res.data?.data?.roleDistribution || [],
-        hourlyDistribution: res.data?.data?.hourlyDistribution || [],
-        recentScans: res.data?.data?.recentScans || [],
-      });
-      
-      if (auditRes.data?.data && auditRes.data.data.length > 0) {
-        // Map backend audit log format to the frontend activityLog format
-        const mappedLogs = auditRes.data.data.map(log => ({
-          timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
-          action: log.action || 'Unknown',
-          details: `${log.module} - ${typeof log.details === 'object' ? JSON.stringify(log.details) : (log.details || '')}`,
-          severity: (log.action || '').includes('Delete') ? 'error' : (log.action || '').includes('Update') ? 'warning' : 'info',
-          user: log.performedBy?.username || log.performedBy?.email || 'System'
-        }));
-        setActivityLog(mappedLogs);
-      }
+
     } catch (e) {
       console.error('Error loading dashboard data', e);
     }
@@ -3109,10 +3117,6 @@ function App() {
       const hasProducts = hasPermission('canManageProducts');
       const hasLeaderboard = hasPermission('canViewLeaderboard');
 
-      const usersPromise = isMainAdmin()
-        ? authAPI.getUsers()
-        : Promise.resolve({ data: { data: [] } });
-
       const handleApiError = (apiCall, fallbackData, errorMessage) => {
         return apiCall.catch(err => {
           console.error(errorMessage, err);
@@ -3121,20 +3125,24 @@ function App() {
         });
       };
 
+      const usersPromise = isMainAdmin()
+        ? authAPI.getUsers((fresh) => setUsers(fresh.data?.data || []))
+        : Promise.resolve({ data: { data: [] } });
+
       const [scansRes, usersRes, productsRes, loyaltyConfigRes, allScansRes] = await Promise.all([
-        handleApiError(scansAPI.getLive(), [], 'Failed to load recent scans.'),
+        handleApiError(scansAPI.getLive((fresh) => setScanHistory(fresh.data?.data || [])), [], 'Failed to load recent scans.'),
         handleApiError(usersPromise, [], 'Failed to load users.'),
-        handleApiError(productsAPI.getAll(), [], 'Failed to load products.'),
-        handleApiError(loyaltyAPI.getConfig(), null, 'Failed to load loyalty config.'),
-        handleApiError(scansAPI.getAll({ limit: 1000 }), [], 'Failed to load scan history.')
+        handleApiError(productsAPI.getAll({}, (fresh) => setProducts(fresh.data?.data || [])), [], 'Failed to load products.'),
+        handleApiError(loyaltyAPI.getConfig((fresh) => setLoyaltyConfig(fresh.data?.data || null)), null, 'Failed to load loyalty config.'),
+        handleApiError(scansAPI.getAll({ limit: 1000 }, (fresh) => setAllScans(fresh.data?.data || [])), [], 'Failed to load scan history.')
       ]);
 
       if (hasProducts || isMainAdmin()) {
         try {
-          const rewardsRes = await rewardsAPI.getAll();
-          setRewards(rewardsRes.data.data || []);
-          const redemptionsRes = await redemptionsAPI.getAll();
-          setRedemptions(redemptionsRes.data.data || []);
+          const rewardsRes = await rewardsAPI.getAll((fresh) => setRewards(fresh.data?.data || []));
+          setRewards(rewardsRes.data?.data || []);
+          const redemptionsRes = await redemptionsAPI.getAll((fresh) => setRedemptions(fresh.data?.data || []));
+          setRedemptions(redemptionsRes.data?.data || []);
         } catch (e) { console.warn('Error loading rewards/redemptions', e); }
       }
 

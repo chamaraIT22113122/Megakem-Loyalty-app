@@ -211,7 +211,7 @@ export const authAPI = {
   refreshToken: (refreshToken) => api.post('/auth/refresh', { refreshToken }),
   updateProfile: (data) => api.put('/auth/profile', data),
   changePassword: (data) => api.put('/auth/change-password', data),
-  getUsers: () => api.get('/auth/users'),
+  getUsers: (onFreshData) => api.getWithCache('/auth/users', {}, onFreshData),
   createUser: (userData) => api.post('/auth/users', userData),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
   updateUserPoints: (id, points, operation = 'set') => api.put(`/auth/users/${id}/points`, { points, operation }),
@@ -225,8 +225,8 @@ export const authAPI = {
 
 // Scans API
 export const scansAPI = {
-  getAll: (params) => api.get('/scans', { params }),
-  getLive: () => api.get('/scans/live'),
+  getAll: (params, onFreshData) => api.getWithCache('/scans', { params }, onFreshData),
+  getLive: (onFreshData) => api.getWithCache('/scans/live', {}, onFreshData),
   getOne: (id) => api.get(`/scans/${id}`),
   create: (scanData) => api.post('/scans', scanData),
   createBatch: (scans) => api.post('/scans/batch', { scans }),
@@ -236,7 +236,7 @@ export const scansAPI = {
 
 // Products API
 export const productsAPI = {
-  getAll: (params) => api.get('/products', { params }),
+  getAll: (params, onFreshData) => api.getWithCache('/products', { params }, onFreshData),
   getOne: (id) => api.get(`/products/${id}`),
   create: (productData) => api.post('/products', productData),
   update: (id, productData) => api.put(`/products/${id}`, productData),
@@ -246,13 +246,13 @@ export const productsAPI = {
 
 // Analytics API
 export const analyticsAPI = {
-  getDashboard: (params) => api.get('/analytics/dashboard', { params }),
+  getDashboard: (params, onFreshData) => api.getWithCache('/analytics/dashboard', { params }, onFreshData),
   getLeaderboard: (params) => api.get('/analytics/leaderboard', { params }),
   getUserStats: () => api.get('/analytics/user-stats'),
   export: (params) => api.get('/analytics/export', { params, responseType: 'blob' }),
   getDailyReport: (date) => api.get('/analytics/daily-report', { params: { date } }),
   getCalendarData: (year, month) => api.get('/analytics/calendar-data', { params: { year, month } }),
-  getPurchaseIntents: () => api.get('/analytics/purchase-intents'),
+  getPurchaseIntents: (onFreshData) => api.getWithCache('/analytics/purchase-intents', {}, onFreshData),
   updatePurchaseIntent: (id, data) => api.put(`/analytics/purchase-intent/${id}`, data),
   deletePurchaseIntent: (id) => api.delete(`/analytics/purchase-intent/${id}`),
   trackPageView: (data) => api.post('/analytics/track', data),
@@ -261,7 +261,7 @@ export const analyticsAPI = {
 
 // Members API (Customers & Applicators)
 export const membersAPI = {
-  getAll: (params) => api.get('/members', { params }),
+  getAll: (params, onFreshData) => api.getWithCache('/members', { params }, onFreshData),
   getOne: (id) => api.get(`/members/${id}`),
   create: (data) => api.post('/members', data),
   update: (id, data) => api.put(`/members/${id}`, data),
@@ -275,16 +275,16 @@ export const membersAPI = {
 
 // Loyalty Configuration API
 export const loyaltyAPI = {
-  getPublicConfig: () => api.get('/loyalty/public-config'),
-  getConfig: () => api.get('/loyalty/config'),
+  getPublicConfig: (onFreshData) => api.getWithCache('/loyalty/public-config', {}, onFreshData),
+  getConfig: (onFreshData) => api.getWithCache('/loyalty/config', {}, onFreshData),
   updateConfig: (config) => api.put('/loyalty/config', config),
   updateProductPoints: (productId, pointsConfig) => api.put(`/loyalty/products/${productId}/points`, pointsConfig),
 };
 
 // Cash Rewards API
 export const cashRewardsAPI = {
-  getMemberRewards: (memberId, params) => api.get(`/cash-rewards/${memberId}`, { params }),
-  getAllRewards: (params) => api.get('/cash-rewards', { params }),
+  getMemberRewards: (memberId, params, onFreshData) => api.getWithCache(`/cash-rewards/${memberId}`, { params }, onFreshData),
+  getAllRewards: (params, onFreshData) => api.getWithCache('/cash-rewards', { params }, onFreshData),
   getYtdAnalytics: (params) => api.get('/cash-rewards/ytd-analytics', { params }),
   calculateReward: (memberId, data) => api.post(`/cash-rewards/calculate/${memberId}`, data),
   requestApproval: (memberId, data) => api.put(`/cash-rewards/request-approval/${memberId}`, data),
@@ -329,7 +329,7 @@ export const redemptionsAPI = {
 };
 
 export const auditLogsAPI = {
-  getAll: (params) => api.get('/audit-logs', { params }),
+  getAll: (params, onFreshData) => api.getWithCache('/audit-logs', { params }, onFreshData),
   revert: (id) => api.post(`/audit-logs/${id}/revert`),
 };
 
@@ -348,17 +348,46 @@ export const backupAPI = {
 
 export const feedbackAPI = {
   create: (data) => api.post('/feedback', data),
-  getAll: () => api.get('/feedback'),
+  getAll: (onFreshData) => api.getWithCache('/feedback', {}, onFreshData),
   delete: (id) => api.delete(`/feedback/${id}`),
   getSettings: () => api.get('/feedback/settings'),
   updateSettings: (data) => api.post('/feedback/settings', data),
 };
 
 export const recycleBinAPI = {
-  getAll: () => api.get('/recycle-bin'),
+  getAll: (onFreshData) => api.getWithCache('/recycle-bin', {}, onFreshData),
   restore: (id) => api.post(`/recycle-bin/restore/${id}`),
   delete: (id) => api.delete(`/recycle-bin/${id}`),
   empty: () => api.delete('/recycle-bin/empty'),
+};
+
+// Global cache for Stale-While-Revalidate (SWR) behavior
+export const globalCache = new Map();
+
+api.hasCache = (url, config = {}) => {
+  const cacheKey = url + JSON.stringify(config.params || {});
+  return globalCache.has(cacheKey);
+};
+
+api.getWithCache = async (url, config = {}, onFreshData = null) => {
+  const cacheKey = url + JSON.stringify(config.params || {});
+  const hasCachedData = globalCache.has(cacheKey);
+  
+  const fetchPromise = api.get(url, config).then(res => {
+    globalCache.set(cacheKey, res);
+    if (onFreshData && hasCachedData) {
+      onFreshData(res);
+    }
+    return res;
+  }).catch(err => {
+    throw err;
+  });
+
+  if (hasCachedData) {
+    return Promise.resolve(globalCache.get(cacheKey));
+  }
+
+  return fetchPromise;
 };
 
 export default api;

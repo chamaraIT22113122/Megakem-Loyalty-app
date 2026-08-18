@@ -4,7 +4,7 @@ import {
   IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, FormControl, InputLabel, Tooltip, Grid, LinearProgress, CircularProgress
 } from '@mui/material';
 import { Delete, Edit, Notes, FileDownload, FilterList, Refresh } from '@mui/icons-material';
-import { analyticsAPI } from '../services/api';
+import api, { analyticsAPI } from '../services/api';
 import * as XLSX from 'xlsx';
 
 const statusColors = {
@@ -30,8 +30,10 @@ function LeadsManagementTab({ onShowNotification }) {
 
   const loadLeads = async () => {
     try {
-      setLoading(true);
-      const res = await analyticsAPI.getPurchaseIntents();
+      if (!api.hasCache('/analytics/purchase-intents')) setLoading(true);
+      const res = await analyticsAPI.getPurchaseIntents((fresh) => {
+        setLeads(fresh.data.data || []);
+      });
       setLeads(res.data.data || []);
     } catch (err) {
       console.error(err);

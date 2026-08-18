@@ -20,7 +20,7 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import { recycleBinAPI } from '../services/api';
+import api, { recycleBinAPI } from '../services/api';
 import RestoreIcon from '@mui/icons-material/Restore';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 
@@ -37,7 +37,10 @@ const RecycleBin = () => {
 
   const fetchItems = async () => {
     try {
-      const response = await recycleBinAPI.getAll();
+      if (!api.hasCache('/recycle-bin')) setLoading(true);
+      const response = await recycleBinAPI.getAll((fresh) => {
+        setItems(fresh.data);
+      });
       setItems(response.data);
     } catch (err) {
       setError('Failed to fetch recycle bin items');

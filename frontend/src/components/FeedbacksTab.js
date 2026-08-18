@@ -6,7 +6,7 @@ import {
   DialogContent, DialogActions, Button, Tooltip, Chip, TextField, InputAdornment
 } from '@mui/material';
 import { Delete, Image as ImageIcon, ArrowBackIos, ArrowForwardIos, Save, Email, PictureAsPdf } from '@mui/icons-material';
-import { feedbackAPI, API_BASE_URL } from '../services/api';
+import api, { feedbackAPI, API_BASE_URL } from '../services/api';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 // Removed import of pdfTemplateUrl from assets
 
@@ -22,8 +22,10 @@ const FeedbacksTab = () => {
 
   const fetchFeedbacks = async () => {
     try {
-      setLoading(true);
-      const response = await feedbackAPI.getAll();
+      if (!api.hasCache('/feedback')) setLoading(true);
+      const response = await feedbackAPI.getAll((fresh) => {
+        if (fresh.data.success) setFeedbacks(fresh.data.data);
+      });
       if (response.data.success) {
         setFeedbacks(response.data.data);
       }

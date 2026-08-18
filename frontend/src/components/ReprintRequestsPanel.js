@@ -34,31 +34,43 @@ const ReprintRequestsPanel = ({ onShowNotification, onRequestsChanged }) => {
 
   const loadRequests = async () => {
     try {
-      setLoading(true);
-      const response = await api.get('/qr-codes/reprint-requests');
-      let combinedRequests = response.data.data || [];
-
-      try {
-        const notifRes = await api.get('/cash-rewards/admin-notifications');
-        const notifications = notifRes.data?.data || [];
-        combinedRequests = [...combinedRequests, ...notifications];
-      } catch (notifErr) {
-        console.error('Failed to load admin notifications:', notifErr);
+      if (!api.hasCache('/qr-codes/reprint-requests') || !api.hasCache('/cash-rewards/admin-notifications') || !api.hasCache('/change-requests')) {
+        setLoading(true);
       }
+      
+      let currentReprint = [];
+      let currentNotif = [];
+      let currentChange = [];
 
-      try {
-        const changeRes = await api.get('/change-requests');
-        const changeReqs = changeRes.data?.data || [];
-        combinedRequests = [...combinedRequests, ...changeReqs];
-      } catch (changeErr) {
-        console.error('Failed to load change requests:', changeErr);
-      }
+      const updateCombined = () => {
+         const combined = [...currentReprint, ...currentNotif, ...currentChange];
+         combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+         setRequests(combined);
+      };
 
-      combinedRequests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const p1 = api.getWithCache('/qr-codes/reprint-requests', {}, (fresh) => {
+          currentReprint = fresh.data?.data || [];
+          updateCombined();
+      }).catch(() => ({ data: { data: [] } }));
+      
+      const p2 = api.getWithCache('/cash-rewards/admin-notifications', {}, (fresh) => {
+          currentNotif = fresh.data?.data || [];
+          updateCombined();
+      }).catch(() => ({ data: { data: [] } }));
+      
+      const p3 = api.getWithCache('/change-requests', {}, (fresh) => {
+          currentChange = fresh.data?.data || [];
+          updateCombined();
+      }).catch(() => ({ data: { data: [] } }));
 
-      setRequests(combinedRequests);
+      const [res1, res2, res3] = await Promise.all([p1, p2, p3]);
+      currentReprint = res1.data?.data || [];
+      currentNotif = res2.data?.data || [];
+      currentChange = res3.data?.data || [];
+      updateCombined();
     } catch (error) {
-      onShowNotification('Error loading reprint requests: ' + (error.response?.data?.error || error.message), 'error');
+      console.error('Error loading requests:', error);
+      onShowNotification('Failed to load requests', 'error');
     } finally {
       setLoading(false);
     }
