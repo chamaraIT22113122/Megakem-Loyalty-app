@@ -157,6 +157,25 @@ router.get('/ytd-analytics', protect, hasPermission('canViewRewards'), async (re
     });
   }
 });
+// @route   GET /api/cash-rewards/admin-notifications
+// @desc    Get admin notifications (like payment notifications)
+// @access  Private/Admin
+router.get('/admin-notifications', protect, async (req, res) => {
+  // Allow main admin or those with co-admin request management permissions
+  if (!req.user || (req.user.role !== 'admin' && !req.user.permissions?.canManageCoAdminRequests && !req.user.permissions?.canViewDashboard)) {
+    return res.status(403).json({ success: false, message: 'Access denied' });
+  }
+  try {
+    const notifications = await AdminNotification.find()
+      .populate('createdBy', 'username')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json({ success: true, data: notifications });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 
 // @route   GET /api/cash-rewards/:memberId
 // @desc    Get cash rewards for a specific member
@@ -658,24 +677,6 @@ router.post('/unpay/:memberId', protect, hasPermission('canViewRewards'), async 
   }
 });
 
-// @route   GET /api/cash-rewards/admin-notifications
-// @desc    Get admin notifications (like payment notifications)
-// @access  Private/Admin
-router.get('/admin-notifications', protect, async (req, res) => {
-  // Allow main admin or those with co-admin request management permissions
-  if (!req.user || (req.user.role !== 'admin' && !req.user.permissions?.canManageCoAdminRequests && !req.user.permissions?.canViewDashboard)) {
-    return res.status(403).json({ success: false, message: 'Access denied' });
-  }
-  try {
-    const notifications = await AdminNotification.find()
-      .populate('createdBy', 'username')
-      .sort({ createdAt: -1 })
-      .limit(50);
-    res.json({ success: true, data: notifications });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
 
 module.exports = router;
 

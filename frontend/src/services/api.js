@@ -11,32 +11,6 @@ const api = axios.create({
   },
 });
 
-// --- API Request Queue to prevent Cloudflare rate limiting ---
-const MAX_CONCURRENT_REQUESTS = 2;
-const REQUEST_DELAY_MS = 250;
-let activeRequests = 0;
-const requestQueue = [];
-
-const processQueue = () => {
-  if (requestQueue.length === 0 || activeRequests >= MAX_CONCURRENT_REQUESTS) return;
-  
-  activeRequests++;
-  const nextRequest = requestQueue.shift();
-  // Execute the queued request
-  nextRequest();
-};
-
-const queueRequest = () => {
-  return new Promise(resolve => {
-    requestQueue.push(resolve);
-    processQueue();
-  });
-};
-
-const finishRequest = () => {
-  activeRequests--;
-  setTimeout(processQueue, REQUEST_DELAY_MS);
-};
 // --- Server Wake Mechanism to prevent 502/429 storms on cold start ---
 let isServerAwake = false;
 let isWakingUp = false;
@@ -60,12 +34,13 @@ const ensureServerAwake = async () => {
     let attempts = 0;
     while(attempts < 30) {
       try {
-        const res = await fetch(`${API_BASE_URL}`, { 
+        // Add cache buster to prevent Cloudflare from returning a cached 404 and fooling the health check
+        const res = await fetch(`${API_BASE_URL}?_t=${Date.now()}`, { 
           method: 'GET',
           headers: { 'Accept': 'application/json' }
         });
         // If it's a 404 or any normal status, the Express server is awake!
-        if (res.status !== 502 && res.status !== 503) {
+        if (res.status !== 502 && res.status !== 503 && res.status !== 429) {
           isServerAwake = true;
           isWakingUp = false;
           return true;
@@ -85,11 +60,8 @@ const ensureServerAwake = async () => {
 
 api.interceptors.request.use(
   async (config) => {
-    // Before queuing, ensure server is awake to prevent 502/429 storms
+    // Before sending, ensure server is awake to prevent 502/429 storms
     await ensureServerAwake();
-    
-    // Wait in queue before proceeding to prevent 429 errors from Cloudflare
-    await queueRequest();
 
     const token = localStorage.getItem('token');
     if (token) {
@@ -157,11 +129,9 @@ api.interceptors.request.use(
 // Handle response errors
 api.interceptors.response.use(
   (response) => {
-    finishRequest();
     return response;
   },
   async (error) => {
-    finishRequest();
     
     // If Render proxy returns 502/503 (server sleeping or crashed), reset awake state
     if (error.response?.status === 502 || error.response?.status === 503 || error.message === 'Network Error') {
