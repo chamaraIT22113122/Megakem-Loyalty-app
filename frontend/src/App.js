@@ -3056,8 +3056,16 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardStartDate, dashboardEndDate, dateFilter, adminAuth, adminTab]);
 
+  const isLoadingAdminData = useRef(false);
+
   const loadAdminData = async () => {
     if (!adminAuth || (user && user.role !== 'admin' && user.role !== 'co-admin')) return;
+    if (isLoadingAdminData.current) {
+      console.log('⏳ Skipping concurrent loadAdminData call to prevent Cloudflare DDoS block');
+      return;
+    }
+    
+    isLoadingAdminData.current = true;
     try {
       console.log('🔄 Loading admin data...');
       
@@ -3150,6 +3158,8 @@ function App() {
       }
     } catch (error) {
       console.error('❌ Error loading admin data:', error);
+    } finally {
+      isLoadingAdminData.current = false;
     }
   };
 
