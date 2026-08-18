@@ -723,6 +723,9 @@ function App() {
       }
       return 'welcome';
     }
+    if (localStorage.getItem('adminAuth') === 'true') {
+      return 'admin';
+    }
     if (savedRole && savedMemberId) {
       return 'cart';
     }
@@ -4373,14 +4376,7 @@ function App() {
     return false;
   };
 
-  if (initializing) return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)' }}>
-      <Box sx={{ animation: 'pulse 1.5s ease-in-out infinite', '@keyframes pulse': { '0%, 100%': { transform: 'scale(1)', opacity: 1 }, '50%': { transform: 'scale(1.05)', opacity: 0.8 } } }}>
-        <CircularProgress size={60} thickness={4} sx={{ color: '#A4D233' }} />
-      </Box>
-      <Typography variant='body1' sx={{ mt: 3, color: 'white', fontWeight: 600, letterSpacing: '1px' }}>Securely connecting...</Typography>
-    </Box>
-  );
+  // The Securely connecting... block was removed to allow instant rendering
 
   return (
     <ThemeProvider theme={getTheme()}><CssBaseline /><Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)', display: 'flex', flexDirection: 'column' }}>
