@@ -183,9 +183,9 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Trust proxy for Render load balancers so rate limiter works properly
 app.set('trust proxy', true);
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 1 * 60 * 1000, // 1 minute (reduced from 15m to quickly clear old penalties)
   max: 2000, // limit each IP to 2000 requests per windowMs
-  message: 'Too many requests from this IP, please try again after 15 minutes',
+  message: 'Too many requests from this IP, please try again after 1 minute',
   handler: (req, res, next, options) => {
     // Add CORS headers so the frontend can read the 429 status code instead of getting a CORS error
     const origin = req.headers.origin;
