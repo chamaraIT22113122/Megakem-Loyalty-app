@@ -12,8 +12,8 @@ const api = axios.create({
 });
 
 // --- API Request Queue to prevent Cloudflare rate limiting ---
-const MAX_CONCURRENT_REQUESTS = 3;
-const REQUEST_DELAY_MS = 50;
+const MAX_CONCURRENT_REQUESTS = 2;
+const REQUEST_DELAY_MS = 250;
 let activeRequests = 0;
 const requestQueue = [];
 

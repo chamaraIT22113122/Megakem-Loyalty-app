@@ -3404,13 +3404,7 @@ function App() {
     }
   }, [adminAuth, view]); // eslint-disable-line react-hooks/exhaustive-deps
   
-  // Auto-reload members and stats data when new scans are detected to update leaderboard and dashboard in real-time
-  useEffect(() => {
-    if (adminAuth && scanHistory.length > 0) {
-      reloadMembers();
-      loadAdminData();
-    }
-  }, [scanHistory.length, adminAuth]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Removed auto-reload members on scanHistory change to prevent DDoS/429 errors
 
   const fetchPaginatedScans = async () => {
     if (!adminAuth || adminTab !== 'scans') return;
