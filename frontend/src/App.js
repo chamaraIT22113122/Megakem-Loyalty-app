@@ -2977,10 +2977,18 @@ function App() {
       if (start) params.startDate = start;
       if (end) params.endDate = end;
 
-      const [res, auditRes] = await Promise.all([
-        analyticsAPI.getDashboard(params),
-        isMainAdmin() ? auditLogsAPI.getAll({ limit: 50 }) : Promise.resolve({ data: { data: [] } })
-      ]);
+      // Fetch dashboard data
+      const res = await analyticsAPI.getDashboard(params);
+      
+      // Fetch audit logs separately so it doesn't crash the dashboard if it fails
+      let auditRes = { data: { data: [] } };
+      try {
+        if (isMainAdmin()) {
+          auditRes = await auditLogsAPI.getAll({ limit: 50 });
+        }
+      } catch (err) {
+        console.error('Error loading audit logs:', err);
+      }
       
       setDashboardData(res.data?.data);
       setStats({
@@ -2998,9 +3006,9 @@ function App() {
         // Map backend audit log format to the frontend activityLog format
         const mappedLogs = auditRes.data.data.map(log => ({
           timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
-          action: log.action,
+          action: log.action || 'Unknown',
           details: `${log.module} - ${typeof log.details === 'object' ? JSON.stringify(log.details) : (log.details || '')}`,
-          severity: log.action.includes('Delete') ? 'error' : log.action.includes('Update') ? 'warning' : 'info',
+          severity: (log.action || '').includes('Delete') ? 'error' : (log.action || '').includes('Update') ? 'warning' : 'info',
           user: log.performedBy?.username || log.performedBy?.email || 'System'
         }));
         setActivityLog(mappedLogs);
