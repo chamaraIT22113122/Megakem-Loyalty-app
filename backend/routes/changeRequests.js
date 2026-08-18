@@ -172,22 +172,18 @@ router.put('/:id/reject', protect, async (req, res) => {
   }
 });
 
-// Delete request
+// Delete request (Main Admin only)
 router.delete('/:id', protect, async (req, res) => {
   try {
+    const isMainAdmin = req.user.email === 'admin@megakem.com' || (req.user.role === 'admin' && !req.user.permissions);
+    
+    if (!isMainAdmin) {
+      return res.status(403).json({ success: false, error: 'Only Main Admin can delete change requests' });
+    }
+
     const request = await ChangeRequest.findById(req.params.id);
     if (!request) {
       return res.status(404).json({ success: false, error: 'Request not found' });
-    }
-
-    const isMainAdmin = req.user.email === 'admin@megakem.com' || (req.user.role === 'admin' && !req.user.permissions);
-    
-    if (!isMainAdmin && request.requesterId.toString() !== req.user._id.toString()) {
-       return res.status(403).json({ success: false, error: 'You can only delete your own requests' });
-    }
-
-    if (request.status !== 'pending') {
-       return res.status(400).json({ success: false, error: 'Cannot delete processed requests' });
     }
 
     // Save to recycle bin
@@ -202,6 +198,11 @@ router.delete('/:id', protect, async (req, res) => {
     await binItem.save();
 
     await request.deleteOne();
+    
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'reprint_requests' });
+    }
+
     res.json({ success: true, message: 'Request deleted' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

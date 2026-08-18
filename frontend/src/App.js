@@ -10555,7 +10555,7 @@ function App() {
 
           {/* Reprint Requests Tab */}
           {adminTab === 'reprint-requests' && (isMainAdmin() || hasPermission('canManageCoAdminRequests')) && <Box>
-            <ReprintRequestsPanel onShowNotification={showNotification} onRequestsChanged={loadPendingRequestsCount} />
+            <ReprintRequestsPanel onShowNotification={showNotification} onRequestsChanged={loadPendingRequestsCount} userInfo={user} />
           </Box>}
 
           {/* Feedbacks Tab */}

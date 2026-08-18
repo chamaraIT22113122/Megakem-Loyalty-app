@@ -176,6 +176,33 @@ router.get('/admin-notifications', protect, async (req, res) => {
   }
 });
 
+// @route   DELETE /api/cash-rewards/admin-notifications/:id
+// @desc    Delete an admin notification (Main Admin only)
+// @access  Private/Admin (Main Admin only)
+router.delete('/admin-notifications/:id', protect, async (req, res) => {
+  try {
+    const isMainAdmin = req.user.email === 'admin@megakem.com' || (req.user.role === 'admin' && !req.user.permissions);
+    if (!isMainAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Main Admin can delete notifications' });
+    }
+
+    const notification = await AdminNotification.findById(req.params.id);
+    if (!notification) {
+      return res.status(404).json({ success: false, message: 'Notification not found' });
+    }
+
+    await notification.deleteOne();
+
+    if (req.io) {
+      req.io.emit('data_updated', { entity: 'reprint_requests' });
+    }
+
+    res.json({ success: true, message: 'Notification deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 
 // @route   GET /api/cash-rewards/:memberId
 // @desc    Get cash rewards for a specific member

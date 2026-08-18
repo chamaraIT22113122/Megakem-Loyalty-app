@@ -137,14 +137,18 @@ const initializeApp = async () => {
       console.error('⚠️  Error seeding points:', error.message);
     }
 
+    // Initialize automated backups and scheduled tasks after DB is connected
+    try {
+      initScheduler();
+    } catch (schedError) {
+      console.error('⚠️ Error initializing scheduler:', schedError.message);
+    }
+
   } catch (error) {
     console.error('❌ FATAL: Database initialization failed:', error.message);
     process.exit(1);
   }
 };
-
-// Initialize automated backups and scheduled tasks
-initScheduler();
 
 // Middleware
 const allowedOrigins = [

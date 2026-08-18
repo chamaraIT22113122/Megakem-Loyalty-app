@@ -1226,10 +1226,15 @@ router.put('/reprint-requests/:id/reject', protect, hasPermission('canManageCoAd
 });
 
 // @route   DELETE /api/qr-codes/reprint-requests/:id
-// @desc    Delete a reprint request (Main Admin or authorized Co-Admin)
-// @access  Private/Admin (Main Admin or Co-Admin with canManageCoAdminRequests)
-router.delete('/reprint-requests/:id', protect, hasPermission('canManageCoAdminRequests'), async (req, res) => {
+// @desc    Delete a reprint request (Main Admin only)
+// @access  Private/Admin (Main Admin only)
+router.delete('/reprint-requests/:id', protect, async (req, res) => {
   try {
+    const isMainAdmin = req.user.email === 'admin@megakem.com' || (req.user.role === 'admin' && !req.user.permissions);
+    if (!isMainAdmin) {
+      return res.status(403).json({ error: 'Only Main Admin can delete reprint requests' });
+    }
+
     const request = await ReprintRequest.findById(req.params.id);
     if (!request) {
       return res.status(404).json({ error: 'Reprint request not found' });
