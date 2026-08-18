@@ -1271,7 +1271,8 @@ function App() {
     condition: 'good',
     notes: '',
     connectedHardware: '',
-    photo: ''
+    photo: '',
+    bankDetails: { bankName: '', branchName: '', accountName: '', accountNumber: '' }
   });
   const [applicatorPhotoFile, setApplicatorPhotoFile] = useState(null);
   
@@ -10455,7 +10456,10 @@ function App() {
                                           setHardwareFormData(applicator);
                                           setHardwareDialog({ open: true, data: applicator });
                                         } else {
-                                          setApplicatorFormData(applicator);
+                                          setApplicatorFormData({
+                                            ...applicator,
+                                            bankDetails: applicator.bankDetails || { bankName: '', branchName: '', accountName: '', accountNumber: '' }
+                                          });
                                           setApplicatorDialog({ open: true, data: applicator });
                                         }
                                       }}
@@ -14170,14 +14174,37 @@ function App() {
                 }
 
                 if (applicatorDialog.data && applicatorDialog.data._id) {
-                  await membersAPI.update(applicatorDialog.data._id, backendPayload);
+                  const updateRes = await membersAPI.update(applicatorDialog.data._id, backendPayload);
+                  // Immediately patch local state so the table reflects changes without waiting for full reload
+                  const updatedMember = updateRes?.data?.data || updateRes?.data;
+                  if (updatedMember) {
+                    setApplicatorInfo(prev => prev.map(a =>
+                      a._id === applicatorDialog.data._id
+                        ? {
+                            ...a,
+                            name: backendPayload.memberName,
+                            phoneNumber: backendPayload.phone,
+                            whatsappNumber: backendPayload.whatsappNumber,
+                            nic: backendPayload.nic,
+                            birthday: backendPayload.birthday,
+                            location: backendPayload.location,
+                            zone: backendPayload.zone,
+                            notes: backendPayload.notes,
+                            condition: backendPayload.condition,
+                            photo: backendPayload.photo,
+                            bankDetails: backendPayload.bankDetails
+                          }
+                        : a
+                    ));
+                  }
                   showNotification('Applicator info updated successfully', 'success');
                 } else {
                   await membersAPI.create(backendPayload);
                   showNotification('Applicator info added successfully', 'success');
                 }
-                
-                await loadAdminData();
+
+                // Refresh full data in background (non-blocking)
+                loadAdminData();
                 setApplicatorDialog({ open: false, data: null });
                 setApplicatorPhotoFile(null);
               } catch (error) {
