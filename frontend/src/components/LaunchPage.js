@@ -68,8 +68,8 @@ const LaunchPage = ({ onLaunch }) => {
             position: 'absolute',
             top: '50%',
             left: '50%',
-            transform: 'translate(-50%, -50%)',
-            opacity: 0.05,
+            transform: 'translate(-50%, -55%)',
+            opacity: 0.02,
             pointerEvents: 'none',
             zIndex: 1,
             width: { xs: '80%', sm: '500px', md: '700px' }
