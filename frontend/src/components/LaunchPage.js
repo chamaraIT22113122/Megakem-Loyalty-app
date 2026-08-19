@@ -1,9 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Box, Button, Fade, Typography, IconButton } from '@mui/material';
-import SkipNextIcon from '@mui/icons-material/SkipNext';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import { Box, Button, Fade, Typography } from '@mui/material';
 import launchVideo from '../assets/lunch.mp4';
-import megakemRewardsLogo from '../assets/Megakem  Rewards logo .png';
 
 const LaunchPage = ({ onLaunch }) => {
   const [phase, setPhase] = useState('idle'); // 'idle' (ceremony button), 'playing' (video)
@@ -80,42 +77,6 @@ const LaunchPage = ({ onLaunch }) => {
             }
           }} />
 
-          {/* Megakem Rewards Logo */}
-          <Box sx={{ mb: 4, maxWidth: { xs: '260px', sm: '360px', md: '440px' } }}>
-            <img 
-              src={megakemRewardsLogo} 
-              alt="Megakem Rewards" 
-              style={{ 
-                width: '100%', 
-                height: 'auto', 
-                filter: 'drop-shadow(0 10px 25px rgba(255, 179, 0, 0.35))' 
-              }} 
-            />
-          </Box>
-
-          {/* Ceremony Header */}
-          <Typography sx={{
-            color: '#ffb300',
-            fontSize: { xs: '0.8rem', sm: '1.05rem' },
-            fontWeight: 700,
-            letterSpacing: { xs: '3px', sm: '6px' },
-            textTransform: 'uppercase',
-            mb: 1,
-            textShadow: '0 0 12px rgba(255, 179, 0, 0.5)'
-          }}>
-            Official System Launch Ceremony
-          </Typography>
-
-          <Typography sx={{
-            color: 'rgba(255, 255, 255, 0.65)',
-            fontSize: { xs: '0.85rem', sm: '1rem' },
-            maxWidth: '520px',
-            mb: 5,
-            fontWeight: 400
-          }}>
-            Honoring the official digital inauguration of the Megakem Scan-Trak Loyalty Platform.
-          </Typography>
-
           {/* Grand Ceremonial Launch Button */}
           <Button
             onClick={handleStart}
@@ -123,8 +84,8 @@ const LaunchPage = ({ onLaunch }) => {
             onMouseLeave={() => setIsHovered(false)}
             sx={{
               position: 'relative',
-              px: { xs: 4, sm: 6 },
-              py: { xs: 2, sm: 2.5 },
+              px: { xs: 5, sm: 8 },
+              py: { xs: 2.5, sm: 3.5 },
               borderRadius: '16px',
               background: isHovered 
                 ? 'linear-gradient(135deg, #ffb300 0%, #ff8f00 100%)' 
@@ -141,20 +102,9 @@ const LaunchPage = ({ onLaunch }) => {
           >
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <Typography sx={{
-                color: isHovered ? '#000' : '#ffb300',
-                fontSize: { xs: '0.75rem', sm: '0.85rem' },
-                fontWeight: 700,
-                letterSpacing: '4px',
-                textTransform: 'uppercase',
-                mb: 0.5,
-                transition: 'color 0.3s ease'
-              }}>
-                PRESIDENTIAL INITIATION
-              </Typography>
-              <Typography sx={{
                 color: isHovered ? '#05070d' : '#ffffff',
                 fontFamily: '"Outfit", "Inter", sans-serif',
-                fontSize: { xs: '1.25rem', sm: '1.65rem' },
+                fontSize: { xs: '1.4rem', sm: '2rem' },
                 fontWeight: 800,
                 letterSpacing: '2px',
                 textTransform: 'uppercase',
@@ -196,33 +146,6 @@ const LaunchPage = ({ onLaunch }) => {
               perspective: 1000
             }}
           />
-
-          {/* Skip Button (Bottom Right) for safety during the presentation */}
-          <Button
-            onClick={handleFinish}
-            endIcon={<SkipNextIcon />}
-            sx={{
-              position: 'absolute',
-              bottom: 30,
-              right: 30,
-              zIndex: 30,
-              color: 'rgba(255, 255, 255, 0.7)',
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '8px',
-              px: 2,
-              py: 0.8,
-              fontSize: '0.85rem',
-              '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                color: '#ffb300',
-                borderColor: '#ffb300'
-              }
-            }}
-          >
-            Skip to Application
-          </Button>
         </Box>
       </Fade>
 
