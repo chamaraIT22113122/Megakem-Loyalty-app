@@ -183,11 +183,17 @@ const LaunchPage = ({ onLaunch }) => {
             src={launchVideo}
             onEnded={handleFinish}
             playsInline
+            preload="auto"
+            disablePictureInPicture
+            controlsList="nodownload"
             style={{
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              backgroundColor: '#000'
+              backgroundColor: '#000',
+              transform: 'translateZ(0)', // Forces hardware acceleration
+              backfaceVisibility: 'hidden',
+              perspective: 1000
             }}
           />
 
