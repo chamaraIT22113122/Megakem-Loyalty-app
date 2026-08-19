@@ -38,6 +38,7 @@ import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
 import { useTranslation } from 'react-i18next';
 import { speakMessage } from './utils/voice';
 import { productTranslations } from './productTranslations';
+import LaunchPage from './components/LaunchPage';
 // Validation Helpers
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isValidPassword = (password) => password.length >= 6; // Basic validation, can be enhanced
@@ -736,10 +737,9 @@ function App() {
     if (localStorage.getItem('adminAuth') === 'true') {
       return 'admin';
     }
-    if (savedRole && savedMemberId) {
-      return 'cart';
-    }
-    return 'welcome';
+    
+    // Always show launch page on fresh root visit unless they specifically request a view
+    return 'launch';
   });
   const [pendingScan, setPendingScan] = useState(null);
   const [scanHistory, setScanHistory] = useState([]);
@@ -4662,6 +4662,17 @@ function App() {
         <MaintenanceNoticeBanner maintenanceNotice={loyaltyConfig?.maintenanceNotice} currentView={view} />
       </Container>
       <Container maxWidth={['admin', 'profile', 'products-catalog', '403', '404'].includes(view) ? 'xl' : 'sm'} sx={{ flexGrow: 1, py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column' }}>
+        {view === 'launch' && (
+          <LaunchPage onLaunch={() => {
+            const savedRole = localStorage.getItem('user_role');
+            const savedMemberId = localStorage.getItem('user_member_id');
+            if (savedRole && savedMemberId) {
+              setView('cart');
+            } else {
+              setView('welcome');
+            }
+          }} />
+        )}
         {view === 'welcome' && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', animation: 'fadeIn 0.6s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
           <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 5 } }}>
             <Box sx={{ mb: { xs: 2, sm: 4 }, display: 'flex', justifyContent: 'center', animation: 'logoFloat 3s ease-in-out infinite', '@keyframes logoFloat': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-15px)' } } }}>
