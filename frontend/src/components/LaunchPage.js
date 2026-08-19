@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Box, Button, Fade, Typography } from '@mui/material';
 import launchVideo from '../assets/lunch.mp4';
-import megakemBrandLogo from '../assets/MegakemBrandLogo.png';
+import megakemBrandLogo from '../assets/MegakemBrandLogo2.png';
 
 const LaunchPage = ({ onLaunch }) => {
   const [phase, setPhase] = useState('idle'); // 'idle' (ceremony button), 'playing' (video)
