@@ -601,6 +601,10 @@ router.put('/request-approval/:memberId', protect, hasPermission('canViewRewards
       return res.status(404).json({ success: false, message: 'Member not found' });
     }
 
+    if (member.isFlagged) {
+      return res.status(403).json({ success: false, message: 'Account flagged for suspicious activity. Redemptions disabled.' });
+    }
+
     const purchase = member.monthlyPurchases.find(
       p => p.year === parseInt(year) && p.month === parseInt(month)
     );

@@ -219,7 +219,7 @@ app.use('/api/cash-rewards', require('./routes/cashRewards'));
 app.use('/api/qr-codes', require('./routes/qrCode'));
 app.use('/api/rewards', require('./routes/rewards'));
 app.use('/api/redemptions', require('./routes/redemptions'));
-app.use('/api/audit-logs', require('./routes/auditLogs'));
+app.use('/api/system-activity', require('./routes/auditLogs'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/push', require('./routes/push'));
 app.use('/api/backup', require('./routes/backup'));

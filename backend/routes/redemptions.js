@@ -63,6 +63,11 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Member not found' });
     }
 
+    // Advanced Fraud Defense: Block flagged members
+    if (member.isFlagged) {
+      return res.status(403).json({ success: false, message: 'Your account is under review for suspicious activity. Redemptions are temporarily disabled.' });
+    }
+
     // 3. Check points
     if (member.points < reward.pointsRequired) {
       return res.status(400).json({ success: false, message: 'Insufficient points for this reward' });

@@ -86,6 +86,20 @@ const scanSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  ipAddress: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  userAgent: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  isSuspicious: {
+    type: Boolean,
+    default: false
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'

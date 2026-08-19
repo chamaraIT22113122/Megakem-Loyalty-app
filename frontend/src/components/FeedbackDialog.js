@@ -9,8 +9,10 @@ import {
 } from '@mui/icons-material';
 import { feedbackAPI, uploadAPI } from '../services/api';
 import { Html5Qrcode } from 'html5-qrcode';
+import { useTranslation } from 'react-i18next';
 
 const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => {
+  const { t } = useTranslation();
   const [applicatorId, setApplicatorId] = useState(defaultApplicatorId || '');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -208,7 +210,7 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
     <>
       <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'primary.main', color: 'white' }}>
-          <Typography variant="h6">Submit Feedback</Typography>
+          <Typography variant="h6">{t('submitFeedback')}</Typography>
           <IconButton onClick={onClose} sx={{ color: 'white' }}>
             <Close />
           </IconButton>
@@ -218,16 +220,16 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
             
             <Typography variant="subtitle2" color="text.secondary">
-              Please provide either your Customer details OR your Applicator ID.
+              {t('feedbackInstruction')}
             </Typography>
 
             <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, border: '1px solid', borderColor: 'grey.300' }}>
               <Typography variant="body2" fontWeight="bold" mb={1} color={isApplicatorInfoFilled ? 'text.disabled' : 'text.primary'}>
-                Customer Details
+                {t('customerDetails')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
                 <TextField
-                  label="Full Name"
+                  label={t('fullName')}
                   variant="outlined"
                   fullWidth
                   value={name}
@@ -236,7 +238,7 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
                   required={!isApplicatorInfoFilled}
                 />
                 <TextField
-                  label="Phone Number"
+                  label={t('phoneNumber')}
                   variant="outlined"
                   fullWidth
                   value={phone}
@@ -251,10 +253,10 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
 
             <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, border: '1px solid', borderColor: 'grey.300' }}>
               <Typography variant="body2" fontWeight="bold" mb={1} color={isCustomerInfoFilled ? 'text.disabled' : 'text.primary'}>
-                Applicator Details
+                {t('applicatorDetails')}
               </Typography>
               <TextField
-                label="Applicator ID Number"
+                label={t('applicatorIdNum')}
                 variant="outlined"
                 fullWidth
                 value={applicatorId}
@@ -268,7 +270,7 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
 
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 1 }}>
               <TextField
-                label="Product Batch Number (Optional)"
+                label={t('productBatchOpt')}
                 variant="outlined"
                 fullWidth
                 value={batchNumber}
@@ -289,7 +291,7 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
             )}
 
             <TextField
-              label="Message / Feedback"
+              label={t('messageFeedback')}
               variant="outlined"
               fullWidth
               required
@@ -297,7 +299,7 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
               rows={4}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Describe your issue or provide feedback here..."
+              placeholder={t('describeFeedback')}
             />
 
             <Box>
@@ -317,7 +319,7 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
                 onClick={() => fileInputRef.current.click()}
                 fullWidth
               >
-                Upload Photo(s) (Optional)
+                {t('uploadPhotos')}
               </Button>
               
               {imagePreviews.length > 0 && (
@@ -343,7 +345,7 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
 
         <DialogActions sx={{ p: 2, bgcolor: 'background.default' }}>
           <Button onClick={onClose} variant="outlined" color="inherit">
-            Cancel
+            {t('cancel')}
           </Button>
           <Button 
             onClick={handleSubmit} 
@@ -352,7 +354,7 @@ const FeedbackDialog = ({ open, onClose, defaultApplicatorId, defaultRole }) => 
             disabled={loading || !isFormValid()}
             startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CloudUpload />}
           >
-            Submit Feedback
+            {t('submitFeedback')}
           </Button>
         </DialogActions>
       </Dialog>

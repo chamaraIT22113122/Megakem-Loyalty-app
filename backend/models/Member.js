@@ -165,6 +165,14 @@ const memberSchema = new mongoose.Schema({
     branchName: { type: String, trim: true },
     accountName: { type: String, trim: true },
     accountNumber: { type: String, trim: true }
+  },
+  isFlagged: {
+    type: Boolean,
+    default: false
+  },
+  fraudScore: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true

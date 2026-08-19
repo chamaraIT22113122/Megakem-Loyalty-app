@@ -930,6 +930,48 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
+// @route   PUT /api/members/:id/unflag
+// @desc    Unflag a member marked for suspicious activity
+// @access  Private/Admin
+router.put('/:id/unflag', protect, async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    const isCoAdmin = req.user.role === 'co-admin';
+    
+    // Check permission logic
+    const hasUsersPerm = req.user.permissions?.canManageUsers === true;
+    const hasApplicatorsPerm = req.user.permissions?.canManageApplicators === true;
+    const hasCustomersPerm = req.user.permissions?.canManageCustomers === true;
+    
+    if (!isAdmin && !isCoAdmin && !hasUsersPerm && !hasApplicatorsPerm && !hasCustomersPerm) {
+      return res.status(403).json({ success: false, message: 'Not authorized to manage members' });
+    }
+
+    const member = await Member.findById(req.params.id);
+    if (!member) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+
+    // Role-specific permission check
+    if (!isAdmin && isCoAdmin && !hasUsersPerm) {
+      if (member.role === 'applicator' && !hasApplicatorsPerm) {
+        return res.status(403).json({ success: false, message: 'Not authorized to manage applicators' });
+      }
+      if (member.role === 'customer' && !hasCustomersPerm) {
+        return res.status(403).json({ success: false, message: 'Not authorized to manage customers' });
+      }
+    }
+
+    member.isFlagged = false;
+    member.fraudScore = 0;
+    await member.save();
+
+    res.json({ success: true, message: 'Member unflagged successfully', data: member });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   DELETE /api/members/:id
 // @desc    Delete a member
 // @access  Private/Admin

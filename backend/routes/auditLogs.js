@@ -3,7 +3,7 @@ const router = express.Router();
 const AuditLog = require('../models/AuditLog');
 const { protect, hasPermission } = require('../middleware/auth');
 
-// @route   GET /api/audit-logs
+// @route   GET /api/system-activity
 // @desc    Get all audit logs (Main admin only)
 // @access  Private (Main Admin only - assuming Main Admin is the only one who can manage users or we just check if they are an admin. Since we don't have a strict 'super_admin' role, we'll allow those with canManageUsers to view logs)
 router.get('/', protect, hasPermission('canManageUsers'), async (req, res) => {
@@ -69,7 +69,7 @@ router.get('/', protect, hasPermission('canManageUsers'), async (req, res) => {
   }
 });
 
-// @route   POST /api/audit-logs/:id/revert
+// @route   POST /api/system-activity/:id/revert
 // @desc    Revert an action to its oldState (Best-effort undo)
 // @access  Private
 router.post('/:id/revert', protect, hasPermission('canManageUsers'), async (req, res) => {

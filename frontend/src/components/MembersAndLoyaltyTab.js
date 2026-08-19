@@ -3,7 +3,7 @@ import {
   Box, Typography, Button, TextField, MenuItem, Paper, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Chip, IconButton, Grid, Card, CardContent
 } from '@mui/material';
-import { Settings, Download, EmojiEvents, Visibility, People, Engineering, Storefront } from '@mui/icons-material';
+import { Settings, Download, EmojiEvents, Visibility, People, Engineering, Storefront, Flag } from '@mui/icons-material';
 
 const MembersAndLoyaltyTab = ({
   members,
@@ -24,7 +24,10 @@ const MembersAndLoyaltyTab = ({
   exportToExcel,
   getTierDisplayName,
   setMemberId,
-  setView
+  setView,
+  memberStatusFilter,
+  setMemberStatusFilter,
+  handleUnflagMember
 }) => {
   // Compute real-time stats and sort list
   let filteredMembers = members.filter(m => {
@@ -35,7 +38,8 @@ const MembersAndLoyaltyTab = ({
       m.phone?.toLowerCase().includes(memberSearchQuery.toLowerCase());
     const matchesRole = memberRoleFilter === 'all' || m.role === memberRoleFilter;
     const matchesTier = memberTierFilter === 'all' || m.tier === memberTierFilter;
-    return hasScans && matchesSearch && matchesRole && matchesTier;
+    const matchesStatus = !memberStatusFilter || memberStatusFilter === 'all' || (memberStatusFilter === 'flagged' && m.isFlagged);
+    return hasScans && matchesSearch && matchesRole && matchesTier && matchesStatus;
   });
 
   // Map stats for sorting
@@ -232,6 +236,19 @@ const MembersAndLoyaltyTab = ({
             <TextField 
               fullWidth
               select 
+              label='Status'
+              value={memberStatusFilter || 'all'}
+              onChange={(e) => setMemberStatusFilter(e.target.value)}
+              InputProps={{ sx: { borderRadius: 2 } }}
+            >
+              <MenuItem value='all'>All Status</MenuItem>
+              <MenuItem value='flagged'>Flagged</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={4} md={2}>
+            <TextField 
+              fullWidth
+              select 
               label='Sort By'
               value={memberSortKey}
               onChange={(e) => setMemberSortKey(e.target.value)}
@@ -302,6 +319,11 @@ const MembersAndLoyaltyTab = ({
                   <TableCell>
                     <Typography variant='body2'>{m.memberName}</Typography>
                     {m.phone && <Typography variant='caption' color='text.secondary'>{m.phone}</Typography>}
+                    {m.isFlagged && (
+                      <Box mt={0.5}>
+                        <Chip label='Flagged for Fraud' size='small' color='error' icon={<Flag sx={{ fontSize: '1rem !important' }} />} sx={{ fontWeight: 600, height: 20, fontSize: '0.65rem' }} />
+                      </Box>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Chip 
@@ -347,6 +369,17 @@ const MembersAndLoyaltyTab = ({
                     />
                   </TableCell>
                   <TableCell>
+                    {isMainAdmin && m.isFlagged && (
+                      <Button
+                        size='small'
+                        color='success'
+                        variant='outlined'
+                        onClick={() => handleUnflagMember(m._id)}
+                        sx={{ mr: 1, textTransform: 'none', py: 0 }}
+                      >
+                        Unflag
+                      </Button>
+                    )}
                     <IconButton 
                       size='small' 
                       color='info' 

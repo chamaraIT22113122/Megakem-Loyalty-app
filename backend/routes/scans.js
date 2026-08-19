@@ -35,6 +35,35 @@ const { optionalAuth, protect, authorize, hasPermission } = require('../middlewa
 const QRCodeModel = require('../models/QRCode');
 const ScanLog = require('../models/ScanLog');
 const RecycleBin = require('../models/RecycleBin');
+const rateLimit = require('express-rate-limit');
+
+// Advanced Scan Fraud Defense: Velocity Tracking
+const scanRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // Limit each IP to 5 scans per `window` (here, per minute)
+  handler: async (req, res) => {
+    // Auto-flag the member if they are hitting the rate limit
+    if (req.body && req.body.memberId) {
+      try {
+        const member = await Member.findOne({ memberId: req.body.memberId.toUpperCase().trim() });
+        if (member) {
+          member.isFlagged = true;
+          member.fraudScore = (member.fraudScore || 0) + 10;
+          await member.save();
+        }
+      } catch (err) {
+        console.error('Error auto-flagging member during rate limit:', err);
+      }
+    }
+    
+    res.status(429).json({
+      success: false,
+      message: 'Too many scans from this IP or Device. Your account has been temporarily flagged for review.'
+    });
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
 
 // Helper for distance calculation (Haversine in miles)
 function getDistanceFromLatLonInMiles(lat1, lon1, lat2, lon2) {
@@ -194,7 +223,7 @@ router.get('/:id', async (req, res) => {
 // @route   POST /api/scans
 // @desc    Create new scan
 // @access  Public (anonymous allowed)
-router.post('/', optionalAuth, async (req, res) => {
+router.post('/', scanRateLimiter, optionalAuth, async (req, res) => {
   try {
     const {
       memberName,
@@ -207,6 +236,10 @@ router.post('/', optionalAuth, async (req, res) => {
       sig,  // HMAC signature from QR URL — Upgrade 1
       location
     } = req.body;
+
+    // Advanced Fraud Defense: Device Fingerprinting
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    const userAgent = req.headers['user-agent'] || '';
 
     // Auto-detect role from memberId prefix (MA → applicator, MH/CUS- → customer)
     const upperMemberId = (memberId || '').toUpperCase().trim();
@@ -348,6 +381,8 @@ router.post('/', optionalAuth, async (req, res) => {
       location: location || '',
       latitude: req.body.latitude,
       longitude: req.body.longitude,
+      ipAddress,
+      userAgent,
       fraudFlag: fraudFlag,
       connectedHardware: req.body.connectedHardware || '',
       connectedHardwareId: req.body.connectedHardwareId || '',

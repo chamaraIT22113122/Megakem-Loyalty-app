@@ -272,6 +272,7 @@ export const membersAPI = {
   syncFromScans: () => api.post('/members/sync-from-scans'),
   fixRoles: () => api.post('/members/fix-roles'),
   bulkDelete: (ids) => api.post('/members/bulk-delete', { ids }),
+  unflag: (id) => api.put(`/members/${id}/unflag`),
 };
 
 // Loyalty Configuration API
@@ -330,8 +331,8 @@ export const redemptionsAPI = {
 };
 
 export const auditLogsAPI = {
-  getAll: (params, onFreshData) => api.getWithCache('/audit-logs', { params }, onFreshData),
-  revert: (id) => api.post(`/audit-logs/${id}/revert`),
+  getAll: (params, onFreshData) => api.getWithCache('/system-activity', { params }, onFreshData),
+  revert: (id) => api.post(`/system-activity/${id}/revert`),
 };
 
 export const backupAPI = {

@@ -35,6 +35,9 @@ import { DashboardCardSkeleton, ChartSkeleton } from './components/SkeletonLoade
 import megakemLogo from './assets/MegakemLogo.png';
 import megakemBrandLogo from './assets/MegakemBrandLogo.png';
 import megakemRewardsLogo from './assets/Megakem  Rewards logo .png';
+import { useTranslation } from 'react-i18next';
+import { speakMessage } from './utils/voice';
+import { productTranslations } from './productTranslations';
 // Validation Helpers
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isValidPassword = (password) => password.length >= 6; // Basic validation, can be enhanced
@@ -688,6 +691,12 @@ const ZoneSLMap = ({ members }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function App() {
+  const { t, i18n } = useTranslation();
+
+  const handleLanguageChange = (event) => {
+    i18n.changeLanguage(event.target.value);
+  };
+
   const [leadDialog, setLeadDialog] = useState({ open: false, product: null, loading: false });
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('user');
@@ -987,6 +996,7 @@ function App() {
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
   const [memberTierFilter, setMemberTierFilter] = useState('all');
+  const [memberStatusFilter, setMemberStatusFilter] = useState('all');
   const [memberSortKey, setMemberSortKey] = useState('points-desc');
 
   // Load public loyalty config (maintenance banner, tier names, page configs) on startup
@@ -2504,6 +2514,7 @@ function App() {
         showNotification(`${response.data.count} items submitted. ${response.data.duplicates.length} duplicates skipped.`, 'warning');
       } else {
         showNotification(`Successfully submitted ${cart.length} items!`, 'success');
+        speakMessage(t('scanSuccessVoice', { points: 'some' }).replace('some points', cart.length + ' items'), i18n.language); // simple fallback
       }
       
       setCart([]); setMemberId(''); setMemberName(''); setLocation(''); setConnectedHardware(''); setView('welcome');
@@ -4219,6 +4230,21 @@ function App() {
     }
   };
 
+  const handleUnflagMember = async (id) => {
+    if (!window.confirm('Are you sure you want to unflag this member? This will restore their redemption privileges.')) return;
+    setLoading(true);
+    try {
+      await membersAPI.unflag(id);
+      await loadAdminData();
+      showNotification('Member account successfully unflagged.', 'success');
+      addToActivityLog('Member Unflagged', `Restored privileges for ${id}`, 'success');
+    } catch (error) {
+      showNotification('Error unflagging member: ' + (error.response?.data?.message || error.message), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleExportData = async (format = 'csv') => {
     if (!hasPermission('canExport')) {
@@ -4506,6 +4532,24 @@ function App() {
           <Typography variant='h6' component='div' sx={{ fontWeight: 700, letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)', lineHeight: 1.2, fontSize: { xs: '0.9rem', sm: '1.25rem' } }}>MEGAKEM REWARDS</Typography>
           <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: { xs: '0.55rem', sm: '0.65rem' }, opacity: 0.9, display: { xs: 'none', sm: 'block' } }}>WHERE TRUST MEETS EXCELLENCE</Typography>
         </Box>
+        <Select
+          value={i18n.language || 'en'}
+          onChange={handleLanguageChange}
+          variant="outlined"
+          size="small"
+          sx={{
+            color: 'white',
+            marginRight: 2,
+            '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+            '.MuiSvgIcon-root': { color: 'white' }
+          }}
+        >
+          <MenuItem value="en">English</MenuItem>
+          <MenuItem value="si">සිංහල</MenuItem>
+          <MenuItem value="ta">தமிழ்</MenuItem>
+        </Select>
         {adminAuth && view === 'admin' && (
           <>
             <Tooltip title={isMainAdmin() ? "Pending Requests" : "My Requests & Notifications"}>
@@ -4621,14 +4665,14 @@ function App() {
             <Box sx={{ mb: { xs: 2, sm: 4 }, display: 'flex', justifyContent: 'center', animation: 'logoFloat 3s ease-in-out infinite', '@keyframes logoFloat': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-15px)' } } }}>
               <img src={megakemRewardsLogo} alt='Megakem Rewards Logo' style={{ width: '100%', maxWidth: '360px', height: 'auto', filter: 'drop-shadow(0 15px 35px rgba(0,51,102,0.25))' }} />
             </Box>
-            <Typography variant='h6' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '1rem', sm: '1.25rem' } }}>Select your role to begin scanning</Typography>
+            <Typography variant='h6' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '1rem', sm: '1.25rem' } }}>{t('selectRole')}</Typography>
           </Box>
           <Grid container spacing={3}>
             <Grid item xs={12}><Card sx={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.main', overflow: 'hidden', position: 'relative', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', '@media (hover: hover)': { '&:hover': { transform: 'translateY(-8px) scale(1.02)', boxShadow: '0 20px 40px rgba(0,51,102,0.25)' } }, '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '5px', background: 'linear-gradient(90deg, #003366 0%, #00B4D8 50%, #A4D233 100%)' } }}>
               <CardActionArea onClick={() => { setRole('applicator'); setView('cart'); }} sx={{ p: { xs: 2, sm: 3.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Box sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: { xs: '15px', sm: '20px' }, background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', mr: { xs: 2, sm: 3 }, boxShadow: '0 8px 20px rgba(0,51,102,0.35)', transition: 'all 0.3s', '@media (hover: hover)': { '&:hover': { transform: 'rotate(5deg) scale(1.1)' } } }}><Inventory2 sx={{ color: 'white', fontSize: { xs: '1.75rem', sm: '2.5rem' } }} /></Box>
-                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'primary.main', mb: 0.5, letterSpacing: '-0.3px', fontSize: { xs: '0.95rem', sm: '1.25rem' } }}>Waterproofing Technician Club</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '0.75rem', sm: '0.9rem' } }}>Loyalty Plan/Programme</Typography></Box>
+                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'primary.main', mb: 0.5, letterSpacing: '-0.3px', fontSize: { xs: '0.95rem', sm: '1.25rem' } }}>{t('technicianClub')}</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '0.75rem', sm: '0.9rem' } }}>{t('loyaltyPlan')}</Typography></Box>
                   <ArrowForward sx={{ color: 'secondary.main', fontSize: { xs: '1.75rem', sm: '2.5rem' }, animation: 'slideRight 1.5s ease-in-out infinite', '@keyframes slideRight': { '0%, 100%': { transform: 'translateX(0)' }, '50%': { transform: 'translateX(8px)' } } }} />
                 </Box>
               </CardActionArea>
@@ -4638,7 +4682,7 @@ function App() {
               <CardActionArea onClick={() => { setRole('customer'); setView('cart'); }} sx={{ p: { xs: 2, sm: 3.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Box sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: { xs: '15px', sm: '20px' }, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', mr: { xs: 2, sm: 3 }, boxShadow: '0 8px 20px rgba(164,210,51,0.35)', transition: 'all 0.3s', '@media (hover: hover)': { '&:hover': { transform: 'rotate(-5deg) scale(1.1)' } } }}><Person sx={{ color: 'white', fontSize: { xs: '1.75rem', sm: '2.5rem' } }} /></Box>
-                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'secondary.dark', mb: 0.5, letterSpacing: '-0.3px', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>Customer</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '0.85rem', sm: '1rem' } }}>End User / Buyer</Typography></Box>
+                  <Box sx={{ flexGrow: 1 }}><Typography variant='h5' fontWeight='800' sx={{ color: 'secondary.dark', mb: 0.5, letterSpacing: '-0.3px', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>{t('customer')}</Typography><Typography variant='body1' sx={{ color: 'text.secondary', fontWeight: 500, fontSize: { xs: '0.85rem', sm: '1rem' } }}>{t('endUserBuyer')}</Typography></Box>
                   <ArrowForward sx={{ color: 'info.main', fontSize: { xs: '1.75rem', sm: '2.5rem' }, animation: 'slideRight 1.5s ease-in-out infinite', '@keyframes slideRight': { '0%, 100%': { transform: 'translateX(0)' }, '50%': { transform: 'translateX(8px)' } } }} />
                 </Box>
               </CardActionArea>
@@ -4660,7 +4704,7 @@ function App() {
                 '&:hover': { borderWidth: 2 }
               }}
             >
-              Search Purchase History
+              {t('searchHistory')}
             </Button>
             <Button 
               variant='contained' 
@@ -4675,7 +4719,7 @@ function App() {
                 fontWeight: 600
               }}
             >
-              Submit Feedback
+              {t('submitFeedback')}
             </Button>
             <Button 
               variant='contained' 
@@ -4692,7 +4736,7 @@ function App() {
                 boxShadow: '0 4px 15px rgba(0, 51, 102, 0.3)'
               }}
             >
-              Explore Products Catalog
+              {t('exploreCatalog')}
             </Button>
           </Box>
           <FeedbackDialog 
@@ -4716,21 +4760,21 @@ function App() {
               <ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main' }} />
             </IconButton>
             <Box>
-              <Typography variant='h4' fontWeight={800} sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>Purchase History</Typography>
-              <Typography variant='body2' color='text.secondary'>Search and track your purchase history</Typography>
+              <Typography variant='h4' fontWeight={800} sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>{t('purchaseHistory')}</Typography>
+              <Typography variant='body2' color='text.secondary'>{t('searchPurchaseDesc')}</Typography>
             </Box>
           </Box>
           <Card sx={{ mb: 3, overflow: 'hidden', boxShadow: '0 8px 32px -8px rgba(0,51,102,0.2)', bgcolor: 'background.paper' }}>
             <Box sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', p: 2, color: 'white' }}>
               <Typography variant='h6' fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <HistoryIcon /> Search Your History
+                <HistoryIcon /> {t('searchYourHistory')}
               </Typography>
             </Box>
             <Box sx={{ p: 3 }}>
               <TextField 
                 fullWidth 
-                label='Member ID (for Applicators)' 
-                placeholder='e.g., MA0000' 
+                label={t('memberIdApplicators')} 
+                placeholder={t('egMember')} 
                 value={searchMemberId} 
                 onChange={(e) => {
                   setSearchMemberId(e.target.value.toUpperCase());
@@ -4775,7 +4819,7 @@ function App() {
                 }
               }}
             >
-              {loading ? 'Searching...' : 'Search History'}
+              {loading ? t('searching') : t('searchHistoryBtn')}
             </Button>
             </Box>
           </Card>
@@ -4823,7 +4867,7 @@ function App() {
                 <Box sx={{ p: 3, background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant='h5' fontWeight={700}>
-                      🎉 Monthly Purchase Summary ({currentMonthName} {currentYear})
+                      {t('monthlySummary', { month: currentMonthName, year: currentYear })}
                     </Typography>
                     <Chip 
                       label={memberHistory.filter(s => s.role === 'applicator').length > 0 ? 'Applicator' : 'Hardware'} 
@@ -4842,7 +4886,7 @@ function App() {
                       <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
                         <EmojiEvents sx={{ fontSize: 40, mb: 1 }} />
                         <Typography variant='h3' fontWeight={700}>{currentMonthScans.length}</Typography>
-                        <Typography variant='caption' sx={{ opacity: 0.9 }}>{currentMonthName} Scans</Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>{t('monthlyScans', { month: currentMonthName })}</Typography>
                       </Box>
                     </Grid>
                     <Grid item xs={6} sm={6}>
@@ -4851,7 +4895,7 @@ function App() {
                         <Typography variant='h3' fontWeight={700}>
                           {currentMonthPoints.toLocaleString()}
                         </Typography>
-                        <Typography variant='caption' sx={{ opacity: 0.9 }}>{currentMonthName} Points</Typography>
+                        <Typography variant='caption' sx={{ opacity: 0.9 }}>{t('monthlyPoints', { month: currentMonthName })}</Typography>
                       </Box>
                     </Grid>
                   </Grid>
@@ -4866,7 +4910,7 @@ function App() {
                   <Box sx={{ position: 'absolute', top: -12, right: 16, zIndex: 1 }}>
                     <Chip 
                       icon={<EmojiEvents sx={{ fontSize: '1.1rem !important' }} />}
-                      label={`${loyaltyPoints} Points`} 
+                      label={`${loyaltyPoints} ${t('points')}`} 
                       color='success' 
                       sx={{ 
                         fontWeight: 700,
@@ -4881,23 +4925,23 @@ function App() {
                       <Typography variant='h6' fontWeight='bold'>{scan.productName}</Typography>
                       <Chip label={scan.role} size='small' color={scan.role === 'applicator' ? 'primary' : 'secondary'} />
                     </Box>
-                    <Typography variant='body2' color='text.secondary'>Member: {scan.memberName || scan.memberId}</Typography>
-                    {scan.phone && <Typography variant='body2' color='text.secondary'>Phone: {scan.phone}</Typography>}
-                    <Typography variant='body2' color='text.secondary'>PRODUCT: {scan.productNo}</Typography>
+                    <Typography variant='body2' color='text.secondary'>{t('memberPrefix')}{scan.memberName || scan.memberId}</Typography>
+                    {scan.phone && <Typography variant='body2' color='text.secondary'>{t('phonePrefix')}{scan.phone}</Typography>}
+                    <Typography variant='body2' color='text.secondary'>{t('productPrefix')}{scan.productNo}</Typography>
                     <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
-                      <Chip label={`Batch: ${scan.batchNo}`} size='small' variant='outlined' />
-                      <Chip label={`Bag: ${scan.bagNo}`} size='small' variant='outlined' />
+                      <Chip label={`${t('batchPrefix')}${scan.batchNo}`} size='small' variant='outlined' />
+                      <Chip label={`${t('bagPrefix')}${scan.bagNo}`} size='small' variant='outlined' />
                     </Box>
                     {(() => {
                       const batchInfo = parseBatchInfo(scan.batchNo);
                       if (batchInfo?.parsed) {
                         return (
                           <Box sx={{ mt: 1, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
-                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block', fontWeight: 600 }}>Batch Details:</Typography>
-                            <Typography variant='caption' color='text.secondary'>Product Code: {batchInfo.productCode}</Typography>
-                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>Material Batch: {batchInfo.materialBatch}</Typography>
-                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>Date: {batchInfo.date}</Typography>
-                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>Pack Size: {batchInfo.packSize} | Pack No: {batchInfo.packNo}</Typography>
+                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block', fontWeight: 600 }}>{t('batchDetailsHeader')}</Typography>
+                            <Typography variant='caption' color='text.secondary'>{t('productCodePrefix')}{batchInfo.productCode}</Typography>
+                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>{t('materialBatchPrefix')}{batchInfo.materialBatch}</Typography>
+                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>{t('datePrefix')}{batchInfo.date}</Typography>
+                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block' }}>{t('packSizePrefix')}{batchInfo.packSize}{t('packNoPrefix')}{batchInfo.packNo}</Typography>
                           </Box>
                         );
                       }
@@ -4909,10 +4953,10 @@ function App() {
                       <Box sx={{ mt: 2, p: 1.5, bgcolor: 'success.lighter', borderRadius: 1, border: '1px solid', borderColor: 'success.light' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Typography variant='body2' fontWeight={700} color='success.main' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <EmojiEvents sx={{ fontSize: '1.2rem' }} /> Loyalty Points Earned:
+                            <EmojiEvents sx={{ fontSize: '1.2rem' }} /> {t('loyaltyPointsEarned')}
                           </Typography>
                           <Chip 
-                            label={`${loyaltyPoints} Points`} 
+                            label={`${loyaltyPoints} ${t('points')}`} 
                             color='success' 
                             size='small'
                             sx={{ fontWeight: 700 }}
@@ -4986,10 +5030,10 @@ function App() {
                 </IconButton>
                 <Box>
                   <Typography variant='h4' fontWeight='800' sx={{ color: 'primary.main', fontSize: { xs: '1.4rem', sm: '2rem' } }}>
-                    Megakem Product Info & Catalog
+                    {t('megakemCatalogTitle')}
                   </Typography>
                   <Typography variant='body2' color='text.secondary'>
-                    Explore all official company products, technical specifications & loyalty point highlights
+                    {t('megakemCatalogDesc')}
                   </Typography>
                 </Box>
               </Box>
@@ -5000,7 +5044,7 @@ function App() {
               <TextField
                 fullWidth
                 size="small"
-                placeholder="Search product by name, code (e.g. MKL46), or category..."
+                placeholder={t('catalogSearchPlaceholder')}
                 value={catalogSearch}
                 onChange={(e) => setCatalogSearch(e.target.value)}
                 InputProps={{
@@ -5034,7 +5078,7 @@ function App() {
                 if (filteredProducts.length === 0) {
                   return (
                     <Paper sx={{ p: 5, textAlign: 'center', borderRadius: 3 }}>
-                      <Typography color="text.secondary">No products match your search query.</Typography>
+                      <Typography color="text.secondary">{t('noProductsMatch')}</Typography>
                     </Paper>
                   );
                 }
@@ -5046,7 +5090,7 @@ function App() {
                     configuredPts = p.pointsPerPackSize[0].points;
                   }
 
-                  const pointsDisplay = isLoyalty ? 'Loyalty Active' : null;
+                  const pointsDisplay = isLoyalty ? t('loyaltyActive') : null;
 
                   return (
                     <Card key={p._id} sx={{ 
@@ -5066,7 +5110,7 @@ function App() {
                         <Box sx={{ position: 'absolute', top: { xs: 4, sm: 10 }, right: { xs: 4, sm: 10 }, zIndex: 2 }}>
                           <Chip 
                             icon={<EmojiEvents style={{ color: '#003366', fontSize: catalogMobileCols >= 3 ? 10 : 14 }} />} 
-                            label={catalogMobileCols >= 3 ? "Active" : "Loyalty Active"} 
+                            label={catalogMobileCols >= 3 ? t('active') : t('loyaltyActive')} 
                             size="small"
                             sx={{ 
                               background: 'linear-gradient(135deg, #00C853 0%, #00E676 100%)', 
@@ -5102,7 +5146,7 @@ function App() {
                         </Typography>
                         {p.category && (
                           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5, fontWeight: 500, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
-                            Pack Size: <span style={{ fontWeight: 700, color: '#003366' }}>{p.category}</span>
+                            {t('packSizeLabel')} <span style={{ fontWeight: 700, color: '#003366' }}>{p.category}</span>
                           </Typography>
                         )}
                         <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
@@ -5113,14 +5157,14 @@ function App() {
                           )}
                           {isLoyalty && (
                             configuredPts && configuredPts > 0 ? (
-                              <Chip 
-                                label={`🏆 +${configuredPts} pts`} 
-                                size="small" 
-                                sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 900, fontSize: { xs: '0.6rem', sm: '0.72rem' }, height: { xs: 18, sm: 22 }, px: 0.2, border: '1px solid #a7f3d0' }} 
-                              />
+                            <Chip 
+                              label={t('ptsValue', { points: configuredPts })} 
+                              size="small" 
+                              sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 900, fontSize: { xs: '0.6rem', sm: '0.72rem' }, height: { xs: 18, sm: 22 }, px: 0.2, border: '1px solid #a7f3d0' }} 
+                            />
                             ) : (
                               <Chip 
-                                label="Not Set" 
+                                label={t('notSet')} 
                                 size="small" 
                                 color="default"
                                 sx={{ fontWeight: 700, fontSize: { xs: '0.58rem', sm: '0.68rem' }, height: { xs: 16, sm: 20 } }} 
@@ -5129,7 +5173,11 @@ function App() {
                           )}
                         </Box>
                         <Typography variant="caption" color="text.secondary" sx={{ display: '-webkit-box', WebkitLineClamp: catalogMobileCols >= 3 ? 1 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.3, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
-                          {p.description ? p.description.replace(/<[^>]*>?/gm, '') : 'Official Megakem product.'}
+                          {(() => {
+                            const translatedDesc = productTranslations[p.productNo]?.description?.[i18n.language];
+                            const desc = translatedDesc || p.description;
+                            return desc ? desc.replace(/<[^>]*>?/gm, '') : t('officialMegakemProduct');
+                          })()}
                         </Typography>
                       </CardContent>
 
@@ -5137,7 +5185,7 @@ function App() {
                       <CardActions sx={{ p: { xs: 0.8, sm: 1.5 }, pt: { xs: 0.8, sm: 1.2 }, flexDirection: 'column', gap: 0.6, bgcolor: '#fbfcfd' }}>
                         <Box sx={{ display: 'flex', width: '100%', gap: 0.5 }}>
                           <Button size="small" variant="outlined" color="primary" onClick={() => setSelectedProductCatalogDialog({ open: true, product: p })} sx={{ flex: 1, borderRadius: '6px', fontSize: { xs: '0.62rem', sm: '0.7rem' }, fontWeight: 700, textTransform: 'none', py: { xs: 0.3, sm: 0.6 }, px: 0.5 }}>
-                            Details
+                            {t('details')}
                           </Button>
                         </Box>
 
@@ -5150,7 +5198,7 @@ function App() {
                             onClick={() => setLeadDialog({ open: true, product: p, loading: false })}
                             sx={{ borderRadius: '6px', fontWeight: 800, fontSize: { xs: '0.65rem', sm: '0.75rem' }, textTransform: 'none', py: { xs: 0.4, sm: 0.8 }, background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0, 51, 102, 0.25)', '&:hover': { background: 'linear-gradient(135deg, #002244 0%, #0096B8 100%)' } }}
                           >
-                            Buy Online
+                            {t('buyOnline')}
                           </Button>
                         ) : (
                           <Button 
@@ -5161,7 +5209,7 @@ function App() {
                             onClick={() => handleWhatsAppClick(p)}
                             sx={{ borderRadius: '6px', fontWeight: 800, fontSize: { xs: '0.65rem', sm: '0.75rem' }, textTransform: 'none', py: { xs: 0.4, sm: 0.8 }, background: 'linear-gradient(135deg, #128C7E 0%, #25D366 100%)', color: 'white', boxShadow: '0 4px 12px rgba(37, 211, 102, 0.25)', '&:hover': { background: 'linear-gradient(135deg, #075E54 0%, #128C7E 100%)' } }}
                           >
-                            Order via WhatsApp
+                            {t('orderWhatsApp')}
                           </Button>
                         )}
                       </CardActions>
@@ -5206,10 +5254,10 @@ function App() {
                           </Box>
                           <Box>
                             <Typography variant="h5" fontWeight="800" sx={{ color: 'primary.main' }}>
-                              📦 Other Company Products ({otherProducts.length})
+                              {t('otherCompanyProducts', { count: otherProducts.length })}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              Standard waterproofing, sealers and tile adhesive product range
+                              {t('standardWaterproofingDesc')}
                             </Typography>
                           </Box>
                         </Box>
@@ -5233,8 +5281,10 @@ function App() {
                 <React.Fragment>
                   <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box>
-                      <Typography variant="h5" fontWeight="800" color="primary">{selectedProductCatalogDialog.product.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">Product Code: {selectedProductCatalogDialog.product.productNo}</Typography>
+                      <Typography variant="h5" fontWeight="800" color="primary">
+                        {productTranslations[selectedProductCatalogDialog.product.productNo]?.name?.[i18n.language] || selectedProductCatalogDialog.product.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">{t('productCode')}: {selectedProductCatalogDialog.product.productNo}</Typography>
                     </Box>
                     <IconButton onClick={() => setSelectedProductCatalogDialog({ open: false, product: null })}>
                       <Close />
@@ -5250,24 +5300,24 @@ function App() {
                         ) : (
                           <Box sx={{ p: 4, border: '1px solid #eee', borderRadius: 3, textAlign: 'center', bgcolor: '#f0f4f8', color: 'primary.main' }}>
                             <Inventory2 sx={{ fontSize: 80, opacity: 0.5 }} />
-                            <Typography variant="caption" display="block">No Image Provided</Typography>
+                            <Typography variant="caption" display="block">{t('noImageProvided')}</Typography>
                           </Box>
                         )}
                       </Grid>
                       <Grid item xs={12} md={7}>
-                        <Typography variant="subtitle1" fontWeight="700" color="primary" gutterBottom>Product Information</Typography>
+                        <Typography variant="subtitle1" fontWeight="700" color="primary" gutterBottom>{t('productInformation')}</Typography>
                         <Table size="small" sx={{ mb: 2 }}>
                           <TableBody>
-                            <TableRow><TableCell fontWeight={700}>Product Name</TableCell><TableCell>{selectedProductCatalogDialog.product.name}</TableCell></TableRow>
-                            <TableRow><TableCell fontWeight={700}>Product Code</TableCell><TableCell><Chip label={selectedProductCatalogDialog.product.productNo} size="small" color="primary" /></TableCell></TableRow>
-                            <TableRow><TableCell fontWeight={700}>Pack Size</TableCell><TableCell>{selectedProductCatalogDialog.product.category || 'N/A'}</TableCell></TableRow>
-                            <TableRow><TableCell fontWeight={700}>Price (LKR)</TableCell><TableCell><strong>Rs. {selectedProductCatalogDialog.product.price ? selectedProductCatalogDialog.product.price.toLocaleString() : 'N/A'}</strong></TableCell></TableRow>
+                            <TableRow><TableCell fontWeight={700}>{t('productName')}</TableCell><TableCell>{productTranslations[selectedProductCatalogDialog.product.productNo]?.name?.[i18n.language] || selectedProductCatalogDialog.product.name}</TableCell></TableRow>
+                            <TableRow><TableCell fontWeight={700}>{t('productCode')}</TableCell><TableCell><Chip label={selectedProductCatalogDialog.product.productNo} size="small" color="primary" /></TableCell></TableRow>
+                            <TableRow><TableCell fontWeight={700}>{t('packSize')}</TableCell><TableCell>{selectedProductCatalogDialog.product.category || 'N/A'}</TableCell></TableRow>
+                            <TableRow><TableCell fontWeight={700}>{t('priceLKR')}</TableCell><TableCell><strong>Rs. {selectedProductCatalogDialog.product.price ? selectedProductCatalogDialog.product.price.toLocaleString() : 'N/A'}</strong></TableCell></TableRow>
                             <TableRow>
-                              <TableCell fontWeight={700}>Loyalty Points</TableCell>
+                              <TableCell fontWeight={700}>{t('loyaltyPointsLabel')}</TableCell>
                               <TableCell>
                                 {selectedProductCatalogDialog.product.isLoyaltyEnabled !== false ? (
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                                    <Chip icon={<EmojiEvents />} label="Loyalty Active" color="success" size="small" sx={{ fontWeight: 800 }} />
+                                    <Chip icon={<EmojiEvents />} label={t('loyaltyActive')} color="success" size="small" sx={{ fontWeight: 800 }} />
                                     {(() => {
                                       const prod = selectedProductCatalogDialog.product;
                                       let pointsVal = prod.pointsPerProduct;
@@ -5278,7 +5328,7 @@ function App() {
                                       if (pointsVal && pointsVal > 0) {
                                         return (
                                           <Chip 
-                                            label={`🏆 +${pointsVal} Points per Scan`} 
+                                            label={t('pointsPerScan', { points: pointsVal })} 
                                             size="small" 
                                             sx={{ 
                                               bgcolor: '#e6f4ea', 
@@ -5316,7 +5366,7 @@ function App() {
                               onClick={() => setLeadDialog({ open: true, product: selectedProductCatalogDialog.product })}
                               sx={{ borderRadius: 2, fontWeight: 800, px: 3, py: 1.2, background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', color: 'white', boxShadow: '0 4px 15px rgba(56, 239, 125, 0.4)' }}
                             >
-                              Buy Now / Order Online
+                              {t('buyNowOnline')}
                             </Button>
                           ) : (
                             <Button 
@@ -5327,13 +5377,13 @@ function App() {
                               onClick={() => handleWhatsAppClick(selectedProductCatalogDialog.product)}
                               sx={{ borderRadius: 2, fontWeight: 800, px: 3, py: 1.2, background: 'linear-gradient(135deg, #128C7E 0%, #25D366 100%)', color: 'white', boxShadow: '0 4px 15px rgba(37, 211, 102, 0.4)', '&:hover': { background: 'linear-gradient(135deg, #075E54 0%, #128C7E 100%)' } }}
                             >
-                              Order via WhatsApp
+                              {t('orderWhatsApp')}
                             </Button>
                           )}
 
                           {selectedProductCatalogDialog.product.tdsUrl && (
                             <Button variant="outlined" color="info" size="large" startIcon={<CloudDownload />} href={selectedProductCatalogDialog.product.tdsUrl} target="_blank" rel="noopener noreferrer" sx={{ borderRadius: 2, fontWeight: 700, px: 2, py: 1.2 }}>
-                              Download TDS
+                              {t('downloadTDS')}
                             </Button>
                           )}
                         </Box>
@@ -5345,7 +5395,7 @@ function App() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                         <Box sx={{ width: 4, height: 20, bgcolor: 'primary.main', borderRadius: 1 }} />
                         <Typography variant="subtitle1" fontWeight="800" color="primary">
-                          Full Description & Specifications
+                          {t('fullDescSpecs')}
                         </Typography>
                       </Box>
                       
@@ -5372,8 +5422,9 @@ function App() {
                         <div 
                           dangerouslySetInnerHTML={{ 
                             __html: (() => {
-                              const desc = selectedProductCatalogDialog.product.description;
-                              if (!desc) return 'Official high-quality Megakem product.';
+                              const translatedDesc = productTranslations[selectedProductCatalogDialog.product.productNo]?.description?.[i18n.language];
+                              const desc = translatedDesc || selectedProductCatalogDialog.product.description;
+                              if (!desc) return t('officialMegakemProduct');
                               if (/<[a-z][\s\S]*>/i.test(desc)) return desc;
                               return desc.split(/\n+/).filter(p => p.trim()).map(p => `<p>${p.trim()}</p>`).join('');
                             })()
@@ -6148,16 +6199,16 @@ function App() {
           <Box sx={{ position: 'absolute', top: { xs: 60, sm: 80 }, left: 0, right: 0, zIndex: 5, px: 2 }}>
             <Paper elevation={3} sx={{ bgcolor: 'rgba(255,255,255,0.95)', p: { xs: 1.5, sm: 2 }, borderRadius: 2, backdropFilter: 'blur(10px)' }}>
               <Typography variant='subtitle2' fontWeight='bold' color='primary' gutterBottom sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
-                {role === 'applicator' ? 'Waterproofing Technician - Instructions:' : 'Hardware - Instructions:'}
+                {role === 'applicator' ? t('techInstructions') : t('hardwareInstructions')}
               </Typography>
               <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                📱 Scan QR code on product bags
+                {t('scanInstructions1')}
               </Typography>
               <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                ✅ Multiple scans allowed - Add all your products
+                {t('scanInstructions2')}
               </Typography>
               <Typography variant='caption' color='text.secondary' sx={{ display: 'block', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                🎯 {role === 'applicator' ? 'Earn points with each scan!' : 'Track your purchases'}
+                {role === 'applicator' ? t('scanInstructions3Applicator') : t('scanInstructions3Customer')}
               </Typography>
             </Paper>
           </Box>
@@ -6214,9 +6265,9 @@ function App() {
               </Box>
             </Box>
             
-            <Box sx={{ position: 'absolute', zIndex: 0, opacity: 0.3, textAlign: 'center' }}><Typography variant='caption' sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Loading Camera...</Typography></Box>
+            <Box sx={{ position: 'absolute', zIndex: 0, opacity: 0.3, textAlign: 'center' }}><Typography variant='caption' sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('loadingCamera')}</Typography></Box>
             <IconButton onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, left: { xs: 8, sm: 16 }, zIndex: 10, bgcolor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', transition: 'all 0.3s', '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', color: 'primary.main', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
-            {cart.length > 0 && <Fab variant='extended' size={window.innerWidth < 600 ? 'small' : 'medium'} onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, right: { xs: 8, sm: 16 }, zIndex: 10, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white', fontWeight: 700, boxShadow: '0 6px 20px rgba(164,210,51,0.4)', animation: 'bounce 2s ease-in-out infinite', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }, '&:hover': { background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1.5, sm: 2 } }}>View Cart ({cart.length})</Fab>}
+            {cart.length > 0 && <Fab variant='extended' size={window.innerWidth < 600 ? 'small' : 'medium'} onClick={() => setView('cart')} sx={{ position: 'absolute', top: { xs: 8, sm: 16 }, right: { xs: 8, sm: 16 }, zIndex: 10, background: 'linear-gradient(135deg, #A4D233 0%, #7fa326 100%)', color: 'white', fontWeight: 700, boxShadow: '0 6px 20px rgba(164,210,51,0.4)', animation: 'bounce 2s ease-in-out infinite', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }, '&:hover': { background: 'linear-gradient(135deg, #7fa326 0%, #A4D233 100%)' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1.5, sm: 2 } }}>{t('viewCart', { count: cart.length })}</Fab>}
 
             {/* Upgrade 3: Scanner Control Bar — Torch + Continuous Scan + Count */}
             <Box sx={{
@@ -6227,7 +6278,7 @@ function App() {
               px: 2, py: 1
             }}>
               {/* Torch Button */}
-              <Tooltip title={torchOn ? 'Turn Off Torch' : 'Turn On Torch'}>
+              <Tooltip title={torchOn ? t('turnOffTorch') : t('turnOnTorch')}>
                 <IconButton
                   onClick={toggleTorch}
                   size='small'
@@ -6249,7 +6300,7 @@ function App() {
               {/* Continuous Scan Toggle */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
-                  Continuous
+                  {t('continuous')}
                 </Typography>
                 <Box
                   onClick={() => setContinuousScan(prev => !prev)}
@@ -6276,7 +6327,7 @@ function App() {
                   px: 1, py: 0.25, display: 'flex', alignItems: 'center', gap: 0.5
                 }}>
                   <Typography variant='caption' fontWeight='bold' sx={{ fontSize: '0.7rem' }}>
-                    ✓ {scanCount} scanned
+                    {t('scannedCount', { count: scanCount })}
                   </Typography>
                 </Box>
               )}
@@ -6294,7 +6345,7 @@ function App() {
           ) : <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', animation: 'slideIn 0.4s ease-out', '@keyframes slideIn': { from: { opacity: 0, transform: 'translateX(100px)' }, to: { opacity: 1, transform: 'translateX(0)' } } }}>
           <Box sx={{ mb: { xs: 2, sm: 3 }, display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
             <IconButton onClick={() => setView('welcome')} sx={{ background: 'linear-gradient(135deg, #003366 0%, #4A90A4 100%)', color: 'white', boxShadow: '0 4px 12px rgba(0,51,102,0.3)', transition: 'all 0.3s', '&:hover': { transform: 'scale(1.1) rotate(-10deg)', boxShadow: '0 6px 16px rgba(0,51,102,0.4)' }, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}><ArrowForward sx={{ transform: 'rotate(180deg)', fontSize: { xs: '1.2rem', sm: '1.5rem' } }} /></IconButton>
-            <Box><Typography variant='h4' fontWeight='800' sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>Scanned Items</Typography><Typography variant='body1' color='text.secondary' fontWeight={500} sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>{cart.length} items ready for submission</Typography></Box>
+            <Box><Typography variant='h4' fontWeight='800' sx={{ background: 'linear-gradient(135deg, #003366 0%, #00B4D8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' } }}>{t('scannedItems')}</Typography><Typography variant='body1' color='text.secondary' fontWeight={500} sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>{t('itemsReady', { count: cart.length })}</Typography></Box>
           </Box>
           <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: { xs: 2, sm: 3 } }}>
             {cart.map((item, idx) => <Card key={item.tempId} sx={{ mb: { xs: 1.5, sm: 2 }, position: 'relative', background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)', border: '2px solid', borderColor: 'grey.100', animation: `slideInItem 0.4s ease-out ${idx * 0.1}s backwards`, '@keyframes slideInItem': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } }, transition: 'all 0.3s', '@media (hover: hover)': { '&:hover': { borderColor: 'primary.main', transform: 'translateY(-4px)', boxShadow: '0 12px 24px rgba(0,51,102,0.15)' } } }}>
@@ -6306,27 +6357,27 @@ function App() {
                   {item.qty && <Chip label={item.qty} size='medium' sx={{ bgcolor: 'success.main', color: 'white', fontWeight: 700, fontSize: { xs: '0.75rem', sm: '0.9rem' }, height: { xs: 24, sm: 32 } }} />}
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: { xs: 1, sm: 2 }, pt: { xs: 1, sm: 2 }, borderTop: '2px solid', borderColor: 'grey.100', flexWrap: 'wrap', gap: 1 }}>
-                  <Typography variant='body2' color='text.secondary' fontWeight={600} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Batch: {item.batch}</Typography>
-                  <Typography variant='body2' color='text.secondary' fontWeight={600} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Bag: {item.bag}</Typography>
+                  <Typography variant='body2' color='text.secondary' fontWeight={600} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{t('batch')}: {item.batch}</Typography>
+                  <Typography variant='body2' color='text.secondary' fontWeight={600} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{t('bag')}: {item.bag}</Typography>
                 </Box>
               </CardContent>
             </Card>)}
-            <Button variant='outlined' fullWidth startIcon={<Add />} onClick={() => setView('scanner')} sx={{ borderStyle: 'dashed', borderWidth: 3, borderColor: 'primary.main', py: 3, fontSize: '1rem', fontWeight: 700, color: 'primary.main', transition: 'all 0.3s', '&:hover': { borderWidth: 3, bgcolor: 'primary.50', transform: 'scale(1.02)' } }}>SCAN PRODUCT</Button>
+            <Button variant='outlined' fullWidth startIcon={<Add />} onClick={() => setView('scanner')} sx={{ borderStyle: 'dashed', borderWidth: 3, borderColor: 'primary.main', py: 3, fontSize: '1rem', fontWeight: 700, color: 'primary.main', transition: 'all 0.3s', '&:hover': { borderWidth: 3, bgcolor: 'primary.50', transform: 'scale(1.02)' } }}>{t('scanProductQR')}</Button>
           </Box>
           <Paper elevation={6} sx={{ p: { xs: 2, sm: 3 }, borderRadius: { xs: 3, sm: 4 }, background: 'linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)', border: '2px solid', borderColor: 'primary.light', boxShadow: '0 12px 40px rgba(0,51,102,0.2)' }}>
             {role === 'customer' && (
               <Box sx={{ mb: 2, p: 2, bgcolor: 'info.50', borderRadius: 2, border: '1px solid', borderColor: 'info.light' }}>
                 <Typography variant='caption' fontWeight='bold' color='info.dark' sx={{ display: 'block', mb: 1, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                  📋 Customer Information
+                  📋 {t('customerInfo')}
                 </Typography>
                 <Typography variant='caption' color='text.secondary' sx={{ display: 'block', fontSize: { xs: '0.65rem', sm: '0.7rem' } }}>
-                  ⚠️ Disclaimer: By providing your information, you consent to Megakem storing your contact details and purchase history for loyalty program purposes. Your data will be handled according to our privacy policy.
+                  ⚠️ {t('customerDisclaimer')}
                 </Typography>
               </Box>
             )}
             <Grid container spacing={{ xs: 1.5, sm: 2.5 }}>
-              {role === 'customer' && <Grid item xs={12}><TextField fullWidth label='Hardware Name' variant='outlined' value={memberName} onChange={(e) => setMemberName(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>}
-              <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? 'Phone Number' : 'Member ID'} placeholder={role === 'customer' ? 'e.g. 0712345678' : 'e.g. MA0000'} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
+              {role === 'customer' && <Grid item xs={12}><TextField fullWidth label={t('hardwareName')} variant='outlined' value={memberName} onChange={(e) => setMemberName(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>}
+              <Grid item xs={12}><TextField fullWidth label={role === 'customer' ? t('phoneNumber') : t('memberId')} placeholder={role === 'customer' ? t('egPhone') : t('egMember')} variant='outlined' value={memberId} onChange={(e) => { const value = e.target.value; if (role === 'customer') { if (/^\d*$/.test(value) && value.length <= 10) setMemberId(value); } else { setMemberId(value); } }} inputProps={role === 'customer' ? { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } : {}} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'white', fontWeight: 600, '&:hover fieldset': { borderColor: 'primary.main', borderWidth: 2 }, '&.Mui-focused fieldset': { borderWidth: 2 } } }} /></Grid>
               <Grid item xs={12}>
                 <Autocomplete
                   options={members.filter(m => m.role === 'customer' || m.equipment === 'Hardware' || m.memberId?.toUpperCase().startsWith('MH'))}
@@ -6343,8 +6394,8 @@ function App() {
                   renderInput={(params) => (
                     <TextField 
                       {...params} 
-                      label="Select Hardware" 
-                      placeholder="Search Hardware shops..."
+                      label={t('selectHardware')}
+                      placeholder={t('searchHardware')}
 
                       sx={{ 
                         '& .MuiOutlinedInput-root': { 
@@ -8095,7 +8146,7 @@ function App() {
                   size='small'
                   color={showManualScanForm ? 'secondary' : 'primary'}
                 >
-                  {showManualScanForm ? 'Hide Manual Input' : 'Add Manual Scan'}
+                  {showManualScanForm ? t('hideManualInput') : t('addManualScanBtn')}
                 </Button>
               )}
             </Box>
@@ -8103,16 +8154,16 @@ function App() {
             {showManualScanForm && hasPermission('canViewScans') && (
               <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  📝 Record Manual Scan (Old Products)
+                  📝 {t('recordManualScan')}
                 </Typography>
                 <Alert severity="info" sx={{ mb: 3 }}>
-                  Manually enter scan records directly into the system. Points will be calculated automatically based on the product and loyalty configuration.
+                  {t('manualScanInfo')}
                 </Alert>
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Member ID / Hardware ID"
+                      label={t('memberOrHardwareId')}
                       required
                       value={manualScanForm.memberId}
                       onChange={(e) => {
@@ -8130,10 +8181,10 @@ function App() {
                     {manualScanForm.memberId && (
                       <Box sx={{ p: 1.5, bgcolor: manualScanForm.memberName ? 'success.lighter' : 'warning.lighter', borderRadius: 2, border: '1px solid', borderColor: manualScanForm.memberName ? 'success.light' : 'warning.light', width: '100%' }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, color: manualScanForm.memberName ? 'success.dark' : 'warning.dark' }}>
-                          Resolved Name: {manualScanForm.memberName || 'Searching/Unregistered Member...'}
+                          {t('resolvedName')}{manualScanForm.memberName || t('searchingMember')}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Role: {manualScanForm.role === 'applicator' ? '👷 Applicator' : '🏢 Hardware/Customer'}
+                          Role: {manualScanForm.role === 'applicator' ? t('roleApplicator') : t('roleHardware')}
                         </Typography>
                       </Box>
                     )}
@@ -8154,9 +8205,9 @@ function App() {
                         renderInput={(params) => (
                           <TextField 
                             {...params} 
-                            label="Purchased From Hardware Shop *" 
+                            label={t('purchasedFromHardware')} 
                             size="small" 
-                            placeholder="Search Hardware shops..."
+                            placeholder={t('searchHardware')}
                           />
                         )}
                         fullWidth
@@ -8165,7 +8216,7 @@ function App() {
                   )}
                   <Grid item xs={12} md={6}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>Product *</InputLabel>
+                      <InputLabel>{t('productLabel')}</InputLabel>
                       <Select
                         value={manualScanForm.productNo}
                         onChange={(e) => {
@@ -8180,7 +8231,7 @@ function App() {
                             });
                           }
                         }}
-                        label="Product"
+                        label={t('productLabel')}
                       >
                         {products.map(p => (
                           <MenuItem key={p._id} value={p.productNo}>
@@ -8193,7 +8244,7 @@ function App() {
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
-                      label="Number of which batch *"
+                      label={t('batchIndexLabel')}
                       value={manualScanForm.batchIndex || ''}
                       onChange={(e) => setManualScanForm({...manualScanForm, batchIndex: e.target.value})}
                       placeholder="e.g., 010"
@@ -8203,7 +8254,7 @@ function App() {
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
-                      label="Manufacture Date *"
+                      label={t('mfgDateLabel')}
                       type="date"
                       InputLabelProps={{ shrink: true }}
                       value={manualScanForm.mfgDate || ''}
@@ -8214,7 +8265,7 @@ function App() {
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
-                      label="Expiry Date *"
+                      label={t('expiryDateLabel')}
                       type="date"
                       InputLabelProps={{ shrink: true }}
                       value={manualScanForm.expiryDate || ''}
@@ -8225,7 +8276,7 @@ function App() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Bag/Package Number *"
+                      label={t('bagNoLabel')}
                       value={manualScanForm.bagNo}
                       onChange={(e) => setManualScanForm({...manualScanForm, bagNo: e.target.value})}
                       placeholder="e.g., 050"
@@ -8235,7 +8286,7 @@ function App() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Quantity / Pack Size *"
+                      label={t('qtyPackSizeLabel')}
                       value={manualScanForm.qty}
                       onChange={(e) => setManualScanForm({...manualScanForm, qty: e.target.value})}
                       placeholder="e.g., 32 Kg, 5 Ltr"
@@ -8245,7 +8296,7 @@ function App() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Price (Rs.) *"
+                      label={t('priceLabel')}
                       type="number"
                       value={manualScanForm.price}
                       onChange={(e) => setManualScanForm({...manualScanForm, price: parseFloat(e.target.value) || 0})}
@@ -8258,7 +8309,7 @@ function App() {
                     <Grid item xs={12}>
                       <Box sx={{ p: 2, bgcolor: 'primary.lighter', borderRadius: 2, border: '1px dashed', borderColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.dark' }}>
-                          Generated Batch Code:
+                          {t('generatedBatchCode')}
                         </Typography>
                         <Chip 
                           label={manualScanForm.batchNo} 
@@ -8271,7 +8322,7 @@ function App() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Location (Optional)"
+                      label={t('locationLabel')}
                       value={manualScanForm.location}
                       onChange={(e) => setManualScanForm({...manualScanForm, location: e.target.value})}
                       placeholder="e.g., Colombo, Kandy"
@@ -8302,7 +8353,7 @@ function App() {
                         }}
                         size="small"
                       >
-                        Clear Form
+                        {t('clearForm')}
                       </Button>
                       <Button
                         variant="contained"
@@ -8327,11 +8378,13 @@ function App() {
                           try {
                             const response = await api.post('/scans', manualScanForm);
                             if (response.data.success) {
-                              showNotification(
-                                `Scan recorded successfully! Points earned: ${response.data.data.points || 0}`,
-                                'success'
-                              );
-                              // Clear form
+                              const earnedPoints = response.data.data.points || 0;
+                              const translatedMsg = t('scanSuccess', { points: earnedPoints });
+                              const voiceMsg = t('scanSuccessVoice', { points: earnedPoints });
+                              
+                              showNotification(translatedMsg, 'success');
+                              speakMessage(voiceMsg, i18n.language);
+                              
                               setManualScanForm({
                                 memberName: '',
                                 memberId: '',
@@ -8382,17 +8435,17 @@ function App() {
                     <Box sx={{ textAlign: 'center', mt: 8, opacity: 0.5 }}>
                       <HistoryIcon sx={{ fontSize: 60, mb: 2 }} />
                       <Typography variant='h6' gutterBottom>
-                        {serverScanTotal === 0 ? 'No scans yet.' : 'No scans match your filters.'}
+                        {serverScanTotal === 0 ? t('noScansYet') : t('noScansMatch')}
                       </Typography>
                       <Button onClick={() => { setScanSearchQuery(''); setScanDateFilter({ start: '', end: '' }); }} sx={{ mt: 2 }}>
-                        Clear Filters
+                        {t('clearFilters')}
                       </Button>
                     </Box>
                   ) : (
                     <>
                       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Typography variant='body2' color='text.secondary'>
-                          Showing {currentScans.length} of {serverScanTotal} scans
+                          {t('showingScans', { count: currentScans.length, total: serverScanTotal })}
                         </Typography>
                       </Box>
                       {currentScans.map((item, i) => (
@@ -8844,6 +8897,9 @@ function App() {
               getTierDisplayName={getTierDisplayName}
               setMemberId={setMemberId}
               setView={setView}
+              memberStatusFilter={memberStatusFilter}
+              setMemberStatusFilter={setMemberStatusFilter}
+              handleUnflagMember={handleUnflagMember}
             />
           )}
 
