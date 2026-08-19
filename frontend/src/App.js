@@ -2347,7 +2347,16 @@ function App() {
           console.log('   Price: Rs.', product.price?.toLocaleString() || '0');
           
           // Use pack size from batch/fields if available, otherwise from product
-          const finalPackSize = packSize ? packSize : (product.category || '1kg');
+          let finalPackSize = packSize ? packSize : product.category;
+          
+          if (!finalPackSize || finalPackSize === '1kg') {
+            const nameMatch = product.name.match(/(\d+(?:\.\d+)?)\s*(kg|g|l|ml|ltr)/i);
+            if (nameMatch) {
+              finalPackSize = `${nameMatch[1]}${nameMatch[2].toLowerCase()}`;
+            } else {
+              finalPackSize = finalPackSize || '1kg';
+            }
+          }
           
           data = {
             id: product.productNo,
@@ -3704,7 +3713,7 @@ function App() {
               name: product.name,
               batch: pendingScan.fullBatch || pendingScan.batchNo,
               bag: pendingScan.bagNo || '001',
-              qty: pendingScan.packSize || product.category || '1kg',
+              qty: pendingScan.packSize || (product.name.match(/(\d+(?:\.\d+)?)\s*(kg|g|l|ml|ltr)/i) ? `${product.name.match(/(\d+(?:\.\d+)?)\s*(kg|g|l|ml|ltr)/i)[1]}${product.name.match(/(\d+(?:\.\d+)?)\s*(kg|g|l|ml|ltr)/i)[2].toLowerCase()}` : (product.category || '1kg')),
               price: itemPrice,
               tempId: Date.now()
             };
