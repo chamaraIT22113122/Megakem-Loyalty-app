@@ -4532,24 +4532,26 @@ function App() {
           <Typography variant='h6' component='div' sx={{ fontWeight: 700, letterSpacing: '0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)', lineHeight: 1.2, fontSize: { xs: '0.9rem', sm: '1.25rem' } }}>MEGAKEM REWARDS</Typography>
           <Typography variant='caption' sx={{ color: 'white', fontWeight: 500, letterSpacing: '0.5px', fontSize: { xs: '0.55rem', sm: '0.65rem' }, opacity: 0.9, display: { xs: 'none', sm: 'block' } }}>WHERE TRUST MEETS EXCELLENCE</Typography>
         </Box>
-        <Select
-          value={i18n.language || 'en'}
-          onChange={handleLanguageChange}
-          variant="outlined"
-          size="small"
-          sx={{
-            color: 'white',
-            marginRight: 2,
-            '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
-            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-            '.MuiSvgIcon-root': { color: 'white' }
-          }}
-        >
-          <MenuItem value="en">English</MenuItem>
-          <MenuItem value="si">සිංහල</MenuItem>
-          <MenuItem value="ta">தமிழ்</MenuItem>
-        </Select>
+        {view !== 'admin' && (
+          <Select
+            value={i18n.language || 'en'}
+            onChange={handleLanguageChange}
+            variant="outlined"
+            size="small"
+            sx={{
+              color: 'white',
+              marginRight: 2,
+              '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+              '.MuiSvgIcon-root': { color: 'white' }
+            }}
+          >
+            <MenuItem value="en">English</MenuItem>
+            <MenuItem value="si">සිංහල</MenuItem>
+            <MenuItem value="ta">தமிழ்</MenuItem>
+          </Select>
+        )}
         {adminAuth && view === 'admin' && (
           <>
             <Tooltip title={isMainAdmin() ? "Pending Requests" : "My Requests & Notifications"}>
