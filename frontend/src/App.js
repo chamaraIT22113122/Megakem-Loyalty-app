@@ -721,25 +721,40 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const hasParams = params.get('b') || params.get('batch') || params.get('batchNo') || params.get('p') || params.get('product') || params.get('code');
     const urlView = params.get('view');
+    const isLaunchRequested = params.get('launch') === 'true' || params.get('launch') === '1' || urlView === 'launch';
     const savedRole = localStorage.getItem('user_role');
     const savedMemberId = localStorage.getItem('user_member_id');
     
+    // 1. Hidden Ceremonial Launch Page (Only accessible via ?view=launch or ?launch=true)
+    if (isLaunchRequested) {
+      return 'launch';
+    }
+
+    // 2. Specific requested view in URL
     if (urlView) {
       return urlView;
     }
     
+    // 3. QR Scan or Batch navigation
     if (hasParams) {
       if (savedRole && savedMemberId) {
         return 'cart';
       }
       return 'welcome';
     }
+    
+    // 4. Admin auto-reconnect
     if (localStorage.getItem('adminAuth') === 'true') {
       return 'admin';
     }
     
-    // Always show launch page on fresh root visit unless they specifically request a view
-    return 'launch';
+    // 5. Existing logged-in user
+    if (savedRole && savedMemberId) {
+      return 'cart';
+    }
+
+    // 6. Default standard visitor view
+    return 'welcome';
   });
   const [pendingScan, setPendingScan] = useState(null);
   const [scanHistory, setScanHistory] = useState([]);
