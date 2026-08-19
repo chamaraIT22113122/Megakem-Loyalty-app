@@ -4679,13 +4679,7 @@ function App() {
       <Container maxWidth={['admin', 'profile', 'products-catalog', '403', '404'].includes(view) ? 'xl' : 'sm'} sx={{ flexGrow: 1, py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column' }}>
         {view === 'launch' && (
           <LaunchPage onLaunch={() => {
-            const savedRole = localStorage.getItem('user_role');
-            const savedMemberId = localStorage.getItem('user_member_id');
-            if (savedRole && savedMemberId) {
-              setView('cart');
-            } else {
-              setView('welcome');
-            }
+            setView('welcome');
           }} />
         )}
         {view === 'welcome' && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', animation: 'fadeIn 0.6s ease-in', '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
