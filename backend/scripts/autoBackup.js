@@ -53,9 +53,25 @@ async function uploadToGoogleDrive(filePath, fileName, folderId) {
 
     const drive = google.drive({ version: 'v3', auth });
 
+    // Extract ID if it's a full URL
+    const extractDriveFolderId = (urlOrId) => {
+      if (!urlOrId) return null;
+      const match = urlOrId.match(/(?:\/folders\/|id=)([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) return match[1];
+      if (!urlOrId.includes('/') && urlOrId.length > 20) return urlOrId;
+      return urlOrId;
+    };
+    
+    const parsedFolderId = extractDriveFolderId(folderId);
+
+    if (!parsedFolderId) {
+      console.log('⚠️  Google Drive upload skipped: Invalid folder ID or URL.');
+      return;
+    }
+
     const fileMetadata = {
       name: fileName,
-      parents: [folderId] // ID of the folder where to upload
+      parents: [parsedFolderId] // ID of the folder where to upload
     };
 
     const media = {

@@ -110,6 +110,8 @@ scanSchema.pre('save', async function() {
 scanSchema.index({ timestamp: -1 });
 scanSchema.index({ memberId: 1 });
 scanSchema.index({ role: 1 });
+scanSchema.index({ location: 1 });
+scanSchema.index({ productNo: 1 });
 scanSchema.index({ batchNo: 1, bagNo: 1, memberId: 1, role: 1 }); // For duplicate detection
 
 module.exports = mongoose.model('Scan', scanSchema);

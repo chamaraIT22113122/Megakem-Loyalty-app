@@ -2331,16 +2331,12 @@ function App() {
         console.log('Parsed - Pack Size:', packSize || 'N/A (will use from product)');
         console.log('Parsed - Pack No:', packNo);
         console.log('');
-        console.log('Available products:');
-        currentProducts.forEach((p, idx) => {
-          console.log(`  ${idx + 1}. ${p.name} [${p.productNo}]`);
-          console.log(`     Pack Size: ${p.category || 'N/A'} | Price: Rs. ${p.price?.toLocaleString() || '0'}`);
-        });
+        console.log('Available products:', currentProducts.length);
         console.log('');
         
         // Find product by code (case-insensitive)
         const product = currentProducts.find(p => 
-          p.productNo && p.productNo.toUpperCase() === productCode.toUpperCase()
+          p.productNo && p.productNo.trim().toUpperCase() === String(productCode).trim().toUpperCase()
         );
         
         if (product) {

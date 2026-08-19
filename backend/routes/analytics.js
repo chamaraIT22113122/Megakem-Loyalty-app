@@ -96,6 +96,9 @@ router.get('/dashboard', protect, hasPermission('canViewDashboard'), async (req,
     const uniqueCitiesResult = await Scan.distinct('location', { ...dateFilter, location: { $ne: null, $ne: '' } });
     const uniqueCities = uniqueCitiesResult.length;
 
+    const uniqueMembersResult = await Scan.distinct('memberId', { ...dateFilter, memberId: { $ne: null, $ne: '' } });
+    const uniqueMembers = uniqueMembersResult.length;
+
     // Top members
     const topMembers = await Scan.aggregate([
       { $match: dateFilter },
@@ -124,6 +127,7 @@ router.get('/dashboard', protect, hasPermission('canViewDashboard'), async (req,
           totalUsers,
           totalProducts: totalProducts.length,
           uniqueCities,
+          uniqueMembers,
           totalValue
         },
         tierDistribution: tierStats,
