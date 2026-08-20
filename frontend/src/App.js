@@ -2391,8 +2391,6 @@ function App() {
             qty: finalPackSize,
             price: product.price || 0
           };
-          
-          showNotification(`Added ${product.name} (${finalPackSize}) - Rs. ${product.price?.toLocaleString() || '0'}`, 'success');
         } else {
           console.log('❌ NO PRODUCT FOUND');
           console.log('   Code:', productCode);
@@ -2407,24 +2405,44 @@ function App() {
             qty: packSize ? packSize : '1kg',
             price: 0
           };
-          
-          showNotification(
-            `Product "${productCode}" not found. Please add it in the Products tab first.`,
-            'error',
-            5000
-          );
         }
         console.log('================================');
       }
       
       const newItem = { ...data, tempId: Date.now() + Math.random() };
-      setCart(prev => [...prev, newItem]);
-      if (navigator.vibrate) {
-        navigator.vibrate(100);
-      }
-      if (!continuousScan) {
-        setView('cart');
-      }
+      
+      setCart(prev => {
+        // Prevent duplicate scans
+        const isDuplicate = prev.some(item => 
+          item.id === data.id && 
+          item.batch === data.batch && 
+          item.bag === data.bag
+        );
+
+        if (isDuplicate) {
+          setTimeout(() => {
+            showNotification(`This product is already in your current scan list.`, 'warning', 4000);
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          }, 0);
+          return prev;
+        }
+
+        setTimeout(() => {
+          if (data.name.startsWith('Unknown Item')) {
+            showNotification(`Product "${data.id}" not found. Please add it in the Products tab first.`, 'error', 5000);
+          } else {
+            showNotification(`Added ${data.name} (${data.qty}) - Rs. ${data.price?.toLocaleString() || '0'}`, 'success');
+          }
+          if (navigator.vibrate) {
+            navigator.vibrate(100);
+          }
+          if (!continuousScan) {
+            setView('cart');
+          }
+        }, 0);
+
+        return [...prev, newItem];
+      });
     } catch (e) {
       console.error('Scan error:', e);
       showNotification('Scan Error', 'error');

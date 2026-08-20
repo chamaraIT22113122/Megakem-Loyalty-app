@@ -291,6 +291,7 @@ router.post('/', scanRateLimiter, optionalAuth, async (req, res) => {
     // Check for duplicate scan - check if this batch number has been scanned by the same role
     const duplicateScan = await Scan.findOne({
       batchNo,
+      bagNo: bagNo || '',
       role  // Check within the same role only
     });
 
@@ -491,10 +492,22 @@ router.post('/batch', optionalAuth, async (req, res) => {
     // Check for duplicates and filter them out
     const validScans = [];
     const duplicates = [];
+    const processedKeys = new Set();
 
     for (const scan of scans) {
+      const scanKey = `${scan.batchNo}_${scan.bagNo || ''}_${scan.role}`;
+      if (processedKeys.has(scanKey)) {
+        duplicates.push({
+          productName: scan.productName,
+          batchNo: scan.batchNo,
+          bagNo: scan.bagNo
+        });
+        continue;
+      }
+
       const duplicateScan = await Scan.findOne({
         batchNo: scan.batchNo,
+        bagNo: scan.bagNo || '',
         role: scan.role  // Check within the same role only
       });
 
@@ -505,6 +518,7 @@ router.post('/batch', optionalAuth, async (req, res) => {
           bagNo: scan.bagNo
         });
       } else {
+        processedKeys.add(scanKey);
         // Try to get product price and points if not provided
         let productPrice = scan.price;
         let productPoints = 0;
