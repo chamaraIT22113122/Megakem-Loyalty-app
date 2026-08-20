@@ -14069,7 +14069,17 @@ function App() {
                 fullWidth
                 label='Name'
                 value={applicatorFormData.name}
-                onChange={(e) => setApplicatorFormData({ ...applicatorFormData, name: e.target.value })}
+                onChange={(e) => {
+                  const newName = e.target.value;
+                  setApplicatorFormData(prev => ({
+                    ...prev,
+                    name: newName,
+                    bankDetails: {
+                      ...prev.bankDetails,
+                      accountName: newName
+                    }
+                  }));
+                }}
                 required
               />
             </Grid>
@@ -14113,7 +14123,27 @@ function App() {
                 <InputLabel>City</InputLabel>
                 <Select
                   value={applicatorFormData.location}
-                  onChange={(e) => setApplicatorFormData({ ...applicatorFormData, location: e.target.value })}
+                  onChange={(e) => {
+                    const selectedCity = e.target.value;
+                    let autoZone = applicatorFormData.zone;
+                    const zone1 = ['Colombo', 'Gampaha', 'Kalutara'];
+                    const zone2 = ['Kandy', 'Matale', 'Nuwara Eliya', 'Kegalle', 'Ratnapura'];
+                    const zone3 = ['Galle', 'Matara', 'Hambantota'];
+                    const zone4 = ['Kurunegala', 'Puttalam', 'Anuradhapura', 'Polonnaruwa'];
+                    const zone5 = ['Jaffna', 'Kilinochchi', 'Mannar', 'Vavuniya', 'Mullaitivu', 'Batticaloa', 'Ampara', 'Trincomalee', 'Badulla', 'Monaragala'];
+                    
+                    if (zone1.includes(selectedCity)) autoZone = 'Zone 01';
+                    else if (zone2.includes(selectedCity)) autoZone = 'Zone 02';
+                    else if (zone3.includes(selectedCity)) autoZone = 'Zone 03';
+                    else if (zone4.includes(selectedCity)) autoZone = 'Zone 04';
+                    else if (zone5.includes(selectedCity)) autoZone = 'Zone 05';
+                    
+                    setApplicatorFormData({ 
+                      ...applicatorFormData, 
+                      location: selectedCity,
+                      zone: autoZone 
+                    });
+                  }}
                   label='City'
                 >
                   <MenuItem value=''>Select City</MenuItem>
@@ -14347,60 +14377,72 @@ function App() {
                 })();
 
               } else {
-                // ── CREATE (keep spinner, this is a new record) ───────────────
-                setLoading(true);
-                try {
-                  // Handle photo upload
-                  if (applicatorPhotoFile) {
-                    try {
-                      const uploadedUrl = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.readAsDataURL(applicatorPhotoFile);
-                        reader.onload = (e) => {
-                          const img = new Image();
-                          img.src = e.target.result;
-                          img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            let width = img.width;
-                            let height = img.height;
-                            const maxDim = 800;
-                            if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
-                            else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
-                            canvas.width = width;
-                            canvas.height = height;
-                            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-                            canvas.toBlob(async (blob) => {
-                              if (!blob) { reject(new Error('Canvas to Blob failed')); return; }
-                              const formData = new FormData();
-                              formData.append('image', blob, applicatorPhotoFile.name || 'photo.jpg');
-                              try {
-                                const uploadRes = await uploadAPI.uploadImage(formData);
-                                const url = uploadRes.data?.url || uploadRes.data?.data?.url;
-                                if (url) resolve(url); else reject(new Error('No URL returned'));
-                              } catch (err) { reject(err); }
-                            }, 'image/jpeg', 0.8);
+                // ── CREATE (Optimistic Fast Update) ───────────────
+                const optimisticNew = {
+                  ...backendPayload,
+                  _id: 'temp_' + Date.now(),
+                };
+                
+                const previousApplicatorInfo = applicatorInfo;
+                
+                // Instantly update the table and close modal
+                setApplicatorInfo(prev => [optimisticNew, ...prev]);
+                setApplicatorDialog({ open: false, data: null });
+                setApplicatorPhotoFile(null);
+                
+                // Send the actual API request in background
+                (async () => {
+                  try {
+                    // Handle photo upload
+                    if (applicatorPhotoFile) {
+                      try {
+                        const uploadedUrl = await new Promise((resolve, reject) => {
+                          const reader = new FileReader();
+                          reader.readAsDataURL(applicatorPhotoFile);
+                          reader.onload = (e) => {
+                            const img = new Image();
+                            img.src = e.target.result;
+                            img.onload = () => {
+                              const canvas = document.createElement('canvas');
+                              let width = img.width;
+                              let height = img.height;
+                              const maxDim = 800;
+                              if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
+                              else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                              canvas.width = width;
+                              canvas.height = height;
+                              canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                              canvas.toBlob(async (blob) => {
+                                if (!blob) { reject(new Error('Canvas to Blob failed')); return; }
+                                const formData = new FormData();
+                                formData.append('image', blob, applicatorPhotoFile.name || 'photo.jpg');
+                                try {
+                                  const uploadRes = await uploadAPI.uploadImage(formData);
+                                  const url = uploadRes.data?.url || uploadRes.data?.data?.url;
+                                  if (url) resolve(url); else reject(new Error('No URL returned'));
+                                } catch (err) { reject(err); }
+                              }, 'image/jpeg', 0.8);
+                            };
+                            img.onerror = reject;
                           };
-                          img.onerror = reject;
-                        };
-                        reader.onerror = reject;
-                      });
-                      backendPayload.photo = uploadedUrl;
-                    } catch (uploadError) {
-                      console.error('Error processing photo:', uploadError);
-                      showNotification('Failed to upload photo. Saving without new photo.', 'warning');
+                          reader.onerror = reject;
+                        });
+                        backendPayload.photo = uploadedUrl;
+                      } catch (uploadError) {
+                        console.error('Error processing photo:', uploadError);
+                        showNotification('Failed to upload photo. Saving without new photo.', 'warning');
+                      }
                     }
+                    
+                    await membersAPI.create(backendPayload);
+                    showNotification('Applicator info added successfully', 'success');
+                    loadAdminData(); // silently refresh true IDs
+                  } catch (error) {
+                    console.error('Error saving applicator:', error);
+                    setApplicatorInfo(previousApplicatorInfo); // Revert
+                    showNotification(error.response?.data?.message || 'Failed to add applicator - reverted', 'error');
                   }
-                  await membersAPI.create(backendPayload);
-                  showNotification('Applicator info added successfully', 'success');
-                  loadAdminData();
-                  setApplicatorDialog({ open: false, data: null });
-                  setApplicatorPhotoFile(null);
-                } catch (error) {
-                  console.error('Error saving applicator:', error);
-                  showNotification(error.response?.data?.message || 'Failed to add applicator', 'error');
-                } finally {
-                  setLoading(false);
-                }
+                })();
               }
             }}
             disabled={!applicatorFormData.name}
