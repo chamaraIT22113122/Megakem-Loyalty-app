@@ -159,7 +159,9 @@ const resources = {
       "notSet": "Not Set",
       "officialMegakemProduct": "Official Megakem product.",
       "details": "Details",
-      "buyOnline": "Buy Online"
+      "buyOnline": "Buy Online",
+      "alreadyInCart": "This product is already in your current scan list.",
+      "alreadyScannedBefore": "This product has already been scanned before."
     }
   },
   si: {
@@ -318,7 +320,9 @@ const resources = {
       "notSet": "සකසා නැත",
       "officialMegakemProduct": "නිල Megakem නිෂ්පාදනයක්.",
       "details": "විස්තර",
-      "buyOnline": "මාර්ගගතව මිලදී ගන්න"
+      "buyOnline": "මාර්ගගතව මිලදී ගන්න",
+      "alreadyInCart": "මෙම නිෂ්පාදනය දැනටමත් ඔබගේ ස්කෑන් ලැයිස්තුවේ ඇත.",
+      "alreadyScannedBefore": "මෙම නිෂ්පාදනය මින් පෙර ස්කෑන් කර ඇත."
     }
   },
   ta: {
@@ -477,7 +481,9 @@ const resources = {
       "notSet": "அமைக்கப்படவில்லை",
       "officialMegakemProduct": "அதிகாரப்பூர்வ Megakem தயாரிப்பு.",
       "details": "விவரங்கள்",
-      "buyOnline": "ஆன்லைனில் வாங்கு"
+      "buyOnline": "ஆன்லைனில் வாங்கு",
+      "alreadyInCart": "இந்தப் பொருள் ஏற்கனவே உங்கள் ஸ்கேன் பட்டியலில் உள்ளது.",
+      "alreadyScannedBefore": "இந்தப் பொருள் முன்பே ஸ்கேன் செய்யப்பட்டுள்ளது."
     }
   }
 };
