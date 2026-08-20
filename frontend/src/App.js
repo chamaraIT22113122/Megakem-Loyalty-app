@@ -1309,6 +1309,7 @@ function App() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const faceDetectionInterval = useRef(null);
+  const [cameraZoom, setCameraZoom] = useState(1);
 
   const startFaceDetection = () => {
     if (faceDetectionInterval.current) clearInterval(faceDetectionInterval.current);
@@ -1346,7 +1347,11 @@ function App() {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: facingMode } 
+        video: { 
+          facingMode: facingMode,
+          width: { ideal: 720 },
+          height: { ideal: 1280 }
+        } 
       });
       setTimeout(() => {
         if (videoRef.current) {
@@ -1406,6 +1411,11 @@ function App() {
         startY = (video.videoHeight - cropHeight) / 2;
       }
       
+      const finalCropWidth = cropWidth / cameraZoom;
+      const finalCropHeight = cropHeight / cameraZoom;
+      const finalStartX = startX + (cropWidth - finalCropWidth) / 2;
+      const finalStartY = startY + (cropHeight - finalCropHeight) / 2;
+      
       // 3x multiplier for high-resolution print capture
       canvas.width = targetW * 3;
       canvas.height = targetH * 3;
@@ -1414,7 +1424,7 @@ function App() {
         ctx.filter = 'brightness(1.15) contrast(1.1)';
       }
       // Draw the cropped center of the video to fill the high-res canvas
-      ctx.drawImage(video, startX, startY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, finalStartX, finalStartY, finalCropWidth, finalCropHeight, 0, 0, canvas.width, canvas.height);
       
       canvas.toBlob((blob) => {
         if (blob) {
@@ -13943,6 +13953,20 @@ function App() {
                       Auto-Enhance
                     </Button>
                   </Box>
+                  <Box sx={{ width: '100%', maxWidth: '260px', mt: 1, mb: 1 }}>
+                    <Typography id="zoom-slider" variant="caption" gutterBottom>
+                      Zoom (to remove black bars)
+                    </Typography>
+                    <Slider
+                      value={cameraZoom}
+                      min={1}
+                      max={3}
+                      step={0.05}
+                      onChange={(e, newValue) => setCameraZoom(newValue)}
+                      aria-labelledby="zoom-slider"
+                      size="small"
+                    />
+                  </Box>
                   <Box sx={{ 
                     position: 'relative', 
                     width: '260px', 
@@ -13960,7 +13984,14 @@ function App() {
                       autoPlay 
                       playsInline
                       muted 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'cover', 
+                        display: 'block',
+                        transform: `scale(${cameraZoom})`,
+                        transformOrigin: 'center'
+                      }}
                     />
                     {/* Face Guide Oval */}
                     <Box sx={{ 
