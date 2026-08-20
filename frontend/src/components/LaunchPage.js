@@ -137,7 +137,7 @@ const LaunchPage = ({ onLaunch }) => {
                 textTransform: 'uppercase',
                 transition: 'color 0.4s ease'
               }}>
-                OFFICIALLY LAUNCH SYSTEM
+                LAUNCH SYSTEM
               </Typography>
             </Box>
           </Button>
