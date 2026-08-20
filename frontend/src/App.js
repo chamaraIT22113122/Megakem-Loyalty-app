@@ -2417,7 +2417,7 @@ function App() {
           role: role 
         });
         if (dupCheckRes.data?.exists) {
-          showNotification(`This product has already been scanned before.`, 'error', 5000);
+          showNotification(t('alreadyScannedBefore'), 'error', 5000);
           if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
           return; // Stop execution, don't add to cart
         }
@@ -2437,7 +2437,7 @@ function App() {
 
         if (isDuplicate) {
           setTimeout(() => {
-            showNotification(`This product is already in your current scan list.`, 'warning', 4000);
+            showNotification(t('alreadyInCart'), 'warning', 4000);
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
           }, 0);
           return prev;
