@@ -373,6 +373,10 @@ api.hasCache = (url, config = {}) => {
   return globalCache.has(cacheKey);
 };
 
+api.clearCache = () => {
+  globalCache.clear();
+};
+
 api.getWithCache = async (url, config = {}, onFreshData = null) => {
   const cacheKey = url + JSON.stringify(config.params || {});
   const hasCachedData = globalCache.has(cacheKey);

@@ -1309,7 +1309,7 @@ function App() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const faceDetectionInterval = useRef(null);
-  const [cameraZoom, setCameraZoom] = useState(1);
+  const [cameraZoom, setCameraZoom] = useState(1.35);
 
   const startFaceDetection = () => {
     if (faceDetectionInterval.current) clearInterval(faceDetectionInterval.current);
@@ -3194,12 +3194,21 @@ function App() {
   }, [dashboardStartDate, dashboardEndDate, dateFilter, adminAuth, adminTab]);
 
   const isLoadingAdminData = useRef(false);
+  const pendingLoadAdminData = useRef(false);
 
-  const loadAdminData = async () => {
+  const loadAdminData = async (forceQueue = true) => {
     if (!adminAuth || (user && user.role !== 'admin' && user.role !== 'co-admin')) return;
     if (isLoadingAdminData.current) {
-      console.log('⏳ Skipping concurrent loadAdminData call to prevent Cloudflare DDoS block');
+      if (forceQueue) {
+        pendingLoadAdminData.current = true;
+      } else {
+        console.log('⏳ Skipping concurrent loadAdminData call to prevent Cloudflare DDoS block');
+      }
       return;
+    }
+    
+    if (forceQueue) {
+      api.clearCache();
     }
     
     isLoadingAdminData.current = true;
@@ -3297,6 +3306,10 @@ function App() {
       console.error('❌ Error loading admin data:', error);
     } finally {
       isLoadingAdminData.current = false;
+      if (pendingLoadAdminData.current) {
+        pendingLoadAdminData.current = false;
+        loadAdminData(); // Execute queued request
+      }
     }
   };
 
@@ -3337,6 +3350,9 @@ function App() {
   // Function to reload only members data (for keeping members tab in sync)
   const reloadMembers = async () => {
     if (!adminAuth) return;
+    
+    api.clearCache();
+    
     try {
       const hasUsers = hasPermission('canManageUsers');
       const hasApplicators = hasPermission('canManageApplicators');
@@ -10635,7 +10651,7 @@ function App() {
                                               await membersAPI.delete(applicator._id);
                                               showNotification('Applicator info deleted successfully', 'success');
                                               setSelectedApplicators(selectedApplicators.filter(id => id !== applicator._id)); // Remove from selection if deleted
-                                              await loadAdminData();
+                                              await reloadMembers();
                                             } else {
                                               const newList = applicatorInfo.filter((_, i) => i !== index);
                                               setApplicatorInfo(newList);
@@ -14398,7 +14414,7 @@ function App() {
 
                     await membersAPI.update(applicatorDialog.data._id, backendPayload);
                     // Silently refresh data in background
-                    loadAdminData();
+                    reloadMembers();
                   } catch (error) {
                     console.error('Error saving applicator:', error);
                     // Revert optimistic update on failure
@@ -14412,6 +14428,8 @@ function App() {
                 const optimisticNew = {
                   ...backendPayload,
                   _id: 'temp_' + Date.now(),
+                  name: backendPayload.memberName,
+                  phoneNumber: backendPayload.phone
                 };
                 
                 const previousApplicatorInfo = applicatorInfo;
@@ -14467,7 +14485,7 @@ function App() {
                     
                     await membersAPI.create(backendPayload);
                     showNotification('Applicator info added successfully', 'success');
-                    loadAdminData(); // silently refresh true IDs
+                    reloadMembers(); // silently refresh true IDs
                   } catch (error) {
                     console.error('Error saving applicator:', error);
                     setApplicatorInfo(previousApplicatorInfo); // Revert
@@ -14665,7 +14683,7 @@ function App() {
                   showNotification('Hardware info added successfully', 'success');
                 }
                 
-                await loadAdminData();
+                await reloadMembers();
                 setHardwareDialog({ open: false, data: null });
               } catch (error) {
                 console.error('Error saving hardware:', error);
