@@ -21,6 +21,25 @@ router.get('/public/hardwares', async (req, res) => {
   }
 });
 
+// @route   GET /api/members/public/applicator/:id
+// @desc    Get basic applicator info publicly for scan validation
+// @access  Public
+router.get('/public/applicator/:id', async (req, res) => {
+  try {
+    const memberId = req.params.id.toUpperCase().trim();
+    const applicator = await Member.findOne({ memberId, role: 'applicator' })
+      .select('memberName memberId location tier');
+      
+    if (!applicator) {
+      return res.status(404).json({ success: false, message: 'Applicator not found' });
+    }
+    
+    res.json({ success: true, data: applicator });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
 // @route   GET /api/members/stats/summary
 // @desc    Get summary statistics for applicators and hardwares
 // @access  Private/Admin

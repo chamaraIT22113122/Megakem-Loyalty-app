@@ -263,6 +263,7 @@ export const analyticsAPI = {
 // Members API (Customers & Applicators)
 export const membersAPI = {
   getPublicHardwares: (onFreshData) => api.getWithCache('/members/public/hardwares', {}, onFreshData),
+  getPublicApplicator: (id) => api.get(`/members/public/applicator/${id}`),
   getAll: (params, onFreshData) => api.getWithCache('/members', { params }, onFreshData),
   getOne: (id) => api.get(`/members/${id}`),
   create: (data) => api.post('/members', data),

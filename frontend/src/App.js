@@ -2497,9 +2497,8 @@ function App() {
       } else if (role === 'applicator') {
         let applicator = null;
         try {
-          const res = await membersAPI.getAll({ role: 'applicator', search: memberId.toUpperCase().trim() });
-          const allFetched = res.data.data || [];
-          applicator = allFetched.find(m => m.memberId.toUpperCase() === memberId.toUpperCase().trim());
+          const res = await membersAPI.getPublicApplicator(memberId.toUpperCase().trim());
+          applicator = res.data.data;
         } catch (err) {
           console.error('Error fetching applicator for validation:', err);
         }
