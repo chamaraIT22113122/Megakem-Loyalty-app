@@ -2409,6 +2409,22 @@ function App() {
         console.log('================================');
       }
       
+      // Check if already in DB
+      try {
+        const dupCheckRes = await scansAPI.checkDuplicate({ 
+          batchNo: data.batch, 
+          bagNo: data.bag, 
+          role: role 
+        });
+        if (dupCheckRes.data?.exists) {
+          showNotification(`This product has already been scanned before.`, 'error', 5000);
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          return; // Stop execution, don't add to cart
+        }
+      } catch (err) {
+        console.error('Error checking duplicate:', err);
+      }
+
       const newItem = { ...data, tempId: Date.now() + Math.random() };
       
       setCart(prev => {

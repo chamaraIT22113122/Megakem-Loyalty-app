@@ -232,6 +232,7 @@ export const scansAPI = {
   createBatch: (scans) => api.post('/scans/batch', { scans }),
   delete: (id) => api.delete(`/scans/${id}`),
   getStats: (params) => api.get('/scans/stats/summary', { params }),
+  checkDuplicate: (params) => api.get('/scans/check-duplicate', { params }),
 };
 
 // Products API
