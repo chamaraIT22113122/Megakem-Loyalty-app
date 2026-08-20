@@ -172,6 +172,34 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+// @route   GET /api/scans/check-duplicate
+// @desc    Check if a scan exists in the database
+// @access  Public
+router.get('/check-duplicate', async (req, res) => {
+  try {
+    const { batchNo, bagNo, role } = req.query;
+    if (!batchNo) {
+      return res.json({ success: true, exists: false });
+    }
+
+    const query = { batchNo };
+    if (bagNo) query.bagNo = bagNo;
+    if (role) query.role = role;
+
+    const existingScan = await Scan.findOne(query).select('_id');
+    
+    res.json({
+      success: true,
+      exists: !!existingScan
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // @route   GET /api/scans/live
 // @desc    Get recent scans for live feed (last 100)
 // @access  Public
