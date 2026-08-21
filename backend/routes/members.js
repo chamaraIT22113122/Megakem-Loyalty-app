@@ -66,12 +66,13 @@ router.get('/stats/summary', protect, async (req, res) => {
     let incompleteHardwares = 0;
 
     allMembers.forEach(m => {
-      if (m.equipment === 'Hardware') {
+      // Use role to distinguish since the frontend tables filter by role
+      if (m.role === 'customer') {
         totalHardwares++;
         const isComplete = !!(m.memberName && m.hardwareAddress && m.phone && m.whatsappNumber && m.contactPersonName && m.contactPersonMobile && m.location && m.zone);
         if (isComplete) completeHardwares++;
         else incompleteHardwares++;
-      } else {
+      } else if (m.role === 'applicator') {
         totalApplicators++;
         const isComplete = !!(m.memberName && m.phone && m.whatsappNumber && m.nic && m.birthday && m.location && m.zone);
         if (isComplete) completeApplicators++;
